@@ -238,7 +238,15 @@ dialog label input, dialog label select { margin-top: 2px; }
      eintraege/<kürzel>/*.json  jede Handlung eine eigene Datei, nie geändert
    ===================================================================== */
 
-const KUERZEL_STANDARD = ["alh", "clu", "hmo", "kum", "lam", "nas", "nsa", "srg", "wec", "wem", "wma"];
+const KUERZEL_STANDARD = ["alh", "clu", "hmo", "kum", "lam", "nas"];
+// frühere Kürzel – nur zum Lesen der alten Excel-Liste
+const KUERZEL_ALT = ["nsa", "srg", "wec", "wem", "wma"];
+/* Gehört ein Name aus dem Praktikumstool zum Team (Einstellungen)? -> Kürzel, sonst null (z.B. Mentor/in) */
+function teamKuerzel(text) {
+  const t = String(text || "").toLowerCase();
+  const d = (S.einst.dozierende || []).filter((d) => d.name).find((d) => d.name.toLowerCase().split(/\s+/).every((w) => t.includes(w)));
+  return d ? d.kuerzel : null;
+}
 const TIPPFEHLER = { km: "kum" };
 const GRUPPEN = ["Halbtag", "Profil", "Quartal", "Spezial", "Abschluss"];
 const TOOL = "https://praktikumstool.phlu.ch";
@@ -911,14 +919,15 @@ function terminGesperrt(x, datum, zeit) {
   if (arb && datum === arb && vormittag(zeit)) return "Vormittag der Arbeitssitzung";
   return besuchsRegeln(x, datum, zeit)[0] || "";
 }
-/* Die Person: nicht 2 Besuche am selben Tag, höchstens 2 pro Woche (alle Fächer, aus «Angemeldete Besuche» im Tool).
+/* Die Person: nicht 2 Besuche am selben Tag, höchstens 2 pro Woche – gezählt werden nur Besuche des Teams.
    Ein Besuch = eine Dozent/in an einem Tag; eine Doppellektion zählt einmal.
    Nicht mitgezählt: dieser Mathe-Besuch selbst und Besuche genau zur selben Zeit (Doppelbesuch). */
 function besuchsRegeln(x, datum, zeit) {
   const w = [];
   const eigen = (v) => (v.datum === datum && v.zeit === zeit) || (x.termin && v.datum === x.termin.datum && (v.mathe || v.zeit === x.termin.zeit));
   const andere = ((x.person && x.person.praktika) || []).filter((y) => y !== x && y.termin);
-  const roh = [...(x.besuche || []).map((v) => ({ datum: v.datum, zeit: v.zeit, wer: v.dozent, mathe: v.fach === "MA" })),
+  // Nur Besuche des Teams (Kürzel in den Einstellungen) – Mentor/innen und andere Fächer zählen nicht
+  const roh = [...(x.besuche || []).filter((v) => v.fach === "MA" && teamKuerzel(v.dozent)).map((v) => ({ datum: v.datum, zeit: v.zeit, wer: teamKuerzel(v.dozent), mathe: true })),
                ...(x.besuche ? [] : (x.lektionen || []).filter((l) => l.gebucht && l.gebucht.length).map((l) => ({ datum: l.datum, zeit: l.zeit, wer: l.gebucht.join(), mathe: true }))),
                ...andere.map((y) => ({ datum: y.termin.datum, zeit: y.termin.zeit, wer: y.wer }))];
   const besuche = [...new Set(roh.filter((v) => !eigen(v)).map((v) => v.datum + "|" + v.wer))].map((k) => k.split("|")[0]);
@@ -1490,9 +1499,12 @@ function ansichtAktualisieren() {
     <p>Aktuelles Studienjahr <select id="eJahr"><option value="" ${!e.studienjahrFest ? "selected" : ""}>automatisch nach Datum (${sjText(studienjahrHeute())})</option>${[...new Set([studienjahrHeute(), ...jahre()])].sort().reverse().map((j) => `<option value="${j}" ${j === e.studienjahrFest ? "selected" : ""}>fest: ${sjText(j)}</option>`).join("")}</select>
        &nbsp; Quote Profil <input class="eingabe" id="eQuote" type="number" min="0" max="100" step="5" value="${Math.round(e.quote * 100)}" style="width:70px"> %</p>
     <p class="leise klein">Soll = Vorgabe an Besuchen im Studienjahr. Änderungen werden sofort gespeichert.</p>
-    <table class="liste" style="max-width:760px"><thead><tr><th>Kürzel</th><th>Name</th><th>Soll Halbtag</th><th>Soll Profil + Quartal</th></tr></thead><tbody id="eDoz">
+    <p class="klein"><b>Wer bucht Mathe-Besuche?</b> Nur Buchungen dieser Personen zählen – Mentor/innen und andere sieht die Seite nicht als «gebucht».
+      Den Namen so schreiben, wie er im Praktikumstool steht (Vor- und Nachname). Neue Person: in der leeren Zeile unten eintragen. Entfernen: ✕.</p>
+    <table class="liste" style="max-width:800px"><thead><tr><th>Kürzel</th><th>Name</th><th>Soll Halbtag</th><th>Soll Profil + Quartal</th><th></th></tr></thead><tbody id="eDoz">
       ${[...e.dozierende, { kuerzel: "", name: "" }].map((d) => `<tr><td><input class="eingabe" value="${esc(d.kuerzel)}" size="6"></td><td><input class="eingabe" value="${esc(d.name)}" size="28"></td>
-        <td><input class="eingabe" type="number" min="0" value="${esc(d.sollHalbtag ?? "")}" style="width:70px"></td><td><input class="eingabe" type="number" min="0" value="${esc(d.sollPQ ?? d.soll ?? "")}" style="width:70px"></td></tr>`).join("")}
+        <td><input class="eingabe" type="number" min="0" value="${esc(d.sollHalbtag ?? "")}" style="width:70px"></td><td><input class="eingabe" type="number" min="0" value="${esc(d.sollPQ ?? d.soll ?? "")}" style="width:70px"></td>
+        <td>${d.kuerzel ? `<button class="knopf klein" title="Person entfernen" onclick="dozWeg(this)">✕</button>` : ""}</td></tr>`).join("")}
     </tbody></table>
     <p><button class="knopf haupt" id="einstSpeichern">Einstellungen speichern</button> <span class="leise klein" id="einstStand"></span></p></div>
   <details class="karte"><summary><b>Einmalig: alte Excel-Liste</b> <span class="leise klein">(${S.alt.length} Personen eingelesen)</span></summary>
@@ -1613,7 +1625,7 @@ function altImportieren(zeilen) {
   const T = (v) => (v == null ? "" : v instanceof Date ? v : String(v).replace(/\s+/g, " ").trim());
   const sj = (jan) => (jan ? `${String((jan - 1) % 100).padStart(2, "0")}-${String(jan % 100).padStart(2, "0")}` : "");
   const jahrAus = (t) => { const m = String(t).match(/(?<!\d)(20\d\d|\d\d)(?!\d)/); if (!m) return 0; const j = Number(m[1]); return j > 100 ? j : 2000 + j; };
-  const bekannt = new Set([...KUERZEL_STANDARD, ...S.einst.dozierende.map((d) => d.kuerzel)]);
+  const bekannt = new Set([...KUERZEL_STANDARD, ...KUERZEL_ALT, ...S.einst.dozierende.map((d) => d.kuerzel)]);
   const kuerzel = (t) => { const w = (String(t).match(/\b[a-z]{2,3}\b/g) || []).find((x) => bekannt.has(x) || TIPPFEHLER[x]); return w ? TIPPFEHLER[w] || w : ""; };
   const besuch = (t, jahrSpalte) => {
     const r = { text: t, sj: "", wer: "", status: "", art: "" };
@@ -1699,6 +1711,12 @@ async function ortKorrigieren(ort) {
   const orte = await leseJSON("stamm/orte.json", {});
   orte[ort] = o; await schreibeJSON("stamm/orte.json", orte); S.orte = orte;
   meldung(`${ort}: ${o.label}`); zeichnen();
+}
+async function dozWeg(knopf) {
+  const tr = knopf.closest("tr"), k = tr.querySelector("input").value;
+  const ok = await frage(`«${k}» aus der Liste entfernen? Ihre Buchungen zählen dann nicht mehr als Team-Besuch.`, { art: "wahl", wert: "ja", optionen: [["ja", "Ja, entfernen"]] });
+  if (ok !== "ja") return;
+  tr.remove(); einstellungenSpeichern(true);
 }
 async function einstellungenSpeichern(neuZeichnen = true) {
   const doz = [...document.querySelectorAll("#eDoz tr")].map((tr) => { const i = tr.querySelectorAll("input");
