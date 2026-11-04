@@ -45,6 +45,13 @@ a.bericht { text-decoration: none; margin-left: 3px; }
 .ber-knoepfe { display: inline-flex; gap: 2px; padding: 2px; border: 1px dashed #cfc3ad; border-radius: 6px; }
 a.bericht:hover { text-decoration: underline; }
 .einrichten { max-width: 720px; }
+details.akk > summary { cursor: pointer; list-style: none; }
+details.akk > summary::-webkit-details-marker { display: none; }
+details.akk > summary h3, details.akk > summary b { display: inline; margin: 0; }
+details.akk > summary::before { content: "▸ "; color: var(--ph-braun); }
+details.akk[open] > summary::before { content: "▾ "; }
+details.akk[open] > summary { margin-bottom: 8px; }
+details.akk { padding-top: 10px; padding-bottom: 10px; }
 .einr-schritt { display: grid; grid-template-columns: 34px 1fr; gap: 10px; padding: 10px 0; border-top: 1px dashed var(--linie); }
 .einr-n { width: 28px; height: 28px; border-radius: 50%; background: var(--ph-braun); color: #fff; display: grid; place-items: center; font-weight: 700; }
 .einr-hinweis { background: var(--ph-sand); border-left: 4px solid var(--ph-braun); padding: 10px 12px; border-radius: 6px; margin: 12px 0; }
@@ -155,15 +162,20 @@ input.eingabe { font-size: 14px; padding: 4px 6px; border: 1px solid #ccc; borde
 .rz.doppel { padding: 7px 2px; border-color: #9a9a9a; font-weight: 600; }
 .rz.frei { background: #dcefd8; border-color: #8cc084; color: #1f4d1a; }
 th.pspalte, td.pspalte { width: 210px; min-width: 210px; border-left: 3px solid var(--ph-braun) !important; }
-.p-halbtag { background: #f2f6fa; } .p-profil { background: #faf5ea; } .p-quartal { background: #f1f7ef; }
-thead th.p-halbtag, thead th.p-profil, thead th.p-quartal { text-align: center; font-size: 14px; color: var(--ph-braun-dunkel); }
-thead tr.unterkopf th { font-weight: 400; font-size: 11.5px; color: var(--leise); padding-top: 0; }
+td.p-halbtag { background: #f1f6fc; } td.p-profil { background: #fdf8e6; } td.p-quartal { background: #f0f8ee; }
+table.liste thead th.p-halbtag { background: #cfe2f5; color: #163a5c; }
+table.liste thead th.p-profil { background: #f5e2a6; color: #4d3a08; }
+table.liste thead th.p-quartal { background: #cfe8c9; color: #1c4a17; }
+table.liste thead th.p-halbtag, table.liste thead th.p-profil, table.liste thead th.p-quartal { text-align: center; font-size: 14.5px; }
+table.liste thead tr.unterkopf th { background: #f3eee4; color: #4a4a4a; font-weight: 600; font-size: 11.5px; top: 92px; }
+table.liste thead tr.unterkopf th.p-halbtag { background: #e6f0fa; } table.liste thead tr.unterkopf th.p-profil { background: #fbf0cd; } table.liste thead tr.unterkopf th.p-quartal { background: #e3f2df; }
 th.p-info { border-bottom: 2px solid var(--ph-braun); }
 td.pspalte .ue + .ue { border-top: 1px dotted #cfc3ad; padding-top: 2px; margin-top: 2px; }
 td.p-bem, th.p-bem { border-left: 3px solid var(--ph-braun) !important; }
-.ue { display: grid; grid-template-columns: 52px 54px auto 34px; gap: 4px; align-items: center; font-size: 12.5px; margin: 1px 0; font-variant-numeric: tabular-nums; }
+.ue { display: grid; grid-template-columns: 58px 54px 76px 40px; gap: 6px; align-items: center; font-size: 12.5px; margin: 1px 0; font-variant-numeric: tabular-nums; }
+.ue > * { text-align: right; } .ue .chip { justify-self: stretch; }
 .ue .chip { font-size: 12px; text-align: center; }
-.ue-j { color: var(--leise); } .ue-d { color: var(--tinte); } .ue-w { text-align: left; }
+.ue-j { color: var(--leise); } .ue-d { color: var(--tinte); }
 .paar { color: var(--ph-braun-dunkel); font-weight: 600; margin-bottom: 3px; text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 .einzeln { color: var(--leise); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 .pname { padding: 3px 0; border-top: 1px dashed #e2d9c8; }
@@ -1508,7 +1520,7 @@ function ansichtStudierende() {
     <span class="leise klein">${liste.length} Personen</span>
   </div>
   <table class="liste"><thead><tr><th colspan="4" class="p-info">Person</th><th class="pspalte p-halbtag">Halbtag</th><th class="pspalte p-profil">Profil</th><th class="pspalte p-quartal">Quartal</th><th colspan="2" class="p-bem">Achtung / Bemerkung</th></tr>
-    <tr class="unterkopf"><th></th><th>Name</th><th>Studiengang</th><th>Fächer</th>${["p-halbtag", "p-profil", "p-quartal"].map((c) => `<th class="pspalte ${c}">Jahr${c === "p-halbtag" ? " Periode" : ""} · Besuch am · Stand · von</th>`).join("")}<th class="p-bem"></th><th></th></tr></thead><tbody>
+    <tr class="unterkopf"><th></th><th>Name</th><th>Studiengang</th><th>Fächer</th>${["p-halbtag", "p-profil", "p-quartal"].map((c) => `<th class="pspalte ${c}"><div class="ue"><span>${c === "p-halbtag" ? "Jahr Per." : "Jahr"}</span><span>Besuch am</span><span style="text-align:center">Stand</span><span>von</span></div></th>`).join("")}<th class="p-bem"></th><th></th></tr></thead><tbody>
   ${liste.map((p) => { const a = (p.achtungen || []).length || p.praktika.some((x) => x.achtung && x.achtung.length);
     const bem = [...(p.achtungen || []).map((x) => `<div class="rot">⚠ im ${esc(x.fuer)} besuchen${x.text ? ": " + esc(x.text) : ""}
         <button class="knopf klein" title="ändern" onclick="achtungSetzen(REFS[${ref(p.id)}], REFS[${ref(x.id)}])">ändern</button>
@@ -1666,7 +1678,7 @@ function ansichtAktualisieren() {
   for (const p of Object.values(S.praktika)) proJahr[p.jahr + " " + p.gruppe] = (proJahr[p.jahr + " " + p.gruppe] || 0) + 1;
   return `<h2>Aktualisieren</h2>
   <p><b>In der Regel muss hier nichts gemacht werden.</b> Nur vor neuen Praktika holt eine Person für alle die Daten aus dem Praktikumstool. Alles wird hier im Browser gelesen – nichts geht an einen anderen Dienst.</p>
-  <div class="karte"><h3>1 · Praktika aus dem Praktikumstool</h3>
+  <details class="karte akk" name="akt" ${lies("aktOffen") === "1" ? "open" : ""} ontoggle="if (this.open) merke('aktOffen', '1')"><summary><h3>1 · Praktika aus dem Praktikumstool</h3></summary>
     <p>Studienjahre <input class="eingabe" id="holJahre" value="${esc(`${jahrPlus(e.studienjahr, -4)} bis ${e.studienjahr}`)}" size="16">
        <label class="klein"><input type="checkbox" id="holPlan" checked> mit Stundenplänen (Mathe-Lektionen) für ${sjText(e.studienjahr)}</label></p>
     <p><button class="knopf haupt" id="toolHolen">Praktikumstool öffnen und Daten holen</button>
@@ -1676,14 +1688,14 @@ function ansichtAktualisieren() {
     <details><summary class="leise klein">oder eine gespeicherte Datei einlesen</summary>
       <input type="file" id="dateiTool" accept=".json" multiple> <button class="knopf" id="importTool">Einlesen</button></details>
     <div class="import-ergebnis" id="ergTool"></div>
-    <p class="leise klein">Jetzt im Ordner: ${n} Praktika${n ? " · " + Object.entries(proJahr).sort().reverse().map(([k, v]) => `${sjText(k.split(" ")[0])} ${k.split(" ")[1]}: ${v}`).join(" · ") : ""}</p></div>
-  <div class="karte"><h3>2 · Spezialfälle</h3>
+    <p class="leise klein">Jetzt im Ordner: ${n} Praktika${n ? " · " + Object.entries(proJahr).sort().reverse().map(([k, v]) => `${sjText(k.split(" ")[0])} ${k.split(" ")[1]}: ${v}`).join(" · ") : ""}</p></details>
+  <details class="karte akk" name="akt" ${lies("aktOffen") === "2" ? "open" : ""} ontoggle="if (this.open) merke('aktOffen', '2')"><summary><h3>2 · Spezialfälle</h3></summary>
     <p>Excel-Liste «Spezialfälle Besuchsplanung» der Praktikumsabteilung. Studienjahr:
       <select id="spezJahr">${[...new Set([e.studienjahr, ...jahre()])].map((j) => `<option ${j === e.studienjahr ? "selected" : ""} value="${j}">${sjText(j)}</option>`).join("")}</select></p>
     <input type="file" id="dateiSpez" accept=".xlsx,.xls"> <button class="knopf haupt" id="importSpez">Einlesen</button>
     <div class="import-ergebnis" id="ergSpez"></div>
-    <p class="leise klein">Jetzt im Ordner: ${S.spezial.length} Spezialfälle (${S.spezial.filter((f) => !f.idstudent).length} ohne Zuordnung).</p></div>
-  <div class="karte"><h3>3 · Regeln (Checkliste der Praktikumsabteilung)</h3>
+    <p class="leise klein">Jetzt im Ordner: ${S.spezial.length} Spezialfälle (${S.spezial.filter((f) => !f.idstudent).length} ohne Zuordnung).</p></details>
+  <details class="karte akk" name="akt" ${lies("aktOffen") === "3" ? "open" : ""} ontoggle="if (this.open) merke('aktOffen', '3')"><summary><h3>3 · Regeln (Checkliste der Praktikumsabteilung)</h3></summary>
     <p class="leise klein">Einmal pro Studienjahr aus der Checkliste übernehmen. Termine, die dagegen verstossen, bietet die Seite nicht an.</p>
     <table class="regeln">
       <tr><td>Arbeitssitzung Profil (Vormittag, keine Besuche)</td><td><input class="eingabe" type="date" id="eArbP" value="${esc(e.arbeitssitzungProfil || "")}"></td></tr>
@@ -1696,8 +1708,8 @@ function ansichtAktualisieren() {
     </table>
     <p style="margin-top:10px"><b>Checkliste als PDF im Ordner ablegen</b> (damit alle die aktuelle Fassung haben):
       <input type="file" id="dateiCheck" accept=".pdf"> <button class="knopf" id="checkAblegen">Ablegen</button></p>
-    <div id="dokumente" class="klein"></div></div>
-  <div class="karte"><h3>4 · Orte für den Umkreis</h3>
+    <div id="dokumente" class="klein"></div></details>
+  <details class="karte akk" name="akt" ${lies("aktOffen") === "4" ? "open" : ""} ontoggle="if (this.open) merke('aktOffen', '4')"><summary><h3>4 · Orte für den Umkreis</h3></summary>
     <p>Sucht die Koordinaten der Schulorte bei swisstopo (geo.admin.ch). Übermittelt werden nur Ortsnamen, keine Personen.
        Bei mehreren gleichnamigen Orten nimmt die Seite den nächsten zu Luzern.</p>
     <button class="knopf haupt" id="orteSuchen">Fehlende Orte suchen</button>
@@ -1707,8 +1719,8 @@ function ansichtAktualisieren() {
       <table class="liste" style="max-width:700px;margin-top:6px"><thead><tr><th>Schulort</th><th>gefunden</th><th></th></tr></thead><tbody>
       ${schulorte().map((o) => `<tr><td>${esc(o)}</td><td class="klein">${S.orte[o] ? esc(S.orte[o].label) : '<span class="rot">nicht gefunden</span>'}</td>
         <td><button class="knopf klein" onclick="ortKorrigieren(REFS[${ref(o)}])">korrigieren</button></td></tr>`).join("")}
-      </tbody></table></details></div>
-  <div class="karte"><h3>5 · Einstellungen</h3>
+      </tbody></table></details></details>
+  <details class="karte akk" name="akt" ${lies("aktOffen") === "5" ? "open" : ""} ontoggle="if (this.open) merke('aktOffen', '5')"><summary><h3>5 · Einstellungen</h3></summary>
     <p>Aktuelles Studienjahr <select id="eJahr"><option value="" ${!e.studienjahrFest ? "selected" : ""}>automatisch nach Datum (${sjText(studienjahrHeute())})</option>${[...new Set([studienjahrHeute(), ...jahre()])].sort().reverse().map((j) => `<option value="${j}" ${j === e.studienjahrFest ? "selected" : ""}>fest: ${sjText(j)}</option>`).join("")}</select>
        &nbsp; Quote Profil <input class="eingabe" id="eQuote" type="number" min="0" max="100" step="5" value="${Math.round(e.quote * 100)}" style="width:70px"> %</p>
     <p class="leise klein">Soll = Vorgabe an Besuchen im Studienjahr. Änderungen werden sofort gespeichert.</p>
@@ -1719,8 +1731,8 @@ function ansichtAktualisieren() {
         <td><input class="eingabe" type="number" min="0" value="${esc(d.sollHalbtag ?? "")}" style="width:70px"></td><td><input class="eingabe" type="number" min="0" value="${esc(d.sollPQ ?? d.soll ?? "")}" style="width:70px"></td>
         <td>${d.kuerzel ? `<button class="knopf klein" title="Person entfernen" onclick="dozWeg(this)">✕</button>` : ""}</td></tr>`).join("")}
     </tbody></table>
-    <p><button class="knopf haupt" id="einstSpeichern">Einstellungen speichern</button> <span class="leise klein" id="einstStand"></span></p></div>
-  <details class="karte"><summary><b>Einmalig: alte Excel-Liste</b> <span class="leise klein">(${S.alt.length} Personen eingelesen)</span></summary>
+    <p><button class="knopf haupt" id="einstSpeichern">Einstellungen speichern</button> <span class="leise klein" id="einstStand"></span></p></details>
+  <details class="karte akk" name="akt"><summary><b>6 · Einmalig: alte Excel-Liste</b> <span class="leise klein">(${S.alt.length} Personen eingelesen)</span></summary>
     <p>«Buchhaltung Praxisbesuche.xlsx» – liefert den Verlauf: wer wen früher besucht hat, Bemerkungen. Ist bereits eingelesen; nur bei Bedarf erneut.</p>
     <input type="file" id="dateiAlt" accept=".xlsx"> <button class="knopf" id="importAlt">Einlesen</button>
     <div class="import-ergebnis" id="ergAlt"></div></details>`;
