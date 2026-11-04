@@ -98,7 +98,7 @@ table.liste tr:hover td { background: #fbfbfb; }
 table.liste td.name { font-weight: 600; cursor: pointer; color: var(--akzent); white-space: nowrap; }
 table.liste td.name:hover { text-decoration: underline; }
 .chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 13px; white-space: nowrap; }
-.s-offen { background: var(--offen); } .s-uebernommen { background: var(--uebernommen); } .s-gebucht { background: var(--gebucht); }
+.s-offen { background: var(--offen); } .s-uebernommen { background: var(--gebucht); } .s-gebucht { background: var(--gebucht); }
 .s-besucht { background: var(--besucht); } .s-nicht { background: var(--nichtnoetig); color: #888; }
 .n-ja { font-weight: 700; color: var(--achtung); } .n-optional { color: var(--leise); } .n-nein { color: #aaa; } .n-spaeter { color: #aaa; }
 .achtung { color: var(--achtung); font-weight: 700; cursor: help; }
@@ -717,8 +717,9 @@ function standChip(x, kurz = false) {
   const wer = x.wer ? ` · ${esc(x.wer)}` : x.dozentTool ? ` · ${esc(x.dozentTool)}` : "";
   const t = !kurz && x.termin && x.stand !== "besucht" ? ` · ${esc(kurzDatum(x.termin.datum))} ${esc(x.termin.zeit || "")}` : "";
   const doppelt = x.doppelt && x.doppelt.length ? ` <span class="hinweis" title="Mehrere haben übernommen – bitte absprechen">doppelt: ${esc(x.doppelt.join(", "))}</span>` : "";
-  const text = { "übernommen": "reserviert", gebucht: "im Tool gebucht" }[x.stand] || x.stand;
-  const titel = { "übernommen": "Hier reserviert – im Praktikumstool noch nicht eingetragen", gebucht: "Im Praktikumstool eingetragen", besucht: "Besuch hat stattgefunden", offen: "Noch niemand eingeteilt" }[x.stand] || "";
+  // Wer übernimmt, bucht gleichzeitig im Praktikumstool – darum gibt es nur «gebucht»
+  const text = { "übernommen": "gebucht" }[x.stand] || x.stand;
+  const titel = { "übernommen": "gebucht", gebucht: "gebucht (im Praktikumstool)", besucht: "Besuch hat stattgefunden", offen: "Noch niemand eingeteilt" }[x.stand] || "";
   return `<span class="chip ${cls}" title="${esc(titel)}">${esc(text)}${wer}${t}</span>${doppelt}`;
 }
 function achtungZeichen(x) {
@@ -821,7 +822,7 @@ async function terminGewaehlt(ip, il, ipartner) {
     const termin = { datum: l.datum, zeit: l.zeit, bis: l.bis, lektion: l.id };
     if (!(await eintragen(y.wer === S.ich ? { typ: "termin", praktikum: y.idpraktikum, termin } : { typ: "uebernehmen", praktikum: y.idpraktikum, termin }))) return;
   }
-  meldung(meinesSchon ? "Termin geändert." : `Übernommen${partner ? " (beide)" : ""} – jetzt im Praktikumstool eintragen.`);
+  meldung(meinesSchon ? "Termin geändert." : `Gebucht${partner ? " (beide)" : ""} – jetzt sofort im Praktikumstool eintragen (öffnet sich rechts).`);
   if (x.link) { REFS.push(toolLink(x, a.id)); toolOeffnen(REFS.length - 1); }
 }
 function toolOeffnen(i) {
@@ -943,7 +944,7 @@ function filterLeiste(ansicht, anzahl) {
   } else {
     grund += `<div class="fzeile"><span class="ftitel">Periode</span>${knoepfe("perioden", [["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"], ["SK", "SK Einzelfach"]])}</div>`;
   }
-  grund += `<div class="fzeile"><span class="ftitel">Stand</span>${knoepfe("stand", [["offen", "offen"], ["eingeteilt", "reserviert / im Tool gebucht"], ["besucht", "besucht"]])}</div>`;
+  grund += `<div class="fzeile"><span class="ftitel">Stand</span>${knoepfe("stand", [["offen", "offen"], ["eingeteilt", "gebucht"], ["besucht", "besucht"]])}</div>`;
   // Wann
   const wannAktiv = [fw("von", "") && "ab " + kurzDatum(fw("von", "")), fw("bis", "") && "bis " + kurzDatum(fw("bis", "")),
     fa("tage").join(" "), fa("tageszeit").map((t) => t === "vormittag" ? "Vormittag" : "Nachmittag").join(" "),
@@ -1195,7 +1196,7 @@ function ansichtStudierende() {
     const cls = { offen: "s-offen", "übernommen": "s-uebernommen", gebucht: "s-gebucht", besucht: "s-besucht" }[x.stand] || "s-nicht";
     const per = x.gruppe === "Halbtag" ? (periode(x).match(/Periode ([A-D])/) || [, ""])[1] : "";
     const d = x.termin ? x.termin.datum : x.datum;
-    const stand = { "übernommen": "reserviert", gebucht: "gebucht" }[x.stand] || x.stand;
+    const stand = { "übernommen": "gebucht" }[x.stand] || x.stand;
     const wer = ["besucht", "gebucht", "übernommen"].includes(x.stand) ? (x.wer || "NN") : "";
     return `<div class="ue"><span class="ue-j">${sjText(x.jahr)}${per ? " " + per : ""}</span><span class="ue-d">${d ? esc(datumText(d).replace(/\.20(\d\d)$/, ".$1")) : ""}</span><span class="chip ${cls}">${esc(stand)}</span><b class="ue-w">${esc(wer)}</b></div>`;
   };
@@ -1248,8 +1249,7 @@ function ansichtHilfe() {
     <li>Das Praktikumstool öffnet sich rechts direkt bei der Lektion: dort <b>«Besuch eintragen»</b>. Das bleibt Pflicht.</li>
     <li>Nach dem Besuch: <b>Erledigt</b>.</li>
     <li><b>Stand</b>: <span class="chip s-offen">offen</span> noch niemand ·
-      <span class="chip s-uebernommen">reserviert</span> hier übernommen, im Praktikumstool noch nicht eingetragen ·
-      <span class="chip s-gebucht">im Tool gebucht</span> im Praktikumstool eingetragen (erscheint nach dem nächsten Aktualisieren) ·
+      <span class="chip s-gebucht">gebucht</span> übernommen und im Praktikumstool eingetragen – beides gehört zusammen ·
       <span class="chip s-besucht">besucht</span> hat stattgefunden.</li>
     <li><b>Notiz</b>: bei jedem Praktikum in der Zeile – z.B. «Termin mit PxL abgesprochen».</li></ul>`)}
   ${k("4 · Studierende und Achtung", `<ul><li>Reiter <b>Studierende</b>: alle Praktika einer Person auf einen Blick, Klick auf den Namen zeigt den Verlauf.</li>
