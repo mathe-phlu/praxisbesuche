@@ -533,8 +533,23 @@ function standBestimmen(x, altBesuch) {
   let wer = alt && alt.wer ? alt.wer : "", stand = alt && alt.status ? alt.status : "", art = alt && alt.art ? alt.art : "", datum = alt && alt.datum ? alt.datum : "";
   if (stand === "besucht" && !wer) stand = "";
   if (x.quelle === "tool" && x.fachbesuche > 0 && stand !== "besucht") stand = x.jahr < S.einst.studienjahr ? "besucht" : "gebucht";
+  // Im Praktikumstool gebuchte Besuche: wer (Name der Mathe-Dozierenden) und wann (Lektion) aus dem Stundenplan
+  let termin = null;
+  if (x.quelle === "tool" && x.lektionen) {
+    const doz = (S.einst.dozierende || []).filter((d) => d.name);
+    for (const l of x.lektionen) for (const g of l.gebucht || []) {
+      const text = g.toLowerCase();
+      const d = doz.find((d) => d.name.toLowerCase().split(/\s+/).every((t) => text.includes(t)));
+      if (d) {
+        if (!wer) wer = d.kuerzel;
+        if (d.kuerzel === wer) termin = { datum: l.datum, zeit: l.zeit, bis: l.bis, lektion: l.id, imTool: true };
+        if (stand !== "besucht") stand = l.datum < new Date().toISOString().slice(0, 10) ? "besucht" : "gebucht";
+        if (stand === "besucht" && !datum) datum = l.datum;
+      }
+    }
+  }
   // eigene Einträge, der Reihe nach
-  let doppelt = [], termin = null;
+  let doppelt = [];
   for (const e of x.eintraege) {
     if (e.typ === "uebernehmen") { if (wer && wer !== e.wer && stand !== "besucht") doppelt.push(e.wer); else { wer = e.wer; termin = e.termin || termin; if (stand !== "besucht" && stand !== "gebucht") stand = "übernommen"; } }
     if (e.typ === "termin" && e.wer === wer) termin = e.termin || null;
