@@ -796,7 +796,7 @@ function termineZeigen(i, ip) {
   for (const a of l) ((wochen[montag(a.datum)] ||= { Mo: [], Di: [], Mi: [], Do: [], Fr: [] })[wochentag(a.datum)] || []).push(a);
   const d = $("#frage");
   $("#frageText").textContent = `${x.person.name}${partner ? " + " + partner.person.name + " (Doppelbesuch)" : ""} · ${x.gruppe} · ${x.schulort || ""} ${x.schulhaus ? "(" + x.schulhaus + ")" : ""}`;
-  $("#frageFeld").innerHTML = `<p class="klein leise" style="margin-top:0">Freie Mathe-Lektionen, die nach der Checkliste möglich sind${gesperrt ? ` (${gesperrt} ausgeblendet: erste Tage, letzter Tag, Arbeitssitzung)` : ""}.
+  $("#frageFeld").innerHTML = `<p class="klein leise" style="margin-top:0">Freie Mathe-Lektionen, die nach der Checkliste möglich sind${gesperrt ? ` (${gesperrt} ausgeblendet: erste Tage, letzter Tag, Arbeitssitzung, oder die Person hat an diesem Tag bzw. in dieser Woche schon genug Besuche – gemäss «Angemeldete Besuche» im Tool beim letzten Einlesen. Andere Fächer können seither gebucht haben: im Tool kurz prüfen)` : ""}.
       Grün = danach Zeit zum Besprechen. Mit der Maus über einen Termin: Klasse und Zeit danach. <b>Termin anklicken = übernehmen.</b></p>
     <div class="wochen">${Object.entries(wochen).sort().map(([mo, tage]) => `<div class="woche"><div class="wk">Woche ab ${esc(kurzDatum(mo))}</div>
       ${Object.entries(tage).map(([tag, ls]) => `<div class="wt"><div class="rk">${tag}${ls.length ? " " + esc(ls[0].datum.slice(8, 10) + "." + ls[0].datum.slice(5, 7) + ".") : ""}</div>
@@ -882,7 +882,24 @@ function terminGesperrt(x, datum, zeit) {
   if (von && x.gruppe === "Quartal" && ersteKal) { const e = new Date(von + "T12:00"); e.setDate(e.getDate() + ersteKal); if (datum < e.toISOString().slice(0, 10)) return "erste Praktikumswoche"; }
   const arb = x.gruppe === "Profil" ? S.einst.arbeitssitzungProfil : x.gruppe === "Quartal" ? S.einst.arbeitssitzungQuartal : "";
   if (arb && datum === arb && vormittag(zeit)) return "Vormittag der Arbeitssitzung";
-  return "";
+  return besuchsRegeln(x, datum, zeit)[0] || "";
+}
+/* Die Person: nicht 2 Besuche am selben Tag, höchstens 2 pro Woche (alle Fächer, aus «Angemeldete Besuche» im Tool).
+   Ein Besuch = eine Dozent/in an einem Tag; eine Doppellektion zählt einmal.
+   Nicht mitgezählt: dieser Mathe-Besuch selbst und Besuche genau zur selben Zeit (Doppelbesuch). */
+function besuchsRegeln(x, datum, zeit) {
+  const w = [];
+  const eigen = (v) => (v.datum === datum && v.zeit === zeit) || (x.termin && v.datum === x.termin.datum && (v.mathe || v.zeit === x.termin.zeit));
+  const andere = ((x.person && x.person.praktika) || []).filter((y) => y !== x && y.termin);
+  const roh = [...(x.besuche || []).map((v) => ({ datum: v.datum, zeit: v.zeit, wer: v.dozent, mathe: v.fach === "MA" })),
+               ...(x.besuche ? [] : (x.lektionen || []).filter((l) => l.gebucht && l.gebucht.length).map((l) => ({ datum: l.datum, zeit: l.zeit, wer: l.gebucht.join(), mathe: true }))),
+               ...andere.map((y) => ({ datum: y.termin.datum, zeit: y.termin.zeit, wer: y.wer }))];
+  const besuche = [...new Set(roh.filter((v) => !eigen(v)).map((v) => v.datum + "|" + v.wer))].map((k) => k.split("|")[0]);
+  if (besuche.includes(datum)) w.push("an diesem Tag hat die Person schon einen Besuch");
+  const kw = (iso) => { const d = new Date(iso + "T12:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
+  const maxW = Number(regel("maxProWoche")) || 2;
+  if (besuche.filter((b) => kw(b) === kw(datum)).length >= maxW) w.push(`in dieser Woche schon ${maxW} Besuche bei der Person`);
+  return w;
 }
 /* Checkliste 2026/27 (Praktikumsabteilung) */
 function terminWarnungen(x, datum, zeit) {
@@ -903,18 +920,7 @@ function terminWarnungen(x, datum, zeit) {
   // ausser genau zur selben Zeit (Doppelbesuch: zwei Studierende in derselben Lektion)
   const meine = R.praktika.filter((y) => y !== x && y.wer === S.ich && y.termin && y.termin.datum === datum && y.termin.zeit !== zeit && vormittag(y.termin.zeit) === vormittag(zeit));
   if (meine.length) w.push(`am selben ${vormittag(zeit) ? "Vormittag" : "Nachmittag"} schon: ${meine.map((y) => y.person.name).join(", ")}`);
-  // die Person: nicht 2 Besuche am selben Tag, höchstens 2 pro Woche
-  // Ein Besuch = eine Person (Dozent/in) an einem Tag; eine Doppellektion zählt einmal.
-  // Nicht mitgezählt: dieser Mathe-Besuch selbst und Besuche genau zur selben Zeit.
-  const eigen = (v) => (v.datum === datum && v.zeit === zeit) || (x.termin && v.datum === x.termin.datum && (v.mathe || v.zeit === x.termin.zeit));
-  const roh = [...(x.besuche || []).map((v) => ({ datum: v.datum, zeit: v.zeit, wer: v.dozent, mathe: v.fach === "MA" })),
-               ...(x.besuche ? [] : (x.lektionen || []).filter((l) => l.gebucht && l.gebucht.length).map((l) => ({ datum: l.datum, zeit: l.zeit, wer: l.gebucht.join(), mathe: true }))),
-               ...R.praktika.filter((y) => y !== x && y.person === x.person && y.termin).map((y) => ({ datum: y.termin.datum, zeit: y.termin.zeit, wer: y.wer }))];
-  const besuche = [...new Set(roh.filter((v) => !eigen(v)).map((v) => v.datum + "|" + v.wer))].map((k) => k.split("|")[0]);
-  if (besuche.includes(datum)) w.push("an diesem Tag hat die Person schon einen Besuch");
-  const kw = (iso) => { const d = new Date(iso + "T12:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
-  const maxW = Number(regel("maxProWoche")) || 2;
-  if (besuche.filter((b) => kw(b) === kw(datum)).length >= maxW) w.push(`in dieser Woche schon ${maxW} Besuche bei der Person`);
+  w.push(...besuchsRegeln(x, datum, zeit));
   return w;
 }
 async function handlung(typ, i) {
@@ -1677,7 +1683,7 @@ const SCHRITTE = [
     vorher: () => { const n = document.querySelector("#app table.liste tbody tr .name"); if (n) n.click(); }, nachher: () => detailZu() },
   { ziel: ".legende-box", ansicht: "planung", titel: "Mathe-Lektionen lesen", text: "Hohes Kästchen = Doppellektion, flaches = Einzellektion. Grün = danach ist Zeit zum Besprechen. Mit dem Knopf links lässt sich der Stundenplan aus- und einblenden.",
     vorher: () => { merke("raster", "auf"); zeichnen(); } },
-  { ziel: ".raster", ansicht: "planung", titel: "Wochenraster", text: "Für jede Person: an welchen Tagen und wann Mathe ist. Termine, die nach der Checkliste nicht gehen, sind schon weg." },
+  { ziel: ".raster", ansicht: "planung", titel: "Wochenraster", text: "Für jede Person: an welchen Tagen und wann Mathe ist. Termine, die nach der Checkliste nicht gehen, sind schon weg – auch Tage, an denen die Person schon einen Besuch hat (alle Fächer, Stand letztes Einlesen), und Wochen mit schon 2 Besuchen. Gleiche Lektion wie ein anderer Besuch (Doppelbesuch) bleibt möglich." },
   { ziel: "#frageFeld .woche", ansicht: "planung", titel: "Grosse Ansicht: alle Termine", text: "Ein Klick aufs Raster öffnet die grosse Ansicht, Woche für Woche. Mit der Maus über einem Termin stehen Klasse und Zeit danach. Termin anklicken = übernehmen. Danach öffnet sich das Praktikumstool direkt bei dieser Lektion: dort «Besuch eintragen».",
     vorher: () => { const r = document.querySelector(".raster"); if (r) r.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
   { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Ich übernehme", text: "Oder direkt hier: «Ich übernehme» bucht – im Praktikumstool gleich mit eintragen. «Erledigt» klickt man später in «Meine Termine»." },
