@@ -1995,6 +1995,7 @@ setInterval(() => {
 <style>
 #tour { position: fixed; z-index: 50; max-width: 380px; background: #fff; border: 2px solid var(--ph-braun); border-radius: 10px;
         box-shadow: 0 8px 30px rgba(0,0,0,.25); padding: 14px 16px; font-size: 15px; transition: top .35s, left .35s; }
+#tour .griff { cursor: move; user-select: none; font-size: 12px; color: var(--leise); margin: -6px 0 4px; }
 #tour h4 { margin: 0 0 6px; font-family: var(--hand); font-size: 22px; color: var(--ph-braun-dunkel); font-weight: 400; }
 #tour .tk { display: flex; gap: 8px; justify-content: space-between; align-items: center; margin-top: 10px; }
 #tour .pkt { font-size: 12px; color: var(--leise); }
@@ -2008,9 +2009,10 @@ const SCHRITTE = [
   { ziel: "#ich", ansicht: "start", titel: "Wer bin ich?", text: "Oben rechts das eigene Kürzel wählen (hier im Beispiel: clu). Dann gehören deine Buchungen und «Meine Termine» dir. Den Rundgang kann man jederzeit mit «✕ Beenden» abbrechen oder unten direkt zu einem Schritt springen.", vorher: () => { S.ich = "clu"; merke("ich", "clu"); zeichnen(); } },
   { ziel: "nav button[data-ansicht=halbtag]", ansicht: "halbtag", titel: "Halbtagespraktikum", text: "Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als PAAR untereinander – «Termine (beide) ▸» bucht den Doppelbesuch. Wer allein ist, steht als EINZELN da. Die Filter hier sind eigene, unabhängig von Profil & Quartal.", vorher: () => geheZu("halbtag") },
   { ziel: "nav button[data-ansicht=planung]", ansicht: "planung", titel: "Profil & Quartal", text: "Hier wird geplant: alle Profil-, Quartals- und Spezialpraktika des Studienjahrs.", vorher: () => geheZu("planung") },
-  { ziel: ".filterbox .fsek", ansicht: "planung", titel: "Grundauswahl", text: "Welche Praktika, ob ein Besuch nötig ist, und der Stand (offen, gebucht, besucht). Standardmässig ausgeblendet: wen du schon besucht hast. Ein Klick schaltet um." },
-  { ziel: ".filterbox details", ansicht: "planung", titel: "Wann", text: "Der ganze Filter lässt sich oben auf- und zuklappen. Aufklappen: Zeitraum, Tag, Vormittag/Nachmittag, Einzel- oder Doppellektion und «danach Zeit zum Besprechen».", vorher: () => { const d = document.querySelector(".filterbox details"); if (d) d.open = true; } },
-  { ziel: ".aktivleiste", ansicht: "planung", titel: "Was gerade gefiltert ist", text: "Über der Liste stehen die aktiven Filter. Mit ✕ ist einer wieder weg." },
+  { ziel: ".filterbox .fsek", ansicht: "planung", titel: "Grundauswahl", text: "Oben der Filter (mit «▾ Filter» auf- und zuklappen). Links die Grundauswahl: welche Praktika, ob ein Besuch nötig ist, und der Stand (offen, gebucht, besucht). Ein Klick schaltet um.",
+    vorher: () => { merke("filterbox", "auf"); zeichnen(); } },
+  { ziel: ".filterbox details.fsek", ansicht: "planung", titel: "Wann", text: "Der ganze Filter lässt sich oben auf- und zuklappen. Aufklappen: Zeitraum, Tag, Vormittag/Nachmittag, Einzel- oder Doppellektion und «danach Zeit zum Besprechen».", vorher: () => { merke("filterbox", "auf"); zeichnen(); const d = document.querySelector(".filterbox details.fsek"); if (d) d.open = true; } },
+  { ziel: ".aktivleiste", ansicht: "planung", titel: "Was gerade gefiltert ist", text: "Über der Liste stehen die aktiven Filter. Standardmässig an: «nicht schon von mir besucht» – wen du schon besucht hast, ist ausgeblendet. Mit ✕ ist ein Filter wieder weg." },
   { ziel: "#app table.liste tbody tr .name", ansicht: "planung", titel: "Name anklicken", text: "Ein Klick auf den Namen öffnet rechts die Grundinformationen: alle Praktika, wer schon besucht hat, Bemerkungen und Achtung-Vermerke.",
     vorher: () => { const n = document.querySelector("#app table.liste tbody tr .name"); if (n) n.click(); }, nachher: () => detailZu() },
   { ziel: "#app table.liste tbody tr td:last-child .knopf", ansicht: "planung", titel: "Buchen", text: "In der Spalte «Buchen» steht pro Person «Termine ▸», darunter klein, an welchen Tagen Mathe ist und wie viele Termine möglich sind. Tag und Tageszeit wählst du am einfachsten oben im Filter.",
@@ -2045,7 +2047,7 @@ function zeige(i) {
     if (dlg.open && t.parentElement !== dlg) dlg.appendChild(t);
     if (!dlg.open && t.parentElement !== document.body) document.body.appendChild(t);
     const ziel = s.ziel ? document.querySelector(s.ziel) : null;
-    t.innerHTML = `<button class="knopf klein" style="position:absolute;right:8px;top:8px" title="Rundgang beenden" onclick="rundgangEnde()">✕ Beenden</button>
+    t.innerHTML = `<div class="griff" title="Kästchen verschieben">⠿ ziehen zum Verschieben</div><button class="knopf klein" style="position:absolute;right:8px;top:8px" title="Rundgang beenden" onclick="rundgangEnde()">✕ Beenden</button>
       <h4 style="margin-right:80px">${s.titel}</h4><div>${s.text}</div>
       <div style="margin-top:8px"><select class="eingabe klein" onchange="zeige(Number(this.value))" title="Direkt zu einem Schritt">${SCHRITTE.map((x, i) => `<option value="${i}" ${i === schritt ? "selected" : ""}>${i + 1}. ${x.titel}</option>`).join("")}</select></div>
       <div class="tk"><span class="pkt">${schritt + 1} / ${SCHRITTE.length}</span>
@@ -2062,6 +2064,15 @@ function zeige(i) {
   }, 350);
 }
 function weiter(d) { zeige(schritt + d); }
+/* Kästchen mit der Maus verschieben (falls es etwas verdeckt) */
+document.addEventListener("mousedown", (e) => {
+  const g = e.target.closest && e.target.closest("#tour .griff"); if (!g) return;
+  const t = document.getElementById("tour"), r = t.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
+  t.style.transition = "none";
+  const zieh = (m) => { t.style.left = Math.max(0, m.clientX - dx) + "px"; t.style.top = Math.max(0, m.clientY - dy) + "px"; };
+  const los = () => { document.removeEventListener("mousemove", zieh); document.removeEventListener("mouseup", los); t.style.transition = ""; };
+  document.addEventListener("mousemove", zieh); document.addEventListener("mouseup", los); e.preventDefault();
+});
 function rundgangEnde() {
   const s = SCHRITTE[schritt]; if (s && s.nachher) s.nachher();
   document.querySelectorAll(".tour-licht").forEach((e) => e.classList.remove("tour-licht"));
