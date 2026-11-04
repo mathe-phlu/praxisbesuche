@@ -320,6 +320,7 @@ const S = {
   offeneGruppen: new Set(JSON.parse(lies("offen") || "[]")),
   filter: (() => { const f = JSON.parse(lies("filter") || "{}");
     for (const k of ["praktikum", "suche", "tag"]) delete f[k];
+    if (lies("filterV") !== "2") { delete f.bespr; merke("filterV", "2"); merke("filter", JSON.stringify(f)); }
     for (const k of ["noetig", "stand", "tageszeit", "lektart"]) if (f[k] !== undefined && !Array.isArray(f[k])) delete f[k];
     return f; })(),
 };
@@ -378,9 +379,8 @@ function lektionenIm(x, { nurFrei = true, alleTage = false } = {}) {
   const von = fw("von", ""), bis = fw("bis", ""), tage = fa("tage"), tz = fa("tageszeit");
   const planung = S.ansicht === "planung";
   const art = planung ? fa("lektart") : [], bespr = planung && fw("bespr", true);
-  return (x.lektionen || []).filter((l) => {
+  const passt = (x.lektionen || []).filter((l) => {
     if (art.length && !art.includes((l.anzahl || 1) > 1 ? "doppel" : "einzel")) return false;
-    if (bespr && !besprechung(l)) return false;
     if (von && l.datum < von) return false;
     if (bis && l.datum > bis) return false;
     if (terminGesperrt(x, l.datum, l.zeit)) return false;
@@ -390,6 +390,13 @@ function lektionenIm(x, { nurFrei = true, alleTage = false } = {}) {
     if (nurFrei && l.gebucht && l.gebucht.length) return false;
     return true;
   }).sort((a, b) => (a.datum + a.zeit).localeCompare(b.datum + b.zeit));
+  if (!bespr) return passt;
+  const mit = passt.filter(besprechung);
+  // muss zwingend besucht werden, hat aber keinen Termin mit Zeit danach: dann alle zeigen
+  return !mit.length && x.noetig === "ja" ? passt : mit;
+}
+function ohneBesprechungTrotzdem(x, l) {
+  return S.ansicht === "planung" && fw("bespr", true) && x.noetig === "ja" && l.length && !l.some(besprechung);
 }
 /* Luftlinie in km zwischen zwei Schulorten (Koordinaten aus stamm/orte.json) */
 function km(a, b) {
@@ -925,9 +932,10 @@ function buchenZelle(x, partner) {
   if (x.wer && x.wer !== S.ich) return "";
   const l = lektionenIm(x);
   if (!l.length) return `<span class="leise klein">keine passende Lektion</span>`;
+  const ohneB = ohneBesprechungTrotzdem(x, l);
   const tage = ["Mo", "Di", "Mi", "Do", "Fr"].filter((t) => l.some((a) => wochentag(a.datum) === t));
   return `<button class="knopf klein haupt" title="Alle möglichen Termine anzeigen – anklicken bucht" onclick="termineZeigen(${ref(x.idpraktikum)}${partner ? ", " + ref(partner.idpraktikum) : ""})">${partner ? "Termine (beide) ▸" : "Termine ▸"}</button>
-    <div class="leise klein" style="margin-top:2px">${tage.join(" · ")} · ${l.length} Termin${l.length === 1 ? "" : "e"}</div>`;
+    <div class="leise klein" style="margin-top:2px">${tage.join(" · ")} · ${l.length} Termin${l.length === 1 ? "" : "e"}</div>${ohneB ? `<div class="klein rot" title="Muss besucht werden, aber nach keinem Termin ist Zeit zum Besprechen – darum trotzdem angezeigt">ohne Besprechungszeit danach</div>` : ""}`;
 }
 function termineZeigen(i, ip) {
   const x = R.praktika.find((p) => p.idpraktikum === REFS[i]);
@@ -941,6 +949,7 @@ function termineZeigen(i, ip) {
   $("#frageText").textContent = `${x.person.name}${partner ? " + " + partner.person.name + " (Doppelbesuch)" : ""} · ${x.gruppe} · ${x.schulort || ""} ${x.schulhaus ? "(" + x.schulhaus + ")" : ""}`;
   $("#frageFeld").innerHTML = `<p class="klein leise" style="margin-top:0">Freie Mathe-Lektionen, die nach der Checkliste möglich sind${gesperrt ? ` (${gesperrt} ausgeblendet: erste Tage, letzter Tag, Arbeitssitzung, oder die Person hat an diesem Tag bzw. in dieser Woche schon genug Besuche – gemäss «Angemeldete Besuche» im Tool beim letzten Einlesen. Andere Fächer können seither gebucht haben: im Tool kurz prüfen)` : ""}.
       Mit der Maus über einen Termin: Klasse und Zeit danach.</p>
+    ${ohneBesprechungTrotzdem(x, l) ? `<p class="einr-hinweis" style="margin:0 0 8px;border-color:#c0392b"><b>Muss besucht werden</b>, hat aber keinen Termin mit Zeit zum Besprechen direkt danach – darum hier alle Termine (Besprechung z. B. später oder online).</p>` : ""}
     <p class="einr-hinweis" style="margin:0 0 8px"><b>Termin anklicken = übernehmen.</b> Das Praktikumstool öffnet sich danach sofort in einem neuen Fenster bei dieser Woche – dort «Besuch eintragen».</p>
     <div class="leg-zeile"><span class="rz">9:10</span> Einzellektion <span class="rz doppel">8:20</span> Doppellektion
       <span class="trenn">|</span> <span class="rz frei">10:15</span> danach frei zum Besprechen <span class="rz">13:35</span> danach Unterricht</div>
@@ -965,15 +974,18 @@ async function terminGewaehlt(ip, il, ipartner) {
   const wer = alle.map((y) => y.person.name).join(" + ");
   const ok = await frage(`${wer}: ${blockText(a)}${w.length ? "\n⚠ " + w.join("\n⚠ ") : ""}\n\n${meinesSchon ? "Termin ändern?" : "Übernehmen und im Praktikumstool eintragen?"}`, { art: "wahl", wert: "ja", optionen: [["ja", meinesSchon ? "Ja, Termin ändern" : "Ja, übernehmen"]] });
   if (ok === null) return;
+  // Fenster gleich jetzt (direkt nach dem Klick) öffnen, sonst macht der Browser evtl. einen Reiter daraus
+  const vorab = (!partner || meinesSchon) && x.link ? window.open("", "pbFenster", popupMasse()) : null;
+  if (vorab) try { vorab.document.title = "Praktikumstool …"; vorab.document.body.innerHTML = "<p style='font:16px sans-serif;padding:20px'>Praktikumstool wird geöffnet …</p>"; } catch (e) {}
   for (const y of alle) {
     // beim Partner dieselbe Lektion (gleicher Tag, gleiche Zeit) suchen
     const l = y === x ? a : (y.lektionen || []).find((b) => b.datum === a.datum && b.zeit === a.zeit) || a;
     const termin = { datum: l.datum, zeit: l.zeit, bis: l.bis, lektion: l.id };
-    if (!(await eintragen(y.wer === S.ich ? { typ: "termin", praktikum: y.idpraktikum, termin } : { typ: "uebernehmen", praktikum: y.idpraktikum, termin }))) return;
+    if (!(await eintragen(y.wer === S.ich ? { typ: "termin", praktikum: y.idpraktikum, termin } : { typ: "uebernehmen", praktikum: y.idpraktikum, termin }))) { if (vorab) vorab.close(); return; }
   }
   meldung(meinesSchon ? "Termin geändert." : partner ? "Doppelbesuch gebucht – unten bei beiden im Tool eintragen." : "Gebucht – jetzt sofort im Praktikumstool eintragen (öffnet sich als Fenster).");
   // Einzelbesuch: Tool sofort öffnen. Doppelbesuch: zwei Knöpfe, einer pro Person – man öffnet sie selbst nacheinander.
-  if (!partner || meinesSchon) { if (x.link) { REFS.push(toolLink(x, a.id)); toolOeffnen(REFS.length - 1); } }
+  if (!partner || meinesSchon) { if (x.link) { REFS.push(toolLink(x, a.id)); toolOeffnen(REFS.length - 1, "pbFenster", vorab); } }
   else doppelToolZeigen(alle.map((y) => { const l = y === x ? a : (y.lektionen || []).find((b) => b.datum === a.datum && b.zeit === a.zeit) || a; REFS.push(toolLink(y, l.id)); return [y.person.name, REFS.length - 1]; }), blockText(a));
 }
 function doppelToolZeigen(personen, wann) {
@@ -981,17 +993,22 @@ function doppelToolZeigen(personen, wann) {
   const k = document.createElement("div"); k.id = "zweitesTool";
   k.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:70;background:#fff;border:2px solid var(--ph-braun);border-radius:10px;padding:14px 18px;box-shadow:0 8px 30px rgba(0,0,0,.25);max-width:560px";
   k.innerHTML = `<div style="margin-bottom:8px"><b>Doppelbesuch gebucht</b> (${esc(wann)}). Jetzt bei beiden im Praktikumstool «Besuch eintragen»:</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${personen.map(([name, i], n) => `<button class="knopf haupt" onclick="toolOeffnen(${i}, 'pbToolPopup${n + 1}'); this.textContent = '✓ ${esc(name.replace(/'/g, ""))}'; this.classList.remove('haupt')">${n + 1}. ${esc(name)} im Tool ↗</button>`).join("")}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${personen.map(([name, i], n) => `<button class="knopf haupt" onclick="toolOeffnen(${i}, 'pbFenster${n + 1}'); this.textContent = '✓ ${esc(name.replace(/'/g, ""))}'; this.classList.remove('haupt')">${n + 1}. ${esc(name)} im Tool ↗</button>`).join("")}
     <button class="knopf klein" style="margin-left:auto" onclick="document.getElementById('zweitesTool').remove()">Fertig ✕</button></div>`;
   document.body.appendChild(k);
 }
 /* Praktikumstool als Pop-up-Fenster mittig über der Seite: eintragen, Fenster schliessen, weiter hier */
-function toolOeffnen(i, fenster = "pbToolPopup") {
-  const link = REFS[i];
-  if (!link) return;
+function popupMasse() {
   const w = Math.min(1250, Math.round(screen.availWidth * 0.8)), h = Math.round(screen.availHeight * 0.85);
   const l = Math.round((screen.availWidth - w) / 2 + (screen.availLeft || 0)), t = Math.round((screen.availHeight - h) / 2 + (screen.availTop || 0));
-  const f = window.open(link.startsWith("http") ? link : TOOL + link, fenster, `popup=yes,width=${w},height=${h},left=${l},top=${t}`);
+  return `popup=yes,width=${w},height=${h},left=${l},top=${t}`;
+}
+function toolOeffnen(i, fenster = "pbFenster", vorab = null) {
+  const link = REFS[i];
+  if (!link) { if (vorab) vorab.close(); return; }
+  const url = link.startsWith("http") ? link : TOOL + link;
+  if (vorab && !vorab.closed) { vorab.location.href = url; vorab.focus(); return; }
+  const f = window.open(url, fenster, popupMasse());
   if (f) f.focus();
 }
 /* Übernehmen mit Termin: Lektion wählen oder Datum/Zeit eingeben, Checkliste prüfen */
@@ -1022,13 +1039,14 @@ async function uebernehmen(i, nurTermin = false) {
   d.returnValue = ""; d.showModal();
   await new Promise((ok) => (d.onclose = ok));
   if (d.returnValue !== "ok") return;
+  const vorab = $("#tTool") && $("#tTool").checked && x.link ? window.open("", "pbFenster", popupMasse()) : null;
   const datum = $("#tDatum").value, zeit = $("#tZeit").value;
   const lekt = sel && sel.value ? sel.value : (frei.find((l) => l.datum === datum && l.zeit === zeit) || {}).id || "";
   const termin = datum ? { datum, zeit, lektion: lekt } : null;
   const ok = await eintragen(nurTermin ? { typ: "termin", praktikum: id, termin } : { typ: "uebernehmen", praktikum: id, termin });
-  if (!ok) return;
+  if (!ok) { if (vorab) vorab.close(); return; }
   meldung(nurTermin ? "Termin geändert." : "Übernommen – bitte im Praktikumstool eintragen.");
-  if ($("#tTool") && $("#tTool").checked && x.link) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1); }
+  if (vorab) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1, "pbFenster", vorab); }
 }
 /* Termine, die nach der Checkliste nie gehen – sie werden gar nicht angeboten */
 function terminGesperrt(x, datum, zeit) {
@@ -1095,10 +1113,11 @@ async function handlung(typ, i) {
   const id = REFS[i];
   const x = R.praktika.find((p) => p.idpraktikum === id);
   const lekt = x && x.termin ? x.termin.lektion : "";
-  if (!(await eintragen({ typ, praktikum: id }))) return;
+  const vorab = typ === "abgeben" && x && x.link ? window.open("", "pbFenster", popupMasse()) : null;
+  if (!(await eintragen({ typ, praktikum: id }))) { if (vorab) vorab.close(); return; }
   if (typ === "abgeben") {
     meldung("Abgegeben – bitte im Praktikumstool die Buchung löschen (öffnet sich als Fenster).");
-    if (x && x.link) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1); }
+    if (vorab) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1, "pbFenster", vorab); }
   } else meldung("Übernommen – bitte im Praktikumstool buchen.");
 }
 /* Berichte (Protokolle) liegen im gemeinsamen Ordner unter «Protokolle/<Nachname Vorname Studiengang>/»
