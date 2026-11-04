@@ -1585,16 +1585,15 @@ function detailZeigen(id, oeffnen = true) {
     <div class="leise">${esc(p.studiengang || "")}${p.faecher && p.faecher.length ? " · Fächer: " + esc(p.faecher.join(", ")) : ""}${p.nurAlt ? " · nur aus der alten Liste" : ""}</div>
     ${p.spezial.length ? `<div class="karte" style="margin-top:12px;border-color:var(--achtung)"><b class="rot">⚠ Spezialfall</b>${p.spezial.map((f) => `<div>${sjText(f.jahr)} · ${esc(f.kategorie)}: <b>${esc(f.hinweis)}</b>${f.bemerkung ? " – " + esc(f.bemerkung) : ""}</div>`).join("")}</div>` : ""}
     <h3>Verlauf</h3>
-    <table class="liste"><thead><tr><th>Jahr</th><th>Praktikum</th><th>Schule</th><th>nötig?</th><th>Stand</th><th></th></tr></thead><tbody>
+    <table class="liste"><thead><tr><th>Jahr</th><th>Praktikum</th><th>Schule</th><th>Besuch nötig?</th><th>Stand · Bericht</th><th></th></tr></thead><tbody>
     ${p.praktika.map((x) => `<tr><td>${sjText(x.jahr)}</td><td>${esc(x.gruppe)}${x.quelle === "alt" ? ' <span class="leise klein">(alte Liste)</span>' : ""}<div class="leise klein">${zeitraum(x)}</div></td>
       <td>${esc(x.schulort)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
       <td><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}">${esc(x.noetig)}</span><div class="leise klein">${esc(x.warum)}</div></td>
       <td>${standChip(x)}${x.besuchsart === "Wertschätzung" ? ' <span class="klein leise">Wertschätzung</span>' : ""}${x.datum ? `<div class="leise klein">${datumText(x.datum)}</div>` : ""}
-        ${x.lektionen && x.lektionen.length ? `<div style="margin-top:4px">${lektionenZelle(x)}</div>` : ""}
         ${x.berichte && x.berichte.length ? `<div style="margin-top:4px">${berichtLinks(x)}</div>` : ""}
         ${x.notizen.map(notiz).join("")}</td>
-      <td style="white-space:nowrap">${aktionen(x)}<br><button class="knopf klein" onclick="notizZu(REFS[${ref(x.idpraktikum)}])">+ Notiz</button>
-        <button class="knopf klein" title="Besuch nötig von Hand festlegen" onclick="noetigSetzen(REFS[${ref(x.idpraktikum)}])">nötig?</button></td></tr>`).join("")}
+      <td style="white-space:nowrap">${x.wer === S.ich && x.stand !== "besucht" ? `<button class="knopf klein" title="Termin ändern oder wieder abgeben" onclick="anpassen(${ref(x.idpraktikum)})">Anpassen ▾</button>` : ""}
+        ${x.link ? `<button class="knopf klein" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>` : ""}</td></tr>`).join("")}
     </tbody></table>
     <h3>Protokolle</h3><div id="protokolle" class="klein"><span class="leise">wird gesucht …</span></div>
     <h3>Achtung</h3>
