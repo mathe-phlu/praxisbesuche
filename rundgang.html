@@ -1924,7 +1924,8 @@ async function praktikaUebernehmen(liste) {
   bestand.praktika = Object.values(nach);
   bestand.stand = new Date().toISOString();
   await schreibeJSON("stamm/praktika.json", bestand);
-  const text = `<ul><li>${neu} neu, ${geaendert} aktualisiert</li>${Object.entries(proJahr).sort().map(([k, v]) => `<li>${esc(sjText(k.split(" ")[0]))} ${esc(k.split(" ")[1])}: ${v}</li>`).join("")}</ul>`;
+  const fremdeArten = Object.entries(Object.assign({}, ...liste.map((d) => d.andereArten || {})));
+  const text = `${fremdeArten.length ? `<div class="karte" style="border-color:var(--achtung)"><b class="rot">⚠ Im Praktikumstool gibt es Mathe-Praktika in Arten, die hier nicht eingelesen werden:</b><ul>${fremdeArten.map(([id, t]) => `<li>${esc(t)} (Nr. ${esc(id)})</li>`).join("")}</ul>Bitte Rike melden, damit sie dazukommen.</div>` : ""}<ul><li>${neu} neu, ${geaendert} aktualisiert</li>${Object.entries(proJahr).sort().map(([k, v]) => `<li>${esc(sjText(k.split(" ")[0]))} ${esc(k.split(" ")[1])}: ${v}</li>`).join("")}</ul>`;
   await allesLaden();
   if ($("#ergTool")) $("#ergTool").innerHTML = text;
   meldung(`Praktika eingelesen: ${neu} neu, ${geaendert} aktualisiert.`);
@@ -2133,7 +2134,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261104-214858";
+const STAND = "20261104-215106";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
