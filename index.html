@@ -559,7 +559,8 @@ function standBestimmen(x, altBesuch) {
   }
   let wer = alt && alt.wer ? alt.wer : "", stand = alt && alt.status ? alt.status : "", art = alt && alt.art ? alt.art : "", datum = alt && alt.datum ? alt.datum : "";
   if (stand === "besucht" && !wer) stand = "";
-  if (x.quelle === "tool" && x.fachbesuche > 0 && stand !== "besucht") stand = x.jahr < S.einst.studienjahr ? "besucht" : "gebucht";
+  // Ohne Liste «Angemeldete Besuche» (ältere Jahre): Zahl der Fachbesuche aus der Fächerliste. Mit Liste zählen nur Besuche des Teams.
+  if (x.quelle === "tool" && !x.besuche && x.fachbesuche > 0 && stand !== "besucht") stand = x.jahr < S.einst.studienjahr ? "besucht" : "gebucht";
   // Im Praktikumstool gebuchte Besuche: wer (Name der Mathe-Dozierenden) und wann (Lektion) aus dem Stundenplan
   let termin = null;
   if (x.quelle === "tool" && x.besuche) {
@@ -567,9 +568,9 @@ function standBestimmen(x, altBesuch) {
     for (const v of x.besuche.filter((v) => v.fach === "MA")) {
       const text = v.dozent.toLowerCase();
       const d = doz.find((d) => d.name.toLowerCase().split(/\s+/).every((t) => text.includes(t)));
-      if (!wer) wer = d ? d.kuerzel : "";
-      x.dozentTool = v.dozent;
-      if (!d || d.kuerzel === wer) {
+      if (!d) continue;   // Mentor/in o.ä. in einer Mathe-Lektion: zählt nicht als Fachdidaktik-Besuch
+      if (!wer) wer = d.kuerzel;
+      if (d.kuerzel === wer) {
         const l = (x.lektionen || []).find((l) => l.datum === v.datum && l.zeit === v.zeit) || {};
         termin ||= { datum: v.datum, zeit: v.zeit, bis: l.bis || "", lektion: l.id || "", imTool: true };
       }
@@ -597,7 +598,7 @@ function standBestimmen(x, altBesuch) {
     if (e.typ === "termin" && e.wer === wer) termin = e.termin || null;
     if (e.typ === "abgeben" && e.wer === wer) { wer = ""; termin = null; if (stand === "übernommen") stand = ""; }
     if (e.typ === "erledigt") { stand = "besucht"; datum = e.datum || e.zeit; if (!wer) wer = e.wer; if (e.art) art = e.art; }
-    if (e.typ === "zuruecksetzen") { stand = x.fachbesuche > 0 ? "gebucht" : wer ? "übernommen" : ""; datum = ""; }
+    if (e.typ === "zuruecksetzen") { stand = (x.besuche ? termin && termin.imTool : x.fachbesuche > 0) ? "gebucht" : wer ? "übernommen" : ""; datum = ""; }
   }
   if (!stand && wer) stand = "übernommen";
   x.wer = wer; x.stand = stand || "offen"; x.besuchsart = art; x.datum = datum; x.termin = termin;
