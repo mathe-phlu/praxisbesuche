@@ -1570,7 +1570,8 @@ function ansichtHilfe() {
   return `<h2>Hilfe</h2>
   <div class="hilfe">
     <nav class="hilfe-nav">${HILFE.map(([k, t, u], n) => `<button class="${k === wahl[0] ? "an" : ""}" onclick="hilfeWahl('${k}')"><b>${n + 1} · ${t}</b><span>${u}</span></button>`).join("")}
-      <a class="knopf haupt" style="text-decoration:none;text-align:center;margin-top:10px" href="rundgang.html" target="_blank">▶ Rundgang (2 Min)</a></nav>
+      <button class="knopf haupt" style="margin-top:10px" onclick="typeof rundgangStart === 'function' ? rundgangStart() : window.open('rundgang.html')">▶ Rundgang (2 Min)</button>
+      <a class="leise klein" style="text-align:center" href="rundgang.html" target="_blank">oder mit Beispieldaten ansehen</a></nav>
     <div class="karte hilfe-text"><h3>${wahl[1]}</h3>${wahl[3]}</div>
   </div>`;
 }
@@ -1973,5 +1974,102 @@ setInterval(() => {
   if (await ordnerZugriff()) await allesLaden(); else zeichnen();
 })();
 </script>
+<script>window.RUNDGANG_ECHT = true;</script>
+<style>
+#tour { position: fixed; z-index: 50; max-width: 380px; background: #fff; border: 2px solid var(--ph-braun); border-radius: 10px;
+        box-shadow: 0 8px 30px rgba(0,0,0,.25); padding: 14px 16px; font-size: 15px; transition: top .35s, left .35s; }
+#tour .griff { cursor: move; user-select: none; font-size: 12px; color: var(--leise); margin: -6px 0 4px; }
+#tour h4 { margin: 0 0 6px; font-family: var(--hand); font-size: 22px; color: var(--ph-braun-dunkel); font-weight: 400; }
+#tour .tk { display: flex; gap: 8px; justify-content: space-between; align-items: center; margin-top: 10px; }
+#tour .pkt { font-size: 12px; color: var(--leise); }
+.tour-licht { outline: 3px solid #e0a43a !important; outline-offset: 3px; border-radius: 4px; box-shadow: 0 0 0 9999px rgba(0,0,0,.18) !important; position: relative; z-index: 40; }
+</style>
+<script>
+/* Rundgang: führt mit Beispieldaten durch die Seite. Nichts wird gespeichert. */
+// Beispielseite: startet von selbst. Echte Seite (RUNDGANG_ECHT): Start über «▶ Rundgang» in der Hilfe, nichts wird verändert.
+const ECHT = !!window.RUNDGANG_ECHT;
+if (!ECHT) window.addEventListener("load", () => setTimeout(rundgangStart, 900));
+const SCHRITTE = [
+  { ansicht: "start", titel: "Willkommen", text: () => ECHT ? "In zwei Minuten durch die Seite – mit deinen echten Daten. Der Rundgang zeigt nur, er bucht und speichert nichts. Mit «Weiter» geht es zum nächsten Schritt." : "In zwei Minuten durch die Praxisbesuche – mit erfundenen Beispieldaten. Mit «Weiter» geht es zum nächsten Schritt.", vorher: () => geheZu("start") },
+  { ziel: "#ich", ansicht: "start", titel: "Wer bin ich?", text: () => (ECHT ? "Oben rechts steht dein Kürzel." : "Oben rechts das eigene Kürzel wählen (hier im Beispiel: clu).") + " Dann gehören deine Buchungen und «Meine Termine» dir. Den Rundgang kann man jederzeit mit «✕ Beenden» abbrechen oder unten direkt zu einem Schritt springen. Das Kästchen lässt sich oben am Griff verschieben.", vorher: () => { if (!ECHT) { S.ich = "clu"; merke("ich", "clu"); zeichnen(); } } },
+  { ziel: "nav button[data-ansicht=halbtag]", ansicht: "halbtag", titel: "Halbtagespraktikum", text: "Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als PAAR untereinander – «Termine (beide) ▸» bucht den Doppelbesuch. Wer allein ist, steht als EINZELN da. Die Filter hier sind eigene, unabhängig von Profil & Quartal.", vorher: () => geheZu("halbtag") },
+  { ziel: "nav button[data-ansicht=planung]", ansicht: "planung", titel: "Profil & Quartal", text: "Hier wird geplant: alle Profil-, Quartals- und Spezialpraktika des Studienjahrs.", vorher: () => geheZu("planung") },
+  { ziel: ".filterbox .fsek", ansicht: "planung", titel: "Grundauswahl", text: "Oben der Filter (mit «▾ Filter» auf- und zuklappen). Links die Grundauswahl: welche Praktika, ob ein Besuch nötig ist, und der Stand (offen, gebucht, besucht). Ein Klick schaltet um.",
+    vorher: () => { merke("filterbox", "auf"); zeichnen(); } },
+  { ziel: ".filterbox details.fsek", ansicht: "planung", titel: "Wann", text: "Der ganze Filter lässt sich oben auf- und zuklappen. Aufklappen: Zeitraum, Tag, Vormittag/Nachmittag, Einzel- oder Doppellektion und «danach Zeit zum Besprechen».", vorher: () => { merke("filterbox", "auf"); zeichnen(); const d = document.querySelector(".filterbox details.fsek"); if (d) d.open = true; } },
+  { ziel: ".aktivleiste", ansicht: "planung", titel: "Was gerade gefiltert ist", text: "Über der Liste stehen die aktiven Filter. Standardmässig an: «nicht schon von mir besucht» – wen du schon besucht hast, ist ausgeblendet. Mit ✕ ist ein Filter wieder weg." },
+  { ziel: "#app table.liste tbody tr .name", ansicht: "planung", titel: "Name anklicken", text: "Ein Klick auf den Namen öffnet rechts die Grundinformationen: alle Praktika, wer schon besucht hat, Bemerkungen und Achtung-Vermerke.",
+    vorher: () => { const n = document.querySelector("#app table.liste tbody tr .name"); if (n) n.click(); }, nachher: () => detailZu() },
+  { ziel: "#app table.liste tbody tr td:last-child .knopf", ansicht: "planung", titel: "Buchen", text: "In der Spalte «Buchen» steht pro Person «Termine ▸», darunter klein, an welchen Tagen Mathe ist und wie viele Termine möglich sind. Tag und Tageszeit wählst du am einfachsten oben im Filter.",
+    vorher: () => { if (!ECHT) { merke("filter", "{}"); S.filter = {}; zeichnen(); } } },
+  { ziel: "#frageFeld .leg-zeile", ansicht: "planung", titel: "Grosse Ansicht: so buchst du", text: "«Termine ▸» öffnet alle möglichen Termine Woche für Woche. Oben die Legende: flach = Einzellektion, hoch = Doppellektion, grün = danach frei zum Besprechen. Termine, die gegen die Regeln verstossen, sind schon weg. Termin anklicken und bestätigen: Damit ist er hier gebucht, und das Praktikumstool öffnet sich bei dieser Woche – dort «Besuch eintragen».",
+    vorher: () => { const b = document.querySelector("#app table.liste tbody tr td:last-child .knopf.haupt"); if (b) b.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
+  { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Termin wieder abgeben", text: "Bei deinen eigenen Buchungen steht dort «Termin wieder abgeben» – falls es im Praktikumstool doch nicht klappt. Danach öffnet sich das Tool, damit du die Buchung dort auch löschst." },
+  { ziel: ".aktivleiste .knopf", ansicht: "planung", titel: "Liste für Excel kopieren", text: "Kopiert die Liste, so wie sie gefiltert ist – dann in Excel oder eine Mail einfügen." },
+  { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "Hier hast du alle deine Termine im Überblick, nach Tag geordnet und filterbar nach Halbtag, Profil, Quartal. Pro Termin: «✓ Erledigt» nach dem Besuch; «Anpassen» – Termin ändern oder wieder abgeben, danach öffnet sich das Praktikumstool, damit du es dort auch anpasst; «Achtung / Bemerkung» – Pflichtbesuch später (z.B. im Quartal) oder nur eine Bemerkung; «Bericht ↑» legt deinen Bericht in den Ordner der Person unter «Protokolle» und öffnet gleich danach eine neue E-Mail an Studierende, Mathe-PxL und Mentor/in mit Betreff und Text – Bericht hineinziehen, senden; danach «📄 öffnen», «✉ E-Mail» (Entwurf nochmals) und «✕» (falsch hochgeladen? löschen); ganz rechts «Tool ↗». Unter dem Namen klappen die «Kontakte» auf: Mathe-PxL, zuständige PxL und Mentor/in mit E-Mail. Die Hinweise rechts melden, falls doch etwas gegen eine Regel verstösst (z.B. Buchungen, die ausserhalb dieser Seite gemacht wurden).", vorher: () => geheZu("termine") },
+  { ziel: "#protokolle", ansicht: "termine", titel: "Protokolle im Verlauf", text: "Klick auf einen Namen: Im Verlauf stehen unter «Protokolle» alle Berichte der Person aus dem gemeinsamen Ordner – auch die alten. Vor einem Besuch z.B. kurz den Halbtagsbericht anschauen.",
+    vorher: () => { const n = document.querySelector("#app table.liste tbody tr .name"); if (n) n.click(); }, nachher: () => detailZu() },
+  { ziel: "nav button[data-ansicht=studierende]", ansicht: "studierende", titel: "Studierende", text: "Eine Zeile je Person: Halbtag, Profil, Quartal je mit Datum · Stand · Kürzel (NN = unbekannt). Suche beim Tippen, Filter nach Studienjahr, Sortierung. Abgeschlossene sind im Archiv.", vorher: () => geheZu("studierende") },
+  { ansicht: "start", titel: "Los geht's", text: () => ECHT ? "Das war's – du bist auf der echten Seite und kannst gleich loslegen. Die Hilfe oben erklärt alles nochmals Schritt für Schritt." : "Das war die Beispielseite. Jetzt oben «Zur echten Seite» klicken: in Chrome oder Edge öffnen, einmal den Ordner «Mathematik Sek1 - TM - Praxisbesuche» aus OneDrive wählen, Kürzel wählen – fertig. Die Hilfe oben erklärt alles nochmals.", vorher: () => geheZu("start"), ende: true },
+];
+let schritt = 0, uhr = null;
+function rundgangStart() {
+  const t = document.createElement("div"); t.id = "tour"; document.body.appendChild(t);
+  zeige(0);
+}
+function zeige(i) {
+  const alt = SCHRITTE[schritt]; if (alt && alt.nachher && i !== schritt) alt.nachher();
+  document.querySelectorAll(".tour-licht").forEach((e) => e.classList.remove("tour-licht"));
+  schritt = Math.max(0, Math.min(SCHRITTE.length - 1, i));
+  const s = SCHRITTE[schritt];
+  if (s.ansicht && S.ansicht !== s.ansicht) geheZu(s.ansicht);
+  if (s.ansicht === "planung" && lies("raster") === "zu") { merke("raster", "auf"); zeichnen(); }
+  if (s.vorher) s.vorher();
+  const sText = typeof s.text === "function" ? s.text() : s.text;
+  setTimeout(() => {
+    const t = document.getElementById("tour");
+    // Ist die grosse Ansicht (Dialog) offen, muss das Tour-Fenster darin liegen, sonst ist es nicht anklickbar
+    const dlg = $("#frage");
+    if (dlg.open && t.parentElement !== dlg) dlg.appendChild(t);
+    if (!dlg.open && t.parentElement !== document.body) document.body.appendChild(t);
+    const ziel = s.ziel ? document.querySelector(s.ziel) : null;
+    t.innerHTML = `<div class="griff" title="Kästchen verschieben">⠿ ziehen zum Verschieben</div><button class="knopf klein" style="position:absolute;right:8px;top:8px" title="Rundgang beenden" onclick="rundgangEnde()">✕ Beenden</button>
+      <h4 style="margin-right:80px">${s.titel}</h4><div>${sText}</div>
+      <div style="margin-top:8px"><select class="eingabe klein" onchange="zeige(Number(this.value))" title="Direkt zu einem Schritt">${SCHRITTE.map((x, i) => `<option value="${i}" ${i === schritt ? "selected" : ""}>${i + 1}. ${x.titel}</option>`).join("")}</select></div>
+      <div class="tk"><span class="pkt">${schritt + 1} / ${SCHRITTE.length}</span>
+      <span>${schritt ? '<button class="knopf klein" onclick="weiter(-1)">Zurück</button>' : ""}
+      ${s.ende ? (ECHT ? '<button class="knopf haupt klein" onclick="rundgangEnde()">Schliessen</button>' : '<a class="knopf haupt klein" style="text-decoration:none" href="./">Zur echten Seite</a>')
+               : '<button class="knopf haupt klein" onclick="weiter(1)">Weiter</button>'}</span></div>`;
+    if (ziel) {
+      ziel.classList.add("tour-licht"); ziel.scrollIntoView({ block: "center", behavior: "smooth" });
+      const r = ziel.getBoundingClientRect();
+      const top = r.bottom + 14 + 190 < innerHeight ? r.bottom + 14 : Math.max(10, r.top - 200);
+      t.style.top = top + "px"; t.style.left = Math.min(innerWidth - 400, Math.max(10, r.left)) + "px";
+    } else { t.style.top = "30%"; t.style.left = "calc(50% - 190px)"; }
+    clearTimeout(uhr);
+  }, 350);
+}
+function weiter(d) { zeige(schritt + d); }
+/* Kästchen mit der Maus verschieben (falls es etwas verdeckt) */
+document.addEventListener("mousedown", (e) => {
+  const g = e.target.closest && e.target.closest("#tour .griff"); if (!g) return;
+  const t = document.getElementById("tour"), r = t.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
+  t.style.transition = "none";
+  const zieh = (m) => { t.style.left = Math.max(0, m.clientX - dx) + "px"; t.style.top = Math.max(0, m.clientY - dy) + "px"; };
+  const los = () => { document.removeEventListener("mousemove", zieh); document.removeEventListener("mouseup", los); t.style.transition = ""; };
+  document.addEventListener("mousemove", zieh); document.addEventListener("mouseup", los); e.preventDefault();
+});
+function rundgangEnde() {
+  const s = SCHRITTE[schritt]; if (s && s.nachher) s.nachher();
+  document.querySelectorAll(".tour-licht").forEach((e) => e.classList.remove("tour-licht"));
+  const t = document.getElementById("tour"); if (t) t.remove();
+  if (ECHT) return;
+  const k = document.createElement("button"); k.className = "knopf haupt"; k.textContent = "▶ Rundgang neu starten";
+  k.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:50"; k.onclick = () => { k.remove(); rundgangStart(); };
+  document.body.appendChild(k);
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && document.getElementById("tour")) rundgangEnde(); });
+</script>
+
 </body>
 </html>
