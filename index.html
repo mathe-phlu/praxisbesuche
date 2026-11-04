@@ -41,6 +41,8 @@ button.knopf:hover { background: var(--grau); }
 .kontakte summary { cursor: pointer; color: var(--ph-braun-dunkel); }
 .kontakte > div, .kontakte details > div { margin: 2px 0 2px 12px; }
 .kontakte details summary { margin-left: 12px; }
+a.bericht { text-decoration: none; margin-left: 3px; }
+a.bericht:hover { text-decoration: underline; }
 .akt { display: flex; gap: 4px; align-items: center; }
 .akt-rechts { margin-left: auto; padding-left: 4px; }
 button.knopf.haupt { background: var(--ph-braun); color: #fff; border-color: var(--ph-braun); }
@@ -105,6 +107,11 @@ table.liste { border-collapse: collapse; width: 100%; background: #fff; border: 
 table.liste th { position: sticky; top: 56px; background: var(--ph-braun); color: #fff; font-weight: 600; text-align: left; padding: 8px 10px; font-size: 14px; white-space: nowrap; }
 table.liste td { padding: 7px 10px; border-bottom: 1px solid var(--linie); vertical-align: top; }
 table.liste tr:hover td { background: #fbfbfb; }
+/* Spalten deutlich trennen: abwechselnd leicht getönt, Kopf mit hellen Trennern */
+table.liste.spalten td:nth-child(even) { background: #faf7f1; }
+table.liste.spalten tr:hover td { background: #f3eee4; }
+table.liste.spalten th + th { border-left: 1px solid rgba(255,255,255,.25); }
+table.liste.spalten td.noetig { width: 1%; white-space: nowrap; text-align: center; }
 table.liste td.name { font-weight: 600; cursor: pointer; color: var(--akzent); white-space: nowrap; }
 table.liste td.name:hover { text-decoration: underline; }
 .chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 13px; white-space: nowrap; }
@@ -613,6 +620,10 @@ function standBestimmen(x, altBesuch) {
   x.doppelt = doppelt.filter((w) => w !== wer);
   x.besuchtVon = wer && (x.stand === "besucht" || x.stand === "übernommen" || x.stand === "gebucht") ? [wer] : [];
   x.notizen = x.eintraege.filter((e) => e.typ === "notiz");
+  // Berichte: je Dateiname der neueste Eintrag; «bericht_weg» entfernt ihn
+  const ber = {};
+  for (const e of x.eintraege) { if (e.typ === "bericht") ber[e.datei] = e; if (e.typ === "bericht_weg") delete ber[e.datei]; }
+  x.berichte = Object.values(ber);
 }
 
 function noetigBestimmen(x) {
@@ -770,6 +781,8 @@ function aktionen(x) {
   const tool = x.link ? `<button class="knopf klein" title="Im Praktikumstool öffnen (Fenster rechts)" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>` : "";
   if (S.ansicht === "termine") {
     k.push(`<button class="knopf klein" title="z.B. «muss im Quartal besucht werden» oder eine Bemerkung zur Person" onclick="achtungSetzen(REFS[${ref(x.person.id)}])">Achtung / Bemerkung</button>`);
+    k.push(`<button class="knopf klein" title="Bericht (PDF/Word) in den gemeinsamen Ordner «Berichte/${esc(x.jahr)}» legen" onclick="berichtHochladen(${ref(x.idpraktikum)})">Bericht ↑</button>`);
+    if (x.berichte && x.berichte.length) k.push(berichtLinks(x));
     const letzte = x.notizen && x.notizen.length ? x.notizen[x.notizen.length - 1] : null;
     return reihe(k, tool) + (letzte ? `<div class="klein leise" style="white-space:normal;max-width:300px;margin-top:3px">✎ ${esc(letzte.text)} <i>(${esc(letzte.wer)})</i></div>` : "");
   }
@@ -971,6 +984,41 @@ async function handlung(typ, i) {
     if (x && x.link) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1); }
   } else meldung("Übernommen – bitte im Praktikumstool buchen.");
 }
+/* Berichte liegen im gemeinsamen Ordner unter «Berichte/<Studienjahr>» (neben «Daten») */
+async function berichtBasis(anlegen) {
+  const basis = S.wurzel && S.wurzel !== S.ordner ? S.wurzel : S.ordner;
+  return basis.getDirectoryHandle("Berichte", { create: anlegen });
+}
+async function berichtHochladen(i) {
+  const x = R.praktika.find((p) => p.idpraktikum === REFS[i]); if (!x) return;
+  if (!S.ich) return meldung("Bitte oben rechts «Ich bin» wählen.");
+  const wahl = document.createElement("input"); wahl.type = "file"; wahl.accept = ".pdf,.docx,.doc,.odt,.pages";
+  wahl.onchange = async () => {
+    const f = wahl.files[0]; if (!f) return;
+    const endung = (f.name.match(/\.[a-z0-9]+$/i) || [".pdf"])[0].toLowerCase();
+    const sauber = (t) => String(t || "").replace(/[\/\\:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
+    const name = sauber(`${x.jahr} ${x.gruppe} ${x.person.name} ${S.ich}`) + endung;
+    try {
+      const jahrOrdner = await (await berichtBasis(true)).getDirectoryHandle(x.jahr || "ohne Jahr", { create: true });
+      const w = await (await jahrOrdner.getFileHandle(name, { create: true })).createWritable();
+      await w.write(await f.arrayBuffer()); await w.close();
+      await eintragen({ typ: "bericht", praktikum: x.idpraktikum, person: x.person.id, datei: `${x.jahr || "ohne Jahr"}/${name}`, original: f.name });
+      meldung(`Bericht abgelegt: Berichte/${x.jahr}/${name}`);
+    } catch (e) { meldung("Bericht konnte nicht gespeichert werden: " + e.message); }
+  };
+  wahl.click();
+}
+async function berichtOeffnen(i) {
+  const pfad = REFS[i];
+  try {
+    const [jahr, name] = pfad.split("/");
+    const f = await (await (await (await berichtBasis(false)).getDirectoryHandle(jahr)).getFileHandle(name)).getFile();
+    window.open(URL.createObjectURL(f), "_blank");
+  } catch (e) { meldung("Bericht nicht gefunden – vielleicht noch nicht synchronisiert. (Ordner «Berichte/" + pfad + "»)"); }
+}
+function berichtLinks(x, kurz) {
+  return (x.berichte || []).map((b) => `<a href="#" class="bericht" title="${esc(b.datei)} – von ${esc(b.wer)}" onclick="event.preventDefault();berichtOeffnen(${ref(b.datei)})">📄${kurz ? "" : " Bericht"}</a>`).join(" ");
+}
 /* «Anpassen» in Meine Termine: Termin ändern oder wieder abgeben – danach geht es jeweils ins Praktikumstool */
 async function anpassen(i) {
   const x = R.praktika.find((p) => p.idpraktikum === REFS[i]); if (!x) return;
@@ -1033,10 +1081,10 @@ function filterLeiste(ansicht, anzahl) {
       <select onchange="setzeFilter('umKm',this.value)">${opt([["", "– km"], ["5", "5 km"], ["10", "10 km"], ["15", "15 km"], ["20", "20 km"], ["30", "30 km"], ["50", "50 km"]], fw("umKm", ""))}</select>
       ${orte.length ? "" : '<span class="leise klein">Orte zuerst unter «Aktualisieren» suchen lassen.</span>'}</div>`;
   // Weitere
-  const weitereAktiv = [fw("name", "") && "Name «" + fw("name", "") + "»", fw("nichtVonMir", false) && "nicht von mir besucht", fw("nurMeine", false) && "nur meine", fw("nurAchtung", false) && "nur ⚠"].filter(Boolean);
+  const weitereAktiv = [fw("name", "") && "Name «" + fw("name", "") + "»", fw("nichtVonMir", true) && "nicht von mir besucht", fw("nurMeine", false) && "nur meine", fw("nurAchtung", false) && "nur ⚠"].filter(Boolean);
   const weitere = `<div class="fblock"><span class="ftitel">Name</span><input type="search" value="${esc(fw("name", ""))}" onchange="setzeFilter('name',this.value)" placeholder="Name, Studiengang, Fach"></div>
     <div class="fblock haken-liste">
-      <label class="haken"><input type="checkbox" ${fw("nichtVonMir", false) ? "checked" : ""} onchange="setzeFilter('nichtVonMir',this.checked)"> nicht schon von mir besucht</label>
+      <label class="haken"><input type="checkbox" ${fw("nichtVonMir", true) ? "checked" : ""} onchange="setzeFilter('nichtVonMir',this.checked)"> nicht schon von mir besucht</label>
       <label class="haken"><input type="checkbox" ${fw("nurMeine", false) ? "checked" : ""} onchange="setzeFilter('nurMeine',this.checked)"> nur meine</label>
       <label class="haken"><input type="checkbox" ${fw("nurAchtung", false) ? "checked" : ""} onchange="setzeFilter('nurAchtung',this.checked)"> nur ⚠ Spezialfälle</label></div>`;
   const gruppe = (titel, inhalt) => `<section class="fsek"><h4>${titel}</h4>${inhalt}</section>`;
@@ -1067,7 +1115,7 @@ function aktivLeiste(ansicht, anzahl) {
   if (fw("ort", "")) weg("ort", "Ort: " + fw("ort", ""));
   if (fw("umOrt", "") && fw("umKm", "")) weg("umKm", `${fw("umKm", "")} km um ${fw("umOrt", "")}`);
   if (fw("name", "")) weg("name", "Name: " + fw("name", ""));
-  if (fw("nichtVonMir", false)) weg("nichtVonMir", "nicht von mir besucht");
+  if (fw("nichtVonMir", true)) c.push(`<button type="button" class="aktivchip" onclick="setzeFilter('nichtVonMir',false)" title="Filter ausschalten">nicht schon von mir besucht ✕</button>`);
   if (fw("nurMeine", false)) weg("nurMeine", "nur meine");
   if (fw("nurAchtung", false)) weg("nurAchtung", "nur ⚠");
   return `<div class="aktivleiste"><b>${anzahl}</b> ${anzahl === 1 ? "Eintrag" : "Einträge"}${c.length ? " · " + c.join(" ") : ' <span class="leise klein">· keine Einschränkung</span>'}
@@ -1109,7 +1157,7 @@ function filtern(liste, ansicht) {
     if (fw("ort", "") && !passtSuche([x.schulort, x.schulhaus].join(" "), fw("ort", "").toLowerCase().trim())) return false;
     if (fw("umOrt", "") && fw("umKm", "")) { const d = km(fw("umOrt", ""), x.schulort); if (d == null || d > Number(fw("umKm", ""))) return false; }
     if (fw("name", "") && !passtSuche([x.person.name, x.person.studiengang, (x.faecher || []).join(" ")].join(" "), fw("name", "").toLowerCase().trim())) return false;
-    if (fw("nichtVonMir", false) && S.ich && x.person.praktika.some((y) => y !== x && y.besuchtVon.includes(S.ich))) return false;
+    if (fw("nichtVonMir", true) && S.ich && x.person.praktika.some((y) => y !== x && y.besuchtVon.includes(S.ich))) return false;
     if (fw("nurMeine", false) && (!S.ich || x.wer !== S.ich)) return false;
     if (fw("nurAchtung", false) && !(x.achtung && x.achtung.length)) return false;
     return true;
@@ -1142,14 +1190,14 @@ function ansichtPlanung() {
   <div class="mitfilter">${filterLeiste("planung", liste.length)}<div class="inhalt">
   ${aktivLeiste("planung", liste.length)}
   ${legende()}
-  ${liste.length ? `<table class="liste"><thead><tr><th></th><th>Name</th><th>Prakt.</th><th>Zeitraum</th><th>Schule</th><th>Besuch nötig?</th><th>Stand</th><th>Mathe-Lektionen</th><th>Früher besucht von</th><th></th></tr></thead><tbody>
+  ${liste.length ? `<table class="liste spalten"><thead><tr><th></th><th>Name</th><th>Prakt.</th><th>Zeitraum</th><th>Schule</th><th title="Besuch nötig?">nötig</th><th>Stand</th><th>Mathe-Lektionen</th><th></th></tr></thead><tbody>
   ${liste.map((x) => `<tr class="${x.achtung.length ? "zeile-achtung" : ""}">
     <td>${achtungZeichen(x)}</td>
     <td class="name" title="Fächer: ${esc((x.faecher || []).join(", "))}" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}<div class="leise klein">${esc(x.person.studiengang || "")} · ${esc((x.faecher || []).join(", "))}</div></td>
     <td>${esc(x.gruppe)}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
-    <td><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}" title="${esc(x.warum)}">${esc(x.noetig)}</span>${x.achtung.length ? `<div class="klein rot">${esc(x.achtung.map((f) => f.hinweis).join(" · "))}</div>` : ""}</td>
-    <td>${standChip(x)}</td><td>${lektionenZelle(x)}</td><td>${frueherBesucht(x)}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`).join("")}
+    <td class="noetig"><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}" title="${esc(x.warum)}">${esc({ optional: "opt.", später: "später" }[x.noetig] || x.noetig)}</span>${x.achtung.length ? `<div class="klein rot" title="${esc(x.achtung.map((f) => f.hinweis).join(" · "))}">⚠ Pflicht</div>` : ""}</td>
+    <td>${standChip(x)}</td><td>${lektionenZelle(x)}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`).join("")}
   </tbody></table>` : `<div class="leer">Keine Praktika für diese Auswahl.</div>`}</div></div>`;
 }
 
@@ -1230,7 +1278,7 @@ function ansichtHalbtag() {
   <div class="mitfilter">${filterLeiste("halbtag", liste.length)}<div class="inhalt">
   ${aktivLeiste("halbtag", liste.length)}
   ${legende()}
-  ${zeilen.length ? `<table class="liste"><thead><tr><th>Studierende</th><th>Periode</th><th>Zeitraum</th><th>Schule</th><th>Stand</th><th>Mathe-Lektionen</th><th>Früher besucht von</th><th></th></tr></thead><tbody>
+  ${zeilen.length ? `<table class="liste spalten"><thead><tr><th>Studierende</th><th>Periode</th><th>Zeitraum</th><th>Schule</th><th>Stand</th><th>Mathe-Lektionen</th><th></th></tr></thead><tbody>
   ${zeilen.map((z) => { const x = z[0];
     return `<tr class="${z.some((y) => y.achtung.length) ? "zeile-achtung" : ""}">
     <td><div class="klein ${z.length === 2 ? "paar" : "einzeln"}">${z.length === 2 ? "Paar · Doppelbesuch" : "einzeln"}</div>${z.map(name).join("")}</td>
@@ -1238,7 +1286,6 @@ function ansichtHalbtag() {
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
     <td>${z.map((y) => `<div>${standChip(y)}</div>`).join("")}</td>
     <td>${lektionenZelle(x, z[1])}</td>
-    <td>${z.map(frueherBesucht).join("<br>")}</td>
     <td style="white-space:nowrap">${z.length === 2 ? paarAktionen(z) : aktionen(x)}</td></tr>`; }).join("")}
   </tbody></table>` : `<div class="leer">Keine Halbtagespraktika für diese Auswahl.</div>`}</div></div>`;
 }
@@ -1279,7 +1326,7 @@ function ansichtStudierende() {
     const d = x.termin ? x.termin.datum : x.datum;
     const stand = { "übernommen": "gebucht" }[x.stand] || x.stand;
     const wer = ["besucht", "gebucht", "übernommen"].includes(x.stand) ? (x.wer || "NN") : "";
-    return `<div class="ue"><span class="ue-j">${sjText(x.jahr)}${per ? " " + per : ""}</span><span class="ue-d">${d ? esc(datumText(d).replace(/\.20(\d\d)$/, ".$1")) : ""}</span><span class="chip ${cls}">${esc(stand)}</span><b class="ue-w">${esc(wer)}</b></div>`;
+    return `<div class="ue"><span class="ue-j">${sjText(x.jahr)}${per ? " " + per : ""}</span><span class="ue-d">${d ? esc(datumText(d).replace(/\.20(\d\d)$/, ".$1")) : ""}</span><span class="chip ${cls}">${esc(stand)}</span><b class="ue-w">${esc(wer)}${berichtLinks(x, true)}</b></div>`;
   };
   const zelle = (p, g) => {
     const xs = p.praktika.filter((x) => x.gruppe === g);
@@ -1321,6 +1368,7 @@ const HILFE = [
     <li>Oben rechts bei <b>Ich bin</b> dein Kürzel wählen. Fertig.</li></ol>`],
   ["suchen", "Besuche suchen", "Wen kann ich wann besuchen?", `<ol class="schritte">
     <li>Reiter <b>Profil &amp; Quartal</b> öffnen.</li>
+    <li>Standardmässig ausgeblendet: Personen, die du schon besucht hast («nicht schon von mir besucht» – mit ✕ ausschalten).</li>
     <li>Oben den <b>Filter</b> aufklappen: Praktikum, Besuch nötig, Stand. Bei Bedarf <b>Wann</b> (Tag, Vormittag, Doppellektion), <b>Wo</b> (Ort, Umkreis) und <b>Weitere</b>.</li>
     <li>In der Spalte <b>Mathe-Lektionen</b> siehst du pro Person den Wochenplan Mo–Fr.</li>
     <li>Aktive Filter stehen über der Liste – mit ✕ sind sie wieder weg.</li></ol>
@@ -1336,7 +1384,8 @@ const HILFE = [
     <li>Nach dem Besuch: <b>✓ Erledigt</b>.</li>
     <li>Termin passt nicht mehr: <b>Anpassen</b> → «Termin ändern» oder «Wieder abgeben». Danach öffnet sich das Tool – dort auch anpassen.</li>
     <li>Unter dem Namen: <b>Kontakte</b> (Mathe-PxL, zuständige PxL, Mentor/in mit E-Mail).</li>
-    <li><b>Achtung / Bemerkung</b>: z.B. «muss im Quartal besucht werden» oder nur eine Bemerkung.</li></ol>
+    <li><b>Achtung / Bemerkung</b>: z.B. «muss im Quartal besucht werden» oder nur eine Bemerkung.</li>
+    <li><b>Bericht ↑</b>: Bericht (PDF oder Word) hochladen. Er landet im gemeinsamen Ordner unter <b>Berichte/Studienjahr</b>. Bei den Studierenden erscheint dann 📄 – Klick öffnet ihn.</li></ol>
     <p class="leise">⚠ rechts = Regel verletzt (z.B. Buchung ausserhalb dieser Seite). Ein Doppelbesuch zur selben Zeit ist kein Problem.</p>`],
   ["halbtag", "Halbtagespraktikum", "Was ist anders?", `<ol class="schritte">
     <li>Reiter <b>Halbtagespraktikum</b>. Filter nach <b>Periode</b> (A–D) statt nach Tag.</li>
@@ -1347,7 +1396,8 @@ const HILFE = [
   ["studierende", "Studierende", "Alle Praktika einer Person", `<ol class="schritte">
     <li>Reiter <b>Studierende</b>: eine Zeile pro Person, Halbtag · Profil · Quartal.</li>
     <li>Suchen beim Tippen, filtern nach Studienjahr. Abgeschlossene sind im <b>Archiv</b>.</li>
-    <li>Klick auf den Namen: Verlauf, wer schon besucht hat, Bemerkungen, ⚠ Achtung.</li></ol>`],
+    <li>Klick auf den Namen: Verlauf, wer schon besucht hat, Bemerkungen, ⚠ Achtung.</li>
+    <li>📄 neben einem Praktikum = Bericht. Vor einem Besuch z.B. kurz den Halbtagsbericht anschauen.</li></ol>`],
   ["anhang", "Anhang", "Aktualisieren, Regeln, Stand", `<ul class="schritte">
     <li><b>Normalerweise ist nichts zu tun.</b> Änderungen der anderen erscheinen nach der Synchronisation (sofort: ↻ oben rechts).</li>
     <li>Vor neuen Praktika (eine Person für alle): Reiter <b>Aktualisieren</b> → «Praktikumstool öffnen und Daten holen» → im Tool das Lesezeichen klicken.</li>
@@ -1389,6 +1439,7 @@ function detailZeigen(id, oeffnen = true) {
       <td><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}">${esc(x.noetig)}</span><div class="leise klein">${esc(x.warum)}</div></td>
       <td>${standChip(x)}${x.besuchsart === "Wertschätzung" ? ' <span class="klein leise">Wertschätzung</span>' : ""}${x.datum ? `<div class="leise klein">${datumText(x.datum)}</div>` : ""}
         ${x.lektionen && x.lektionen.length ? `<div style="margin-top:4px">${lektionenZelle(x)}</div>` : ""}
+        ${x.berichte && x.berichte.length ? `<div style="margin-top:4px">${berichtLinks(x)}</div>` : ""}
         ${x.notizen.map(notiz).join("")}</td>
       <td style="white-space:nowrap">${aktionen(x)}<br><button class="knopf klein" onclick="notizZu(REFS[${ref(x.idpraktikum)}])">+ Notiz</button>
         <button class="knopf klein" title="Besuch nötig von Hand festlegen" onclick="noetigSetzen(REFS[${ref(x.idpraktikum)}])">nötig?</button></td></tr>`).join("")}
@@ -1547,6 +1598,9 @@ async function praktikaUebernehmen(liste) {
       if (!p.idpraktikum || !p.idstudent) continue;
       const alt = nach[p.idpraktikum];
       if (alt && alt.lektionen && !p.lektionen) p.lektionen = alt.lektionen;   // Export ohne Stundenpläne
+      // nur Mathe-Besuche des Teams speichern – Mentor/innen, andere Fächer und andere Personen interessieren nicht
+      if (p.besuche) p.besuche = p.besuche.filter((v) => v.fach === "MA" && teamKuerzel(v.dozent));
+      for (const l of p.lektionen || []) if (l.gebucht) l.gebucht = l.gebucht.filter((g) => teamKuerzel(g));
       if (alt && alt.besuche && !p.besuche) p.besuche = alt.besuche;
       if (alt && alt.kontakte && !p.kontakte) p.kontakte = alt.kontakte;
       if (!alt) neu++; else if (JSON.stringify(alt) !== JSON.stringify(p)) geaendert++;
