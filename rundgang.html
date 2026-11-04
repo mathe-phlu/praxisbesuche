@@ -45,6 +45,7 @@ a.bericht { text-decoration: none; margin-left: 3px; }
 .ber-knoepfe { display: inline-flex; gap: 2px; padding: 2px; border: 1px dashed #cfc3ad; border-radius: 6px; }
 a.bericht:hover { text-decoration: underline; }
 .einrichten { max-width: 720px; }
+.korr-form { display: grid; gap: 8px; } .korr-form label { display: grid; gap: 3px; font-size: 13.5px; }
 .sk-reihe { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 14px; }
 .sk { border-radius: 12px; padding: 14px 16px 16px; cursor: pointer; border: 1px solid transparent; border-top: 6px solid var(--f); background: var(--h); color: var(--tinte); transition: transform .12s, box-shadow .12s; }
 .sk:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.08); }
@@ -146,6 +147,8 @@ table.liste.spalten td.noetig { width: 1%; white-space: nowrap; text-align: cent
 table.liste td.name { font-weight: 600; cursor: pointer; color: var(--akzent); white-space: nowrap; }
 table.liste td.name:hover { text-decoration: underline; }
 .chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 13px; white-space: nowrap; }
+.s-abbruch { background: #f3d6d2; color: #7a2a20; }
+.ue.korr { cursor: pointer; border-radius: 4px; } .ue.korr:hover { background: rgba(0,0,0,.06); }
 .s-offen { background: var(--offen); } .s-uebernommen { background: var(--gebucht); } .s-gebucht { background: var(--gebucht); }
 .s-besucht { background: var(--besucht); } .s-nicht { background: var(--nichtnoetig); color: #888; }
 .n-ja { font-weight: 700; color: var(--achtung); } .n-optional { color: var(--leise); } .n-nein { color: #aaa; } .n-spaeter { color: #aaa; }
@@ -716,6 +719,11 @@ function standBestimmen(x, altBesuch) {
     if (e.typ === "termin" && e.wer === wer) termin = e.termin || null;
     if (e.typ === "abgeben" && e.wer === wer) { wer = ""; termin = null; if (stand === "übernommen") stand = ""; }
     if (e.typ === "erledigt") { stand = "besucht"; datum = e.datum || e.zeit; if (!wer) wer = e.wer; if (e.art) art = e.art; }
+    if (e.typ === "korrektur") {   // von Hand korrigiert (Studierende): gilt ab hier
+      stand = e.stand; wer = e.wer || ""; if (e.datum) datum = e.datum;
+      if (stand === "offen" || stand === "abgebrochen" || stand === "nicht nötig") termin = null;
+      if (e.datumTermin) termin = { datum: e.datumTermin, zeit: "", imTool: false };
+    }
     if (e.typ === "zuruecksetzen") { stand = (x.besuche ? termin && termin.imTool : x.fachbesuche > 0) ? "gebucht" : wer ? "übernommen" : ""; datum = ""; }
   }
   if (!stand && wer) stand = "übernommen";
@@ -752,6 +760,7 @@ function noetigBestimmen(x) {
   } else { n = "ja"; warum = x.gruppe; }
   if (x.achtung.some((f) => f.stufe === "zwingend")) { n = "ja"; warum = x.achtung.map((f) => f.hinweis).join(" · "); }
   if (uebersteuert) { n = uebersteuert.wert; warum = `von Hand (${uebersteuert.wer}): ${uebersteuert.text || ""}`; }
+  if (x.stand === "abgebrochen") { n = "nein"; warum = "Praktikum abgebrochen"; }
   x.noetig = n; x.warum = warum;
   if (x.stand === "offen" && n === "nein") x.stand = "nicht nötig";
 }
@@ -862,7 +871,7 @@ function sollKarte(sj) {
 function geheZu(a, filter) { S.ansicht = a; merke("ansicht", a); if (filter) Object.assign(S.filter, filter); zeichnen(); window.scrollTo(0, 0); }
 
 function standChip(x, kurz = false, ohneWer = false) {
-  const cls = { offen: "s-offen", "übernommen": "s-uebernommen", gebucht: "s-gebucht", besucht: "s-besucht", "nicht nötig": "s-nicht" }[x.stand] || "s-nicht";
+  const cls = { offen: "s-offen", "übernommen": "s-uebernommen", gebucht: "s-gebucht", besucht: "s-besucht", "nicht nötig": "s-nicht", abgebrochen: "s-abbruch" }[x.stand] || "s-nicht";
   const wer = ohneWer ? "" : x.wer ? ` · ${esc(x.wer)}` : x.dozentTool ? ` · ${esc(x.dozentTool)}` : "";
   const t = "";   // der Termin steht in «Meine Termine», nicht beim Stand
   const doppelt = x.doppelt && x.doppelt.length ? ` <span class="hinweis" title="Mehrere haben übernommen – bitte absprechen">doppelt: ${esc(x.doppelt.join(", "))}</span>` : "";
@@ -1240,6 +1249,35 @@ async function protokolleZeigen(personId) {
     feld.innerHTML = `<p class="leise klein">Ordner: Protokolle/${esc(o.name)}</p>` + (dateien.map((n) => `<div><a href="#" class="bericht" onclick="event.preventDefault();berichtOeffnen(${ref(o.name + "/" + n)})">📄 ${esc(n)}</a></div>`).join("") || '<p class="leise klein">Ordner ist leer.</p>');
   } catch (e) { feld.innerHTML = '<p class="leise klein">Ordner «Protokolle» nicht gefunden.</p>'; }
 }
+/* Praktikum von Hand korrigieren (Studierende): Stand, wer, Datum, Abbruch – als Eintrag, damit alle es sehen */
+function praktikumNach(id) {
+  return R.praktika.find((p) => p.idpraktikum === id) || Object.values(R.personen).flatMap((p) => p.praktika).find((p) => p.idpraktikum === id);
+}
+async function korrigieren(i) {
+  const id = REFS[i], x = praktikumNach(id); if (!x) return;
+  if (!S.ich) return meldung("Bitte oben rechts «Ich bin» wählen.");
+  const doz = (S.einst.dozierende || []).map((d) => d.kuerzel);
+  const stand = { "übernommen": "gebucht" }[x.stand] || x.stand;
+  const d = $("#frage");
+  $("#frageText").textContent = `${x.person.name} · ${x.gruppe} ${sjText(x.jahr)} – korrigieren`;
+  $("#frageFeld").innerHTML = `<div class="korr-form">
+    <label>Stand<select id="kStand">${["offen", "gebucht", "besucht", "nicht nötig", "abgebrochen"].map((v) => `<option ${v === stand ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+    <label>Wer (Kürzel)<select id="kWer"><option value="">– niemand / unbekannt –</option>${[...new Set([...doz, x.wer].filter(Boolean))].map((k) => `<option ${k === x.wer ? "selected" : ""}>${esc(k)}</option>`).join("")}</select></label>
+    <label>Datum des Besuchs<input type="date" id="kDatum" value="${esc(x.datum || (x.termin && x.termin.datum) || "")}"></label>
+    <label>Bemerkung (z.B. Grund des Abbruchs)<textarea id="kText" rows="2"></textarea></label>
+    <p class="leise klein">«abgebrochen»: kein Besuch mehr nötig. Ein abgebrochenes Profil gilt nicht als besucht – das Quartal wird dann nötig.</p></div>`;
+  d.returnValue = ""; d.showModal();
+  await new Promise((ok) => (d.onclose = ok));
+  if (d.returnValue !== "ok") return;
+  const e = { typ: "korrektur", praktikum: id, person: x.person.id, stand: $("#kStand").value, wer: $("#kWer").value, text: $("#kText").value.trim() };
+  const dt = $("#kDatum").value;
+  if (dt) { if (e.stand === "besucht") e.datum = dt; else if (e.stand === "gebucht") e.datumTermin = dt; }
+  if (await eintragen(e)) {
+    if (e.text || e.stand === "abgebrochen") await eintragen({ typ: "bemerkung", person: x.person.id, text: `${x.gruppe} ${sjText(x.jahr)}: ${e.stand}${e.text ? " – " + e.text : ""}` });
+    meldung("Korrigiert.");
+    if (S.detail === x.person.id) detailZeigen(x.person.id, true);
+  }
+}
 /* «Anpassen» in Meine Termine: Termin ändern oder wieder abgeben – danach geht es jeweils ins Praktikumstool */
 async function anpassen(i) {
   const x = R.praktika.find((p) => p.idpraktikum === REFS[i]); if (!x) return;
@@ -1539,12 +1577,12 @@ function ansichtStudierende() {
     : sort === "jahrgang" ? String(jahrgang(b)).localeCompare(String(jahrgang(a))) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name));
   // je Praktikum eine Zeile: Studienjahr (Periode) · Datum · Stand · Kürzel (NN = unbekannt)
   const eintrag = (x) => {
-    const cls = { offen: "s-offen", "übernommen": "s-uebernommen", gebucht: "s-gebucht", besucht: "s-besucht" }[x.stand] || "s-nicht";
+    const cls = { offen: "s-offen", "übernommen": "s-uebernommen", gebucht: "s-gebucht", besucht: "s-besucht", abgebrochen: "s-abbruch" }[x.stand] || "s-nicht";
     const per = x.gruppe === "Halbtag" ? (periode(x).match(/Periode ([A-D])/) || [, ""])[1] : "";
     const d = x.termin ? x.termin.datum : x.datum;
     const stand = { "übernommen": "gebucht" }[x.stand] || x.stand;
     const wer = ["besucht", "gebucht", "übernommen"].includes(x.stand) ? (x.wer || "NN") : "";
-    return `<div class="ue"><span class="ue-j">${sjText(x.jahr)}${per ? " " + per : ""}</span><span class="chip ${cls}">${esc(stand)}</span><b class="ue-w">${esc(wer)}${berichtLinks(x, true)}</b></div>`;
+    return `<div class="ue korr" title="Klick: Stand korrigieren" onclick="korrigieren(${ref(x.idpraktikum)})"><span class="ue-j">${sjText(x.jahr)}${per ? " " + per : ""}</span><span class="chip ${cls}">${esc(stand)}</span><b class="ue-w">${esc(wer)}${berichtLinks(x, true)}</b></div>`;
   };
   const zelle = (p, g) => {
     const xs = p.praktika.filter((x) => x.gruppe === g);
@@ -1660,7 +1698,8 @@ function detailZeigen(id, oeffnen = true) {
         ${x.berichte && x.berichte.length ? `<div style="margin-top:4px">${berichtLinks(x)}</div>` : ""}
         ${x.notizen.map(notiz).join("")}</td>
       <td style="white-space:nowrap">${x.wer === S.ich && x.stand !== "besucht" ? `<button class="knopf klein" title="Termin ändern oder wieder abgeben" onclick="anpassen(${ref(x.idpraktikum)})">Anpassen ▾</button>` : ""}
-        ${x.link ? `<button class="knopf klein" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>` : ""}</td></tr>`).join("")}
+        ${x.link ? `<button class="knopf klein" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>` : ""}
+        <button class="knopf klein" title="Stand, Besucher/in oder Datum korrigieren, Abbruch eintragen" onclick="korrigieren(${ref(x.idpraktikum)})">✎ korrigieren</button></td></tr>`).join("")}
     </tbody></table>
     <h3>Protokolle</h3><div id="protokolle" class="klein"><span class="leise">wird gesucht …</span></div>
     <h3>Achtung</h3>
@@ -2055,27 +2094,33 @@ setInterval(() => {
 const ECHT = !!window.RUNDGANG_ECHT;
 if (!ECHT) window.addEventListener("load", () => setTimeout(rundgangStart, 900));
 const SCHRITTE = [
-  { ansicht: "start", titel: "Willkommen", text: () => ECHT ? "In zwei Minuten durch die Seite – mit deinen echten Daten. Der Rundgang zeigt nur, er bucht und speichert nichts. Mit «Weiter» geht es zum nächsten Schritt." : "In zwei Minuten durch die Praxisbesuche – mit erfundenen Beispieldaten. Mit «Weiter» geht es zum nächsten Schritt.", vorher: () => geheZu("start") },
-  { ziel: "#ich", ansicht: "start", titel: "Wer bin ich?", text: () => (ECHT ? "Oben rechts steht dein Kürzel." : "Oben rechts das eigene Kürzel wählen (hier im Beispiel: clu).") + " Dann gehören deine Buchungen und «Meine Termine» dir. Den Rundgang kann man jederzeit mit «✕ Beenden» abbrechen oder unten direkt zu einem Schritt springen. Das Kästchen lässt sich oben am Griff verschieben.", vorher: () => { if (!ECHT) { S.ich = "clu"; merke("ich", "clu"); zeichnen(); } } },
-  { ziel: "nav button[data-ansicht=halbtag]", ansicht: "halbtag", titel: "Halbtagespraktikum", text: "<ul><li>Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als <b>Paar</b> untereinander.</li><li><b>Termine (beide) ▸</b> bucht den Doppelbesuch für beide.</li><li>Danach zwei Knöpfe: je Person ins Praktikumstool.</li><li>Eigene Filter (Periode A–D), unabhängig von Profil &amp; Quartal.</li></ul>", vorher: () => geheZu("halbtag") },
-  { ziel: "nav button[data-ansicht=planung]", ansicht: "planung", titel: "Profil & Quartal", text: "Hier wird geplant: alle Profil-, Quartals- und Spezialpraktika des Studienjahrs.", vorher: () => geheZu("planung") },
-  { ziel: ".filterbox .fsek", ansicht: "planung", titel: "Grundauswahl", text: "<ul><li><b>▾ Filter</b> klappt den ganzen Filter auf und zu.</li><li>Grundauswahl: Praktikum, Besuch nötig, Stand.</li><li>Ein Klick schaltet um.</li></ul>",
-    vorher: () => { merke("filterbox", "auf"); zeichnen(); } },
-  { ziel: ".filterbox details.fsek", ansicht: "planung", titel: "Wann", text: "<ul><li><b>Wann</b>: Zeitraum, Tag, Vormittag/Nachmittag, Einzel- oder Doppellektion, «danach Zeit zum Besprechen».</li><li><b>Wo</b>: Ort, Umkreis.</li><li><b>Weitere</b>: Name, nur meine, nur ⚠.</li></ul>", vorher: () => { merke("filterbox", "auf"); zeichnen(); const d = document.querySelector(".filterbox details.fsek"); if (d) d.open = true; } },
-  { ziel: ".aktivleiste", ansicht: "planung", titel: "Was gerade gefiltert ist", text: "<ul><li>Hier stehen die aktiven Filter – mit ✕ ist einer weg.</li><li>Standardmässig an: <b>nicht schon von mir besucht</b>.</li></ul>" },
-  { ziel: "#app table.liste tbody tr .name", ansicht: "planung", titel: "Name anklicken", text: "<ul><li>Klick auf den Namen öffnet rechts den Verlauf:</li><li>alle Praktika, wer schon besucht hat,</li><li>Berichte (📄), Bemerkungen, ⚠ Achtung.</li></ul>",
+  // --- Überblick
+  { ansicht: "start", titel: "Willkommen", text: () => (ECHT ? "Der Rundgang zeigt nur – er bucht und speichert nichts." : "Mit erfundenen Beispieldaten.") + "<ul><li>Zuerst: was die Reiter oben können.</li><li>Dann: wie Buchen geht (am Beispiel Profil).</li><li>Dann: Meine Termine, Studierende, Hilfe.</li></ul>", vorher: () => geheZu("start") },
+  { ziel: "#ich", ansicht: "start", titel: "Wer bin ich?", text: () => (ECHT ? "Hier steht dein Kürzel." : "Hier das eigene Kürzel wählen (im Beispiel: clu).") + "<ul><li>Dann gehören deine Buchungen und «Meine Termine» dir.</li><li>Rundgang jederzeit mit «✕ Beenden» abbrechen; das Kästchen lässt sich oben am Griff verschieben.</li></ul>", vorher: () => { if (!ECHT) { S.ich = "clu"; merke("ich", "clu"); zeichnen(); } } },
+  { ziel: "nav button[data-ansicht=halbtag]", ansicht: "start", titel: "Reiter: Halbtagespraktikum", text: "<ul><li>Alle Halbtagespraktika, Paare fürs Doppelbesuchen untereinander.</li><li>Buchen wie bei Profil &amp; Quartal (gleich im Beispiel).</li></ul>" },
+  { ziel: "nav button[data-ansicht=planung]", ansicht: "start", titel: "Reiter: Profil & Quartal", text: "<ul><li>Profil-, Quartals- und Spezialpraktika planen und buchen.</li></ul>" },
+  { ziel: "nav button[data-ansicht=termine]", ansicht: "start", titel: "Reiter: Meine Termine", text: "<ul><li>Deine Besuche: erledigen, anpassen, Bericht hochladen, Kontakte.</li></ul>" },
+  { ziel: "nav button[data-ansicht=studierende]", ansicht: "start", titel: "Reiter: Studierende", text: "<ul><li>Alle Praktika einer Person, Berichte, Verlauf.</li><li>Hier kann man auch korrigieren (z.B. Abbruch).</li></ul>" },
+  { ziel: "nav button[data-ansicht=aktualisieren]", ansicht: "start", titel: "Reiter: Aktualisieren", text: "<ul><li>Nur für die <b>Pflege</b> der Daten (neue Praktika, Regeln, Einstellungen).</li><li>Für das Buchen musst du hier <b>nichts</b> machen.</li></ul>" },
+  // --- Buchen am Beispiel Profil
+  { ziel: ".filterbox", ansicht: "planung", titel: "Buchen – Beispiel Profil", text: "<ul><li>Reiter Profil &amp; Quartal, oben der <b>Filter</b>.</li><li>Grundauswahl: Praktikum, Besuch nötig, Stand.</li><li>Aufklappen: Wann (Tag, Vormittag, Doppellektion), Wo (Ort, Umkreis), Weitere.</li><li>Beim Halbtag geht alles genauso.</li></ul>",
+    vorher: () => { geheZu("planung"); merke("filterbox", "auf"); if (!ECHT) { S.filter = { praktika: ["Profil"] }; merke("filter", JSON.stringify(S.filter)); } zeichnen(); const d = document.querySelector(".filterbox details.fsek"); if (d) d.open = true; } },
+  { ziel: ".aktivleiste", ansicht: "planung", titel: "Aktive Filter", text: "<ul><li>Über der Liste stehen die aktiven Filter – mit ✕ weg.</li><li>Standardmässig an: <b>nicht schon von mir besucht</b>.</li></ul>" },
+  { ziel: "#app table.liste tbody tr .name", ansicht: "planung", titel: "Name anklicken", text: "<ul><li>Öffnet rechts den Verlauf: alle Praktika, wer schon besucht hat, Berichte, Bemerkungen.</li></ul>",
     vorher: () => { const n = document.querySelector("#app table.liste tbody tr .name"); if (n) n.click(); }, nachher: () => detailZu() },
-  { ziel: "#app table.liste tbody tr td:last-child .knopf", ansicht: "planung", titel: "Buchen", text: "<ul><li><b>Termine ▸</b> zeigt alle möglichen Termine.</li><li>Darunter klein: an welchen Tagen Mathe ist und wie viele Termine.</li><li>Tag und Tageszeit am besten oben im Filter wählen.</li></ul><div class='t-tool'>↗ Sobald du buchst, öffnet sich <b>sofort das Praktikumstool bei dieser Person</b> – dort «Besuch eintragen», Fenster schliessen, fertig.</div>",
-    vorher: () => { if (!ECHT) { merke("filter", "{}"); S.filter = {}; zeichnen(); } } },
-  { ziel: "#frageFeld .leg-zeile", ansicht: "planung", titel: "Grosse Ansicht: so buchst du", text: "<ul><li>Woche für Woche alle möglichen Termine.</li><li>Flach = Einzellektion, hoch = Doppellektion, grün = danach frei zum Besprechen.</li><li>Termine, die gegen Regeln verstossen, sind schon weg.</li><li><b>Termin anklicken = buchen.</b></li></ul><div class='t-tool'>↗ Sobald du buchst, öffnet sich <b>sofort das Praktikumstool bei dieser Person</b> – dort «Besuch eintragen», Fenster schliessen, fertig.</div>",
+  { ziel: "#app table.liste tbody tr td:last-child .knopf", ansicht: "planung", titel: "Spalte «Buchen»", text: "<ul><li><b>Termine ▸</b> öffnet alle möglichen Termine.</li><li>Darunter: an welchen Tagen Mathe ist, wie viele Termine.</li></ul>" },
+  { ziel: "#frageFeld .leg-zeile", ansicht: "planung", titel: "Termin wählen = buchen", text: "<ul><li>Woche für Woche alle möglichen Termine.</li><li>Flach = Einzel-, hoch = Doppellektion, grün = danach frei zum Besprechen.</li><li>Termine gegen die Regeln sind schon weg.</li><li><b>Termin anklicken = buchen.</b></li></ul><div class='t-tool'>↗ Sobald du buchst, öffnet sich <b>sofort das Praktikumstool bei dieser Person</b> – dort «Besuch eintragen», Fenster schliessen, fertig.</div>",
     vorher: () => { const b = document.querySelector("#app table.liste tbody tr td:last-child .knopf.haupt"); if (b) b.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
-  { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Termin wieder abgeben", text: "<ul><li>Bei deinen eigenen Buchungen steht hier <b>Termin wieder abgeben</b>.</li><li>Danach öffnet sich das Praktikumstool bei der Person – dort die Buchung löschen.</li></ul>" },
-  { ziel: ".aktivleiste .knopf", ansicht: "planung", titel: "Liste für Excel kopieren", text: "Kopiert die Liste, so wie sie gefiltert ist – dann in Excel oder eine Mail einfügen." },
-  { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "<ul class=\"t-knoepfe\"><li>Alle deine Termine nach Tag; oben filtern nach Halbtag, Profil, Quartal.</li><li><b>✓ Erledigt</b> – nach dem Besuch.</li><li><b>Anpassen ▾</b> – Termin ändern oder wieder abgeben; danach öffnet sich das Praktikumstool, um es dort auch anzupassen.</li><li><b>Achtung / Bemerkung</b> – z.B. «im Quartal besuchen» oder nur eine Bemerkung.</li><li><b>Bericht ↑</b> – Bericht hochladen (landet in «Protokolle/Person»), danach öffnet sich eine E-Mail an Studierende, PxL, Mentor/in.</li><li><b>📄 öffnen · ✉ E-Mail · ✕</b> – Bericht ansehen, E-Mail nochmals, falsch hochgeladen löschen.</li><li><b>Tool ↗</b> – ins Praktikumstool bei dieser Person.</li><li><b>Kontakte</b> (unter dem Namen) – Mathe-PxL, zuständige PxL, Mentor/in mit E-Mail.</li><li>⚠ rechts – falls doch etwas gegen eine Regel verstösst.</li></ul>", vorher: () => { geheZu("termine"); const d = document.querySelector("#app details.kontakte"); if (d) d.open = true; } },
-  { ziel: "#protokolle", ansicht: "termine", titel: "Protokolle im Verlauf", text: "<ul><li>Im Verlauf stehen unter «Protokolle» alle Berichte der Person – auch die alten.</li><li>Vor einem Besuch z.B. kurz den Halbtagsbericht anschauen.</li></ul>",
-    vorher: () => { const n = document.querySelector("#app table.liste tbody tr .name"); if (n) n.click(); }, nachher: () => detailZu() },
-  { ziel: "nav button[data-ansicht=studierende]", ansicht: "studierende", titel: "Studierende", text: "<ul><li>Eine Zeile pro Person: Halbtag (blau), Profil (gelb), Quartal (grün).</li><li>Je Praktikum: Jahr · Stand · von, 📄 = Bericht.</li><li>Suche beim Tippen, Filter nach Studienjahr; Abgeschlossene im Archiv.</li></ul>", vorher: () => geheZu("studierende") },
-  { ansicht: "start", titel: "Los geht's", text: () => ECHT ? "Das war's – du bist auf der echten Seite und kannst gleich loslegen. Die Hilfe oben erklärt alles nochmals Schritt für Schritt." : "Das war die Beispielseite. Jetzt oben «Zur echten Seite» klicken: in Chrome oder Edge öffnen, einmal den Ordner «Mathematik Sek1 - TM - Praxisbesuche» aus OneDrive wählen, Kürzel wählen – fertig. Die Hilfe oben erklärt alles nochmals.", vorher: () => geheZu("start"), ende: true },
+  { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Doppelbesuch und Abgeben", text: "<ul><li><b>Doppelbesuch</b> (Halbtag): danach zwei Knöpfe, je Person ins Praktikumstool.</li><li><b>Termin wieder abgeben</b>: bei eigenen Buchungen; danach öffnet sich das Tool, um die Buchung dort zu löschen.</li></ul>" },
+  // --- Meine Termine
+  { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "<ul><li>Alle deine Termine nach Tag; filtern nach Halbtag, Profil, Quartal.</li><li><b>✓ Erledigt</b> – nach dem Besuch.</li><li><b>Anpassen ▾</b> – Termin ändern oder abgeben, danach öffnet sich das Praktikumstool.</li><li><b>Achtung / Bemerkung</b> – z.B. «im Quartal besuchen».</li><li><b>Bericht ↑</b> – landet in «Protokolle/Person», danach öffnet sich eine E-Mail an Studierende, PxL, Mentor/in.</li><li><b>📄 · ✉ · ✕</b> – Bericht öffnen, E-Mail nochmals, löschen.</li><li><b>Tool ↗</b> – ins Praktikumstool.</li><li><b>Kontakte</b> unter dem Namen – PxL und Mentor/in mit E-Mail.</li></ul>",
+    vorher: () => { geheZu("termine"); const d = document.querySelector("#app details.kontakte"); if (d) d.open = true; } },
+  // --- Studierende
+  { ziel: "#app table.liste thead", ansicht: "studierende", titel: "Studierende", text: "<ul><li>Eine Zeile pro Person: Halbtag (blau), Profil (gelb), Quartal (grün).</li><li>Je Praktikum: Jahr · Stand · von, 📄 = Bericht.</li><li><b>Klick auf ein Praktikum: korrigieren</b> – Stand, wer, Datum, Abbruch.</li><li>Suche beim Tippen; Abgeschlossene im Archiv.</li></ul>", vorher: () => geheZu("studierende") },
+  { ziel: "#protokolle", ansicht: "studierende", titel: "Verlauf und Protokolle", text: "<ul><li>Klick auf den Namen: alle Praktika mit ✎ korrigieren.</li><li>Unter «Protokolle» alle Berichte der Person – auch die alten.</li></ul>",
+    vorher: () => { const n = document.querySelector("#app table.liste tbody td.name"); if (n) n.click(); }, nachher: () => detailZu() },
+  // --- Hilfe
+  { ziel: "nav button[data-ansicht=hilfe]", ansicht: "start", titel: "Hilfe", text: () => "<ul><li>In der Hilfe steht alles nochmals Schritt für Schritt.</li><li>Den Rundgang findest du auf der Startseite.</li></ul>" + (ECHT ? "" : "<p><b>Jetzt oben «Zur echten Seite»</b> – dort einmal den Ordner wählen.</p>"), vorher: () => geheZu("start"), ende: true },
 ];
 let schritt = 0, uhr = null;
 function rundgangStart() {
