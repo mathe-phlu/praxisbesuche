@@ -58,6 +58,7 @@ a.bericht:hover { text-decoration: underline; }
 .sk-halbtag { --f: #4f8fcf; --h: #eaf3fc; --d: #163a5c; }
 .sk-profil { --f: #d9a823; --h: #fdf5dc; --d: #5a430a; }
 .sk-quartal { --f: #5aa64e; --h: #ecf7e9; --d: #1c4a17; }
+.sk-spezial { --f: #c8566e; --h: #fcedf0; --d: #5e1a29; }
 .sk-termine { --f: var(--ph-braun); --h: var(--ph-sand); --d: var(--ph-braun-dunkel); }
 .sk-studierende { --f: #8a6bb8; --h: #f3eefa; --d: #3e2a63; }
 .sk-grau { --f: #9a9a9a; --h: #f5f5f3; --d: #3a3a3a; }
@@ -420,7 +421,7 @@ function blockText(l) {
 function toolLink(x, lektion) {
   if (!x.link) return "";
   const l = lektion ? (x.lektionen || []).find((b) => b.id === lektion || (b.ids || []).includes(lektion)) : null;
-  return TOOL + x.link + (l && l.woche ? "#" + l.woche : lektion ? "#lekt" + lektion : "");
+  return TOOL + ((l && l.link) || x.link) + (l && l.woche ? "#" + l.woche : lektion ? "#lekt" + lektion : "");
 }
 function datumText(d) { if (!d) return ""; const x = new Date(d); return isNaN(x) ? String(d) : x.toLocaleDateString("de-CH"); }
 
@@ -502,6 +503,22 @@ async function allesLaden() {
     S.praktika[p.idpraktikum] = p;
     const alte = S.personen[p.idstudent];
     if (!alte || p.jahr >= alte.jahr) S.personen[p.idstudent] = { id: p.idstudent, name: p.name, studiengang: p.studiengang, faecher: p.faecher, jahr: p.jahr };
+  }
+  // Quartal: das Praktikumstool führt Teil 1 und Teil 2 mit eigener Nummer – hier ist das ein einziges Quartalspraktikum
+  S.alias = {};
+  const teile = {};
+  for (const p of Object.values(S.praktika)) if (p.gruppe === "Quartal") (teile[p.idstudent + "|" + p.jahr] ||= []).push(p);
+  for (const l of Object.values(teile)) if (l.length > 1) {
+    l.sort((a, b) => (a.art || 0) - (b.art || 0));
+    const a = l[0], rest = l.slice(1), mitL = l.filter((p) => p.lektionen);
+    const m = { ...a, bis: rest[rest.length - 1].bis || a.bis, teile: l.map((p) => ({ idpraktikum: p.idpraktikum, link: p.link, von: p.von, bis: p.bis })),
+      besuche: l.flatMap((p) => p.besuche || []), fachbesuche: l.reduce((n, p) => n + (Number(p.fachbesuche) || 0), 0),
+      mentoratsbesuche: l.reduce((n, p) => n + (Number(p.mentoratsbesuche) || 0), 0),
+      kontakte: a.kontakte || (rest.find((p) => p.kontakte) || {}).kontakte,
+      lektionen: mitL.length ? mitL.flatMap((p) => p === a ? p.lektionen : p.lektionen.map((x) => ({ ...x, link: p.link }))) : a.lektionen };
+    if (!a.besuche && !rest.some((p) => p.besuche)) delete m.besuche;
+    for (const p of rest) { delete S.praktika[p.idpraktikum]; S.alias[p.idpraktikum] = a.idpraktikum; }
+    S.praktika[a.idpraktikum] = m;
   }
   S.alt = alt.personen || [];
   S.artNamen = pr.arten || {};
@@ -596,7 +613,7 @@ function berechnen() {
   // Einträge je Praktikum
   const proPrakt = {};
   for (const e of S.eintraege) {
-    if (e.praktikum) (proPrakt[e.praktikum] ||= []).push(e);
+    if (e.praktikum) (proPrakt[(S.alias || {})[e.praktikum] || e.praktikum] ||= []).push(e);
     if (e.typ === "bemerkung" && e.person && personen[e.person]) personen[e.person].notizen.push(e);
     if (e.typ === "achtung" && e.person && personen[e.person]) (personen[e.person].achtungen ||= []).push(e);
     if (e.typ === "achtung_weg" && e.person && personen[e.person]) personen[e.person].achtungen = (personen[e.person].achtungen || []).filter((a) => a.id !== e.bezug);
@@ -813,6 +830,7 @@ function ansichtStart() {
   const sj = S.einst.studienjahr, pr = R.praktika.filter((p) => p.jahr === sj);
   const q = pr.filter((p) => p.gruppe === "Quartal" && p.noetig === "ja");
   const prof = pr.filter((p) => p.gruppe === "Profil");
+  const spez = pr.filter((p) => (p.gruppe === "Spezial" || p.gruppe === "Abschluss") && p.noetig === "ja");
   const ht = pr.filter((p) => p.gruppe === "Halbtag");
   const meine = pr.filter((p) => S.ich && p.wer === S.ich);
   const offenQ = q.filter((p) => p.stand === "offen").length;
@@ -833,6 +851,7 @@ function ansichtStart() {
     ${zielKarte("halbtag", "Halbtagespraktikum", "geheZu('halbtag')", ht.filter(dabei).length, ht.length, "alle besuchen")}
     ${zielKarte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", eingeteilt, ziel, `Quote ${Math.round(S.einst.quote * 100)} % von ${prof.length}`)}
     ${zielKarte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", q.filter(dabei).length, q.length, "alle, bei denen der Besuch nötig ist")}
+    ${zielKarte("spezial", "Spezialpraktikum", "geheZu('planung', { praktika: ['Spezial'] })", spez.filter(dabei).length, spez.length, "alle besuchen")}
   </div>
   <div class="sk-reihe">
     ${karte("termine", `Meine Termine ${S.ich ? "· " + esc(S.ich) : ""}`, "geheZu('termine')", S.ich ? `<div class="z">${meine.length}</div><div>gebucht oder besucht in ${sjText(sj)}</div>
@@ -975,17 +994,17 @@ async function terminGewaehlt(ip, il, ipartner) {
   const ok = await frage(`${wer}: ${blockText(a)}${w.length ? "\n⚠ " + w.join("\n⚠ ") : ""}\n\n${meinesSchon ? "Termin ändern?" : "Übernehmen und im Praktikumstool eintragen?"}`, { art: "wahl", wert: "ja", optionen: [["ja", meinesSchon ? "Ja, Termin ändern" : "Ja, übernehmen"]] });
   if (ok === null) return;
   // Fenster gleich jetzt (direkt nach dem Klick) öffnen, sonst macht der Browser evtl. einen Reiter daraus
-  const vorab = (!partner || meinesSchon) && x.link ? window.open("", "pbFenster", popupMasse()) : null;
-  if (vorab) try { vorab.document.title = "Praktikumstool …"; vorab.document.body.innerHTML = "<p style='font:16px sans-serif;padding:20px'>Praktikumstool wird geöffnet …</p>"; } catch (e) {}
+  const vorab = (!partner || meinesSchon) && x.link ? toolFensterVorab() : null;
+  if (vorab) try { if (vorab.location.href === "about:blank") vorab.document.title = "Praktikumstool …"; vorab.document.body.innerHTML = "<p style='font:16px sans-serif;padding:20px'>Praktikumstool wird geöffnet …</p>"; } catch (e) {}
   for (const y of alle) {
     // beim Partner dieselbe Lektion (gleicher Tag, gleiche Zeit) suchen
     const l = y === x ? a : (y.lektionen || []).find((b) => b.datum === a.datum && b.zeit === a.zeit) || a;
     const termin = { datum: l.datum, zeit: l.zeit, bis: l.bis, lektion: l.id };
-    if (!(await eintragen(y.wer === S.ich ? { typ: "termin", praktikum: y.idpraktikum, termin } : { typ: "uebernehmen", praktikum: y.idpraktikum, termin }))) { if (vorab) vorab.close(); return; }
+    if (!(await eintragen(y.wer === S.ich ? { typ: "termin", praktikum: y.idpraktikum, termin } : { typ: "uebernehmen", praktikum: y.idpraktikum, termin }))) { if (vorab && !vorab.closed && vorab.location.href === "about:blank") { try { vorab.close(); } catch (e) {} } return; }
   }
   meldung(meinesSchon ? "Termin geändert." : partner ? "Doppelbesuch gebucht – unten bei beiden im Tool eintragen." : "Gebucht – jetzt sofort im Praktikumstool eintragen (öffnet sich als Fenster).");
   // Einzelbesuch: Tool sofort öffnen. Doppelbesuch: zwei Knöpfe, einer pro Person – man öffnet sie selbst nacheinander.
-  if (!partner || meinesSchon) { if (x.link) { REFS.push(toolLink(x, a.id)); toolOeffnen(REFS.length - 1, "pbFenster", vorab); } }
+  if (!partner || meinesSchon) { if (x.link) { REFS.push(toolLink(x, a.id)); toolOeffnen(REFS.length - 1, "haupt", vorab); } }
   else doppelToolZeigen(alle.map((y) => { const l = y === x ? a : (y.lektionen || []).find((b) => b.datum === a.datum && b.zeit === a.zeit) || a; REFS.push(toolLink(y, l.id)); return [y.person.name, REFS.length - 1]; }), blockText(a));
 }
 function doppelToolZeigen(personen, wann) {
@@ -993,7 +1012,7 @@ function doppelToolZeigen(personen, wann) {
   const k = document.createElement("div"); k.id = "zweitesTool";
   k.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:70;background:#fff;border:2px solid var(--ph-braun);border-radius:10px;padding:14px 18px;box-shadow:0 8px 30px rgba(0,0,0,.25);max-width:560px";
   k.innerHTML = `<div style="margin-bottom:8px"><b>Doppelbesuch gebucht</b> (${esc(wann)}). Jetzt bei beiden im Praktikumstool «Besuch eintragen»:</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${personen.map(([name, i], n) => `<button class="knopf haupt" onclick="toolOeffnen(${i}, 'pbFenster${n + 1}'); this.textContent = '✓ ${esc(name.replace(/'/g, ""))}'; this.classList.remove('haupt')">${n + 1}. ${esc(name)} im Tool ↗</button>`).join("")}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${personen.map(([name, i], n) => `<button class="knopf haupt" onclick="toolOeffnen(${i}, 'doppel${n + 1}'); this.textContent = '✓ ${esc(name.replace(/'/g, ""))}'; this.classList.remove('haupt')">${n + 1}. ${esc(name)} im Tool ↗</button>`).join("")}
     <button class="knopf klein" style="margin-left:auto" onclick="document.getElementById('zweitesTool').remove()">Fertig ✕</button></div>`;
   document.body.appendChild(k);
 }
@@ -1007,12 +1026,22 @@ function popupMasse() {
   else { w = Math.max(700, Math.round(aw / 2)); l = al + aw - w; }
   return `popup=yes,width=${Math.round(w)},height=${ah},left=${Math.round(l)},top=${at}`;
 }
-function toolOeffnen(i, fenster = "pbFenster", vorab = null) {
+/* Fenster werden über das gemerkte Fenster wiederverwendet, nie über einen festen Namen:
+   ein früher als Reiter geöffnetes Tool mit gleichem Namen würde Chrome sonst immer wieder als Reiter benutzen. */
+const TOOLFENSTER = {};
+function neuesToolFenster(url = "") { return window.open(url, "pb" + Date.now() + Math.random().toString(36).slice(2, 6), popupMasse()); }
+function toolFensterVorab(platz = "haupt") {
+  const f = TOOLFENSTER[platz];
+  if (f && !f.closed) return f;
+  return (TOOLFENSTER[platz] = neuesToolFenster());
+}
+function toolOeffnen(i, platz = "haupt", vorab = null) {
   const link = REFS[i];
-  if (!link) { if (vorab) vorab.close(); return; }
+  if (!link) { if (vorab && vorab !== TOOLFENSTER[platz]) vorab.close(); return; }
   const url = link.startsWith("http") ? link : TOOL + link;
-  if (vorab && !vorab.closed) { vorab.location.href = url; vorab.focus(); return; }
-  const f = window.open(url, fenster, popupMasse());
+  let f = vorab && !vorab.closed ? vorab : TOOLFENSTER[platz] && !TOOLFENSTER[platz].closed ? TOOLFENSTER[platz] : null;
+  if (f) f.location.href = url; else f = neuesToolFenster(url);
+  TOOLFENSTER[platz] = f;
   if (f) f.focus();
 }
 /* Übernehmen mit Termin: Lektion wählen oder Datum/Zeit eingeben, Checkliste prüfen */
@@ -1043,14 +1072,14 @@ async function uebernehmen(i, nurTermin = false) {
   d.returnValue = ""; d.showModal();
   await new Promise((ok) => (d.onclose = ok));
   if (d.returnValue !== "ok") return;
-  const vorab = $("#tTool") && $("#tTool").checked && x.link ? window.open("", "pbFenster", popupMasse()) : null;
+  const vorab = $("#tTool") && $("#tTool").checked && x.link ? toolFensterVorab() : null;
   const datum = $("#tDatum").value, zeit = $("#tZeit").value;
   const lekt = sel && sel.value ? sel.value : (frei.find((l) => l.datum === datum && l.zeit === zeit) || {}).id || "";
   const termin = datum ? { datum, zeit, lektion: lekt } : null;
   const ok = await eintragen(nurTermin ? { typ: "termin", praktikum: id, termin } : { typ: "uebernehmen", praktikum: id, termin });
-  if (!ok) { if (vorab) vorab.close(); return; }
+  if (!ok) { if (vorab && !vorab.closed && vorab.location.href === "about:blank") { try { vorab.close(); } catch (e) {} } return; }
   meldung(nurTermin ? "Termin geändert." : "Übernommen – bitte im Praktikumstool eintragen.");
-  if (vorab) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1, "pbFenster", vorab); }
+  if (vorab) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1, "haupt", vorab); }
 }
 /* Termine, die nach der Checkliste nie gehen – sie werden gar nicht angeboten */
 function terminGesperrt(x, datum, zeit) {
@@ -1117,11 +1146,11 @@ async function handlung(typ, i) {
   const id = REFS[i];
   const x = R.praktika.find((p) => p.idpraktikum === id);
   const lekt = x && x.termin ? x.termin.lektion : "";
-  const vorab = typ === "abgeben" && x && x.link ? window.open("", "pbFenster", popupMasse()) : null;
-  if (!(await eintragen({ typ, praktikum: id }))) { if (vorab) vorab.close(); return; }
+  const vorab = typ === "abgeben" && x && x.link ? toolFensterVorab() : null;
+  if (!(await eintragen({ typ, praktikum: id }))) { if (vorab && !vorab.closed && vorab.location.href === "about:blank") { try { vorab.close(); } catch (e) {} } return; }
   if (typ === "abgeben") {
     meldung("Abgegeben – bitte im Praktikumstool die Buchung löschen (öffnet sich als Fenster).");
-    if (vorab) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1, "pbFenster", vorab); }
+    if (vorab) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1, "haupt", vorab); }
   } else meldung("Übernommen – bitte im Praktikumstool buchen.");
 }
 /* Berichte (Protokolle) liegen im gemeinsamen Ordner unter «Protokolle/<Nachname Vorname Studiengang>/»
@@ -1436,6 +1465,7 @@ function ansichtPlanung() {
   const alleJahr = R.praktika.filter((p) => p.jahr === sj);
   const prof = alleJahr.filter((p) => p.gruppe === "Profil");
   const quart = alleJahr.filter((p) => p.gruppe === "Quartal" && p.noetig === "ja");
+  const spez = alleJahr.filter((p) => (p.gruppe === "Spezial" || p.gruppe === "Abschluss") && p.noetig === "ja");
   const eing = (l) => l.filter((p) => ["übernommen", "gebucht", "besucht"].includes(p.stand)).length;
   const ziel = Math.ceil(S.einst.quote * prof.length);
   const welche = fa("praktika");
@@ -1446,6 +1476,7 @@ function ansichtPlanung() {
   <div class="kacheln">
     <div class="kachel gruppe">${k("Profil · Quote", Math.round(S.einst.quote * 100) + " %")}${k("Ziel", ziel)}${k("eingeteilt", eing(prof))}${k("fehlen", Math.max(0, ziel - eing(prof)), ziel - eing(prof) > 0 ? "rot" : "gruen")}</div>
     <div class="kachel gruppe">${k("Quartal · nötig", quart.length)}${k("eingeteilt", eing(quart))}${k("fehlen", quart.length - eing(quart), quart.length - eing(quart) > 0 ? "rot" : "gruen")}</div>
+    <div class="kachel gruppe">${k("Spezial · nötig", spez.length)}${k("eingeteilt", eing(spez))}${k("fehlen", spez.length - eing(spez), spez.length - eing(spez) > 0 ? "rot" : "gruen")}</div>
     <div class="kachel gruppe">${k("Prognose Quartal " + sjText(jahrPlus(sj, 1)), Math.max(0, prof.length - eing(prof)))}</div>
   </div>
   <div class="mitfilter">${filterLeiste("planung", liste.length)}<div class="inhalt">
@@ -2081,7 +2112,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261104-214416";
+const STAND = "20261104-214858";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
