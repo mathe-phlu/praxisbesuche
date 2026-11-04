@@ -1142,6 +1142,7 @@ function ansichtHilfe() {
   const k = (t, inhalt) => `<div class="karte"><h3>${t}</h3>${inhalt}</div>`;
   return `<h2>So arbeitest du mit den Praxisbesuchen</h2>
   <p><a class="knopf haupt" style="text-decoration:none;display:inline-block" href="rundgang.html" target="_blank">▶ Rundgang ansehen (2 Minuten, mit Beispieldaten)</a></p>
+  ${legende().replace(/<button[^>]*rasterUmschalten[^>]*>[^<]*<\/button>/, "")}
   <div class="start">
   ${k("1 · Einmal einrichten", `<ol><li>Seite in <b>Chrome oder Edge</b> öffnen (nicht Safari, Firefox oder Teams).</li>
     <li>OneDrive muss laufen. Teams → Kanal Praktika → Freigegeben → «…» → «In SharePoint öffnen» → beim Ordner <b>Praxisbesuche</b> «Verknüpfung zu OneDrive hinzufügen».</li>
