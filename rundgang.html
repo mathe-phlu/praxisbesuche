@@ -480,6 +480,34 @@ async function allesLaden() {
   S.einst.studienjahr = S.einst.studienjahrFest || studienjahrHeute();
   if (!S.einst.dozierende.length) S.einst.dozierende = KUERZEL_STANDARD.map((k) => ({ kuerzel: k, name: "", soll: "" }));
   await eintraegeLaden();
+  if (!S.protokolle) protokolleEinlesen();   // im Hintergrund, danach neu zeichnen
+}
+/* Ordner «Protokolle» einlesen (nur Namen): Ordner je Person mit ihren Dateien */
+async function protokolleEinlesen() {
+  try {
+    const basis = await protokollBasis(false), map = {};
+    for await (const [name, h] of basis.entries()) {
+      if (h.kind !== "directory") continue;
+      const dateien = [];
+      for await (const [n, f] of h.entries()) if (f.kind === "file" && !n.startsWith(".")) dateien.push(n);
+      map[name] = dateien;
+    }
+    S.protokolle = map; berechnen(); zeichnen();
+  } catch (e) { S.protokolle = {}; }
+}
+/* Datei «UB Nachname PK03 clu 260204.pdf» -> Gruppe und Studienjahr (Aug–Jul) */
+function protokollInfo(datei) {
+  const pk = (datei.match(/PK0([123])/i) || [])[1];
+  const d = datei.match(/(?<!\d)(\d{2})(\d{2})(\d{2})(?!\d)/);
+  let jahr = "";
+  if (d) { const y = Number(d[1]), m = Number(d[2]); if (m >= 1 && m <= 12) jahr = m >= 8 ? `${String(y).padStart(2, "0")}-${String(y + 1).padStart(2, "0")}` : `${String(y - 1).padStart(2, "0")}-${String(y).padStart(2, "0")}`; }
+  const t = datei.toLowerCase();
+  const gruppe = { 1: "Halbtag", 2: "Profil", 3: "Quartal" }[pk]
+    || (/halbtag|htp|hps/.test(t) ? "Halbtag" : /profil|ppk|pkpr/.test(t) ? "Profil" : /quartal/.test(t) ? "Quartal" : "");
+  // Semester statt Datum: HS23 / Herbstsemester 2023 -> 23-24, FS24 / SP24 / Frühlingssemester 2024 -> 23-24
+  const sem = t.match(/\b(hs|fs|sp|spr)\s?(\d{2})\b/) || t.match(/(herbst|frühlings|fruehlings)semester\s*(?:20)?(\d{2})/);
+  if (!jahr && sem) { const y = Number(sem[2]); jahr = /^h/.test(sem[1]) ? `${String(y).padStart(2, "0")}-${String(y + 1).padStart(2, "0")}` : `${String(y - 1).padStart(2, "0")}-${String(y).padStart(2, "0")}`; }
+  return { gruppe, jahr };
 }
 async function eintraegeLaden() {
   const liste = [], gesehen = new Set();
@@ -574,6 +602,20 @@ function berechnen() {
   for (const person of Object.values(personen)) {
     person.praktika.sort((a, b) => (a.jahr || "").localeCompare(b.jahr || "") || GRUPPEN.indexOf(a.gruppe) - GRUPPEN.indexOf(b.gruppe));
     person.besucher = new Set(person.praktika.flatMap((p) => p.besuchtVon));
+  }
+  // vorhandene Protokolle (Ordner «Protokolle») den Praktika zuordnen: gleiche Gruppe, gleiches Studienjahr
+  if (S.protokolle) {
+    const ordnerNach = {};
+    for (const name of Object.keys(S.protokolle)) { const n = nameNorm(name); (ordnerNach[n.split(" ").slice(0, 2).join(" ")] ||= []).push(name); }
+    for (const person of Object.values(personen)) {
+      const n = nameNorm(person.name), kand = (ordnerNach[n.split(" ").slice(0, 2).join(" ")] || []).filter((o) => nameNorm(o) === n || nameNorm(o).startsWith(n + " "));
+      for (const o of kand) for (const datei of S.protokolle[o]) {
+        const info = protokollInfo(datei); if (!info.gruppe) continue;
+        const passend = person.praktika.filter((x) => x.gruppe === info.gruppe);
+        const x = passend.find((x) => x.jahr === info.jahr) || (passend.length === 1 ? passend[0] : null);
+        if (x && !(x.berichte || []).some((b) => b.datei === o + "/" + datei)) (x.berichte ||= []).push({ datei: o + "/" + datei, wer: (datei.match(/PK0\d\s+([a-z]{2,3})\b/i) || [])[1] || "" });
+      }
+    }
   }
   for (const x of liste) noetigBestimmen(x);
   for (const person of Object.values(personen)) for (const x of person.praktika) if (x.quelle === "alt") noetigBestimmen(x);
@@ -800,7 +842,7 @@ function aktionen(x) {
   const tool = x.link ? `<button class="knopf klein" title="Im Praktikumstool öffnen (Fenster rechts)" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>` : "";
   if (S.ansicht === "termine") {
     k.push(`<button class="knopf klein" title="z.B. «muss im Quartal besucht werden» oder eine Bemerkung zur Person" onclick="achtungSetzen(REFS[${ref(x.person.id)}])">Achtung / Bemerkung</button>`);
-    k.push(`<button class="knopf klein" title="Bericht (PDF/Word) in den gemeinsamen Ordner «Berichte/${esc(x.jahr)}» legen" onclick="berichtHochladen(${ref(x.idpraktikum)})">Bericht ↑</button>`);
+    k.push(`<button class="knopf klein" title="Bericht (PDF/Word) in den Ordner der Person unter «Protokolle» legen" onclick="berichtHochladen(${ref(x.idpraktikum)})">Bericht ↑</button>`);
     if (x.berichte && x.berichte.length) k.push(berichtLinks(x));
     const letzte = x.notizen && x.notizen.length ? x.notizen[x.notizen.length - 1] : null;
     return reihe(k, tool) + (letzte ? `<div class="klein leise" style="white-space:normal;max-width:300px;margin-top:3px">✎ ${esc(letzte.text)} <i>(${esc(letzte.wer)})</i></div>` : "");
@@ -1003,10 +1045,26 @@ async function handlung(typ, i) {
     if (x && x.link) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1); }
   } else meldung("Übernommen – bitte im Praktikumstool buchen.");
 }
-/* Berichte liegen im gemeinsamen Ordner unter «Berichte/<Studienjahr>» (neben «Daten») */
-async function berichtBasis(anlegen) {
+/* Berichte (Protokolle) liegen im gemeinsamen Ordner unter «Protokolle/<Nachname Vorname Studiengang>/»
+   – gleiche Ablage wie bisher «Protokolle UB». Dateiname wie gewohnt: «UB Nachname PK03 clu 260204.pdf». */
+const PK = { Halbtag: "PK01", Profil: "PK02", Quartal: "PK03" };
+async function protokollBasis(anlegen) {
   const basis = S.wurzel && S.wurzel !== S.ordner ? S.wurzel : S.ordner;
-  return basis.getDirectoryHandle("Berichte", { create: anlegen });
+  return basis.getDirectoryHandle("Protokolle", { create: anlegen });
+}
+const nameNorm = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+/* Ordner der Person suchen: «Nachname Vorname …» (der Rest ist Studiengang/Jahrgang) */
+async function personOrdner(person, anlegen) {
+  const basis = await protokollBasis(anlegen);
+  const n = nameNorm(person.name);
+  const treffer = [];
+  for await (const [name, h] of basis.entries()) if (h.kind === "directory" && (nameNorm(name) === n || nameNorm(name).startsWith(n + " "))) treffer.push([name, h]);
+  const sg = ((person.alt && person.alt.studiengang) || person.studiengang || "").replace(/\s+/g, "");
+  const best = treffer.find(([name]) => sg && name.replace(/\s+/g, "").endsWith(sg)) || treffer[0];
+  if (best) return { name: best[0], h: best[1] };
+  if (!anlegen) return null;
+  const neuName = `${person.name} ${sg || "__"}`.replace(/[\/\\:*?"<>|]+/g, "-").trim();
+  return { name: neuName, h: await basis.getDirectoryHandle(neuName, { create: true }) };
 }
 async function berichtHochladen(i) {
   const x = R.praktika.find((p) => p.idpraktikum === REFS[i]); if (!x) return;
@@ -1015,14 +1073,17 @@ async function berichtHochladen(i) {
   wahl.onchange = async () => {
     const f = wahl.files[0]; if (!f) return;
     const endung = (f.name.match(/\.[a-z0-9]+$/i) || [".pdf"])[0].toLowerCase();
-    const sauber = (t) => String(t || "").replace(/[\/\\:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
-    const name = sauber(`${x.jahr} ${x.gruppe} ${x.person.name} ${S.ich}`) + endung;
+    const d = (x.datum || (x.termin && x.termin.datum) || new Date().toISOString().slice(0, 10)).replace(/-/g, "").slice(2);
+    const nachname = x.person.name.split(" ")[0];
+    const name = `UB ${nachname} ${PK[x.gruppe] || x.gruppe} ${S.ich} ${d}${endung}`.replace(/[\/\\:*?"<>|]+/g, "-");
     try {
-      const jahrOrdner = await (await berichtBasis(true)).getDirectoryHandle(x.jahr || "ohne Jahr", { create: true });
-      const w = await (await jahrOrdner.getFileHandle(name, { create: true })).createWritable();
+      const o = await personOrdner(x.person, true);
+      let ziel = name;
+      try { await o.h.getFileHandle(ziel); ziel = name.replace(endung, ` ${new Date().toISOString().slice(11, 16).replace(":", "")}${endung}`); } catch (e) { /* frei */ }
+      const w = await (await o.h.getFileHandle(ziel, { create: true })).createWritable();
       await w.write(await f.arrayBuffer()); await w.close();
-      await eintragen({ typ: "bericht", praktikum: x.idpraktikum, person: x.person.id, datei: `${x.jahr || "ohne Jahr"}/${name}`, original: f.name });
-      meldung(`Bericht abgelegt: Berichte/${x.jahr}/${name}`);
+      await eintragen({ typ: "bericht", praktikum: x.idpraktikum, person: x.person.id, datei: `${o.name}/${ziel}`, original: f.name });
+      meldung(`Bericht abgelegt: Protokolle/${o.name}/${ziel}`);
     } catch (e) { meldung("Bericht konnte nicht gespeichert werden: " + e.message); }
   };
   wahl.click();
@@ -1030,13 +1091,26 @@ async function berichtHochladen(i) {
 async function berichtOeffnen(i) {
   const pfad = REFS[i];
   try {
-    const [jahr, name] = pfad.split("/");
-    const f = await (await (await (await berichtBasis(false)).getDirectoryHandle(jahr)).getFileHandle(name)).getFile();
+    const t = pfad.split("/"); const datei = t.pop();
+    let d = await protokollBasis(false); for (const x of t) d = await d.getDirectoryHandle(x);
+    const f = await (await d.getFileHandle(datei)).getFile();
     window.open(URL.createObjectURL(f), "_blank");
-  } catch (e) { meldung("Bericht nicht gefunden – vielleicht noch nicht synchronisiert. (Ordner «Berichte/" + pfad + "»)"); }
+  } catch (e) { meldung("Bericht nicht gefunden – vielleicht noch nicht synchronisiert. (Protokolle/" + pfad + ")"); }
 }
 function berichtLinks(x, kurz) {
   return (x.berichte || []).map((b) => `<a href="#" class="bericht" title="${esc(b.datei)} – von ${esc(b.wer)}" onclick="event.preventDefault();berichtOeffnen(${ref(b.datei)})">📄${kurz ? "" : " Bericht"}</a>`).join(" ");
+}
+/* Im Verlauf einer Person: alle Protokolle aus ihrem Ordner (auch die alten) */
+async function protokolleZeigen(personId) {
+  const feld = $("#protokolle"); if (!feld) return;
+  try {
+    const o = await personOrdner(R.personen[personId], false);
+    if (!o) { feld.innerHTML = '<p class="leise klein">Noch kein Ordner unter «Protokolle».</p>'; return; }
+    const dateien = [];
+    for await (const [name, h] of o.h.entries()) if (h.kind === "file" && !name.startsWith(".")) dateien.push(name);
+    dateien.sort((a, b) => (a.match(/PK0\d/) || ["PK9"])[0].localeCompare((b.match(/PK0\d/) || ["PK9"])[0]) || a.localeCompare(b));
+    feld.innerHTML = `<p class="leise klein">Ordner: Protokolle/${esc(o.name)}</p>` + (dateien.map((n) => `<div><a href="#" class="bericht" onclick="event.preventDefault();berichtOeffnen(${ref(o.name + "/" + n)})">📄 ${esc(n)}</a></div>`).join("") || '<p class="leise klein">Ordner ist leer.</p>');
+  } catch (e) { feld.innerHTML = '<p class="leise klein">Ordner «Protokolle» nicht gefunden.</p>'; }
 }
 /* «Anpassen» in Meine Termine: Termin ändern oder wieder abgeben – danach geht es jeweils ins Praktikumstool */
 async function anpassen(i) {
@@ -1404,7 +1478,7 @@ const HILFE = [
     <li>Termin passt nicht mehr: <b>Anpassen</b> → «Termin ändern» oder «Wieder abgeben». Danach öffnet sich das Tool – dort auch anpassen.</li>
     <li>Unter dem Namen: <b>Kontakte</b> (Mathe-PxL, zuständige PxL, Mentor/in mit E-Mail).</li>
     <li><b>Achtung / Bemerkung</b>: z.B. «muss im Quartal besucht werden» oder nur eine Bemerkung.</li>
-    <li><b>Bericht ↑</b>: Bericht (PDF oder Word) hochladen. Er landet im gemeinsamen Ordner unter <b>Berichte/Studienjahr</b>. Bei den Studierenden erscheint dann 📄 – Klick öffnet ihn.</li></ol>
+    <li><b>Bericht ↑</b>: Bericht (PDF oder Word) hochladen. Er landet im gemeinsamen Ordner unter <b>Protokolle/Name der Person</b> (fehlt der Ordner, wird er angelegt), benannt wie gewohnt «UB Nachname PK03 kürzel JJMMTT». Bei den Studierenden erscheint dann 📄.</li></ol>
     <p class="leise">⚠ rechts = Regel verletzt (z.B. Buchung ausserhalb dieser Seite). Ein Doppelbesuch zur selben Zeit ist kein Problem.</p>`],
   ["halbtag", "Halbtagespraktikum", "Was ist anders?", `<ol class="schritte">
     <li>Reiter <b>Halbtagespraktikum</b>. Filter nach <b>Periode</b> (A–D) statt nach Tag.</li>
@@ -1416,7 +1490,7 @@ const HILFE = [
     <li>Reiter <b>Studierende</b>: eine Zeile pro Person, Halbtag · Profil · Quartal.</li>
     <li>Suchen beim Tippen, filtern nach Studienjahr. Abgeschlossene sind im <b>Archiv</b>.</li>
     <li>Klick auf den Namen: Verlauf, wer schon besucht hat, Bemerkungen, ⚠ Achtung.</li>
-    <li>📄 neben einem Praktikum = Bericht. Vor einem Besuch z.B. kurz den Halbtagsbericht anschauen.</li></ol>`],
+    <li>📄 neben einem Praktikum = Bericht. Im Verlauf (Klick auf den Namen) stehen unter «Protokolle» alle Berichte der Person, auch die alten – vor einem Besuch z.B. kurz den Halbtagsbericht anschauen.</li></ol>`],
   ["anhang", "Anhang", "Aktualisieren, Regeln, Stand", `<ul class="schritte">
     <li><b>Normalerweise ist nichts zu tun.</b> Änderungen der anderen erscheinen nach der Synchronisation (sofort: ↻ oben rechts).</li>
     <li>Vor neuen Praktika (eine Person für alle): Reiter <b>Aktualisieren</b> → «Praktikumstool öffnen und Daten holen» → im Tool das Lesezeichen klicken.</li>
@@ -1463,6 +1537,7 @@ function detailZeigen(id, oeffnen = true) {
       <td style="white-space:nowrap">${aktionen(x)}<br><button class="knopf klein" onclick="notizZu(REFS[${ref(x.idpraktikum)}])">+ Notiz</button>
         <button class="knopf klein" title="Besuch nötig von Hand festlegen" onclick="noetigSetzen(REFS[${ref(x.idpraktikum)}])">nötig?</button></td></tr>`).join("")}
     </tbody></table>
+    <h3>Protokolle</h3><div id="protokolle" class="klein"><span class="leise">wird gesucht …</span></div>
     <h3>Achtung</h3>
     ${(p.achtungen || []).map((a) => `<div class="notiz" style="border-color:var(--achtung)"><b class="rot">⚠ im ${esc(a.fuer)} besuchen</b>${a.text ? " – " + esc(a.text) : ""}
       <div class="wer">${esc(a.wer)}, ${datumText(a.zeit)} ·
@@ -1476,6 +1551,7 @@ function detailZeigen(id, oeffnen = true) {
     <p><button class="knopf haupt" onclick="bemerkungSpeichern(REFS[${ref(p.id)}])">Bemerkung speichern</button></p>
     ${a && (a.notizen || a.original) ? `<details><summary class="leise">Aus der alten Liste</summary><p class="klein">${esc(a.notizen || "")}</p><p class="klein leise">${esc(a.original || "")}</p></details>` : ""}`;
   if (oeffnen) s.classList.add("offen");
+  protokolleZeigen(id);
 }
 function detailZu() { $("#schublade").classList.remove("offen"); S.detail = null; }
 async function achtungSetzen(id, alteId) {
@@ -1864,7 +1940,7 @@ const SCHRITTE = [
     vorher: () => { const r = document.querySelector(".raster"); if (r) r.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
   { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Termin wieder abgeben", text: "Hinten in der Liste steht nur noch «Termin wieder abgeben» – bei deinen eigenen Buchungen, falls es im Praktikumstool doch nicht klappt. Übernehmen geht immer über das Raster." },
   { ziel: ".aktivleiste .knopf", ansicht: "planung", titel: "Liste für Excel kopieren", text: "Kopiert die Liste, so wie sie gefiltert ist – dann in Excel oder eine Mail einfügen." },
-  { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "Hier hast du alle deine Termine im Überblick, nach Tag geordnet und filterbar nach Halbtag, Profil, Quartal. Pro Termin: «✓ Erledigt» nach dem Besuch; «Anpassen» – Termin ändern oder wieder abgeben, danach öffnet sich das Praktikumstool, damit du es dort auch anpasst; «Achtung / Bemerkung» – Pflichtbesuch später (z.B. im Quartal) oder nur eine Bemerkung; «Bericht ↑» legt deinen Bericht in den gemeinsamen Ordner (Berichte/Studienjahr); ganz rechts «Tool ↗». Unter dem Namen klappen die «Kontakte» auf: Mathe-PxL, zuständige PxL und Mentor/in mit E-Mail. Die Hinweise rechts melden, falls doch etwas gegen eine Regel verstösst (z.B. Buchungen, die ausserhalb dieser Seite gemacht wurden).", vorher: () => geheZu("termine") },
+  { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "Hier hast du alle deine Termine im Überblick, nach Tag geordnet und filterbar nach Halbtag, Profil, Quartal. Pro Termin: «✓ Erledigt» nach dem Besuch; «Anpassen» – Termin ändern oder wieder abgeben, danach öffnet sich das Praktikumstool, damit du es dort auch anpasst; «Achtung / Bemerkung» – Pflichtbesuch später (z.B. im Quartal) oder nur eine Bemerkung; «Bericht ↑» legt deinen Bericht in den Ordner der Person unter «Protokolle»; ganz rechts «Tool ↗». Unter dem Namen klappen die «Kontakte» auf: Mathe-PxL, zuständige PxL und Mentor/in mit E-Mail. Die Hinweise rechts melden, falls doch etwas gegen eine Regel verstösst (z.B. Buchungen, die ausserhalb dieser Seite gemacht wurden).", vorher: () => geheZu("termine") },
   { ziel: "nav button[data-ansicht=halbtag]", ansicht: "halbtag", titel: "Halbtagespraktikum", text: "Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als PAAR untereinander – «Beide übernehmen» für den Doppelbesuch. Wer allein ist, steht als EINZELN da. Die Filter hier sind eigene, unabhängig von Profil & Quartal.", vorher: () => geheZu("halbtag") },
   { ziel: "nav button[data-ansicht=studierende]", ansicht: "studierende", titel: "Studierende", text: "Eine Zeile je Person: Halbtag, Profil, Quartal je mit Datum · Stand · Kürzel (NN = unbekannt). Suche beim Tippen, Filter nach Studienjahr, Sortierung. Abgeschlossene sind im Archiv.", vorher: () => geheZu("studierende") },
   { ansicht: "start", titel: "Los geht's", text: "Echte Seite in Chrome oder Edge öffnen, einmal den Ordner «Mathematik Sek1 - TM - Praxisbesuche» aus OneDrive wählen, Kürzel wählen – fertig. Die Hilfe oben erklärt alles nochmals.", vorher: () => geheZu("start"), ende: true },
