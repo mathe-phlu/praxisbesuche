@@ -712,7 +712,7 @@ function achtungZeichen(x) {
 }
 function aktionen(x) {
   const k = [];
-  if (x.stand === "offen" || x.stand === "nicht nötig" || (x.stand === "gebucht" && !x.wer)) k.push(`<button class="knopf klein" onclick="uebernehmen(${ref(x.idpraktikum)})">Ich übernehme</button>`);
+  if (x.stand === "offen" || x.stand === "nicht nötig" || (x.stand === "gebucht" && !x.wer)) k.push(`<button class="knopf klein" title="Zeigt alle möglichen Termine – anklicken bucht und öffnet das Praktikumstool" onclick="uebernehmen(${ref(x.idpraktikum)})">Ich übernehme</button>`);
   if (x.wer === S.ich && x.stand !== "besucht") {
     if (S.ansicht === "termine") k.push(`<button class="knopf klein haupt" title="Der Besuch hat stattgefunden" onclick="erledigt(${ref(x.idpraktikum)})">✓ Erledigt</button>`);
     k.push(`<button class="knopf klein" title="Anderen Termin wählen (im Praktikumstool auch umbuchen)" onclick="uebernehmen(${ref(x.idpraktikum)}, true)">Termin ändern</button>`);
@@ -820,6 +820,9 @@ async function uebernehmen(i, nurTermin = false) {
   const id = REFS[i];
   const x = R.praktika.find((p) => p.idpraktikum === id);
   if (!S.ich) { meldung("Bitte oben rechts «Ich bin» wählen."); return; }
+  // Normalfall: grosse Ansicht mit allen möglichen Terminen – Klick bucht und öffnet das Praktikumstool.
+  // Nur ohne Stundenplan (nicht eingelesen) bleibt die Eingabe von Hand.
+  if (lektionenIm(x, { alleTage: true }).length) { termineZeigen(i); return; }
   const frei = lektionenIm(x, { nurFrei: true });
   const d = $("#frage");
   $("#frageText").textContent = `${x.person.name} · ${x.gruppe} ${sjText(x.jahr)} · ${x.schulort || ""}`;
@@ -1240,8 +1243,9 @@ function ansichtHilfe() {
     <li>Links filtern: Praktikum, Besuch nötig, Stand – darunter aufklappbar <b>Wann</b> (Tag, Vormittag/Nachmittag, Doppellektion, Zeit zum Besprechen), <b>Wo</b> (Ort, Umkreis) und <b>Weitere</b> (z.B. «nicht schon von mir besucht»).</li>
     <li>Über der Liste stehen die aktiven Filter – mit ✕ wieder weg.</li></ul>`)}
   ${k("3 · Termin übernehmen", `<ul><li>Im Raster <b>Mo–Fr</b> stehen die freien Mathe-Lektionen: hohes Kästchen = Doppellektion, grün = danach Zeit zum Besprechen.</li>
-    <li>Klick auf das Raster → alle Termine Woche für Woche → Termin anklicken → <b>übernehmen</b>.</li>
-    <li>Das Praktikumstool öffnet sich rechts direkt bei der Lektion: dort <b>«Besuch eintragen»</b>. Das bleibt Pflicht.</li>
+    <li><b>Der Weg</b>: Klick auf das Raster (oder «Ich übernehme») → alle möglichen Termine Woche für Woche → Termin anklicken → <b>übernehmen</b>. Damit ist er hier als gebucht erfasst.</li>
+    <li>Gleich danach öffnet sich das Praktikumstool in einem neuen Fenster direkt bei dieser Lektion: dort <b>«Besuch eintragen»</b>. Das bleibt Pflicht.</li>
+    <li>Klappt es im Tool nicht (z.B. jemand anderes war schneller): in <b>Meine Termine</b> «Termin ändern» oder «Abgeben».</li>
     <li>Nach dem Besuch: im Reiter <b>Meine Termine</b> auf <b>Erledigt</b>.</li>
     <li><b>Stand</b>: <span class="chip s-offen">offen</span> noch niemand ·
       <span class="chip s-gebucht">gebucht</span> übernommen und im Praktikumstool eingetragen – beides gehört zusammen ·

@@ -731,7 +731,7 @@ function achtungZeichen(x) {
 }
 function aktionen(x) {
   const k = [];
-  if (x.stand === "offen" || x.stand === "nicht nötig" || (x.stand === "gebucht" && !x.wer)) k.push(`<button class="knopf klein" onclick="uebernehmen(${ref(x.idpraktikum)})">Ich übernehme</button>`);
+  if (x.stand === "offen" || x.stand === "nicht nötig" || (x.stand === "gebucht" && !x.wer)) k.push(`<button class="knopf klein" title="Zeigt alle möglichen Termine – anklicken bucht und öffnet das Praktikumstool" onclick="uebernehmen(${ref(x.idpraktikum)})">Ich übernehme</button>`);
   if (x.wer === S.ich && x.stand !== "besucht") {
     if (S.ansicht === "termine") k.push(`<button class="knopf klein haupt" title="Der Besuch hat stattgefunden" onclick="erledigt(${ref(x.idpraktikum)})">✓ Erledigt</button>`);
     k.push(`<button class="knopf klein" title="Anderen Termin wählen (im Praktikumstool auch umbuchen)" onclick="uebernehmen(${ref(x.idpraktikum)}, true)">Termin ändern</button>`);
@@ -839,6 +839,9 @@ async function uebernehmen(i, nurTermin = false) {
   const id = REFS[i];
   const x = R.praktika.find((p) => p.idpraktikum === id);
   if (!S.ich) { meldung("Bitte oben rechts «Ich bin» wählen."); return; }
+  // Normalfall: grosse Ansicht mit allen möglichen Terminen – Klick bucht und öffnet das Praktikumstool.
+  // Nur ohne Stundenplan (nicht eingelesen) bleibt die Eingabe von Hand.
+  if (lektionenIm(x, { alleTage: true }).length) { termineZeigen(i); return; }
   const frei = lektionenIm(x, { nurFrei: true });
   const d = $("#frage");
   $("#frageText").textContent = `${x.person.name} · ${x.gruppe} ${sjText(x.jahr)} · ${x.schulort || ""}`;
@@ -1259,8 +1262,9 @@ function ansichtHilfe() {
     <li>Links filtern: Praktikum, Besuch nötig, Stand – darunter aufklappbar <b>Wann</b> (Tag, Vormittag/Nachmittag, Doppellektion, Zeit zum Besprechen), <b>Wo</b> (Ort, Umkreis) und <b>Weitere</b> (z.B. «nicht schon von mir besucht»).</li>
     <li>Über der Liste stehen die aktiven Filter – mit ✕ wieder weg.</li></ul>`)}
   ${k("3 · Termin übernehmen", `<ul><li>Im Raster <b>Mo–Fr</b> stehen die freien Mathe-Lektionen: hohes Kästchen = Doppellektion, grün = danach Zeit zum Besprechen.</li>
-    <li>Klick auf das Raster → alle Termine Woche für Woche → Termin anklicken → <b>übernehmen</b>.</li>
-    <li>Das Praktikumstool öffnet sich rechts direkt bei der Lektion: dort <b>«Besuch eintragen»</b>. Das bleibt Pflicht.</li>
+    <li><b>Der Weg</b>: Klick auf das Raster (oder «Ich übernehme») → alle möglichen Termine Woche für Woche → Termin anklicken → <b>übernehmen</b>. Damit ist er hier als gebucht erfasst.</li>
+    <li>Gleich danach öffnet sich das Praktikumstool in einem neuen Fenster direkt bei dieser Lektion: dort <b>«Besuch eintragen»</b>. Das bleibt Pflicht.</li>
+    <li>Klappt es im Tool nicht (z.B. jemand anderes war schneller): in <b>Meine Termine</b> «Termin ändern» oder «Abgeben».</li>
     <li>Nach dem Besuch: im Reiter <b>Meine Termine</b> auf <b>Erledigt</b>.</li>
     <li><b>Stand</b>: <span class="chip s-offen">offen</span> noch niemand ·
       <span class="chip s-gebucht">gebucht</span> übernommen und im Praktikumstool eingetragen – beides gehört zusammen ·
@@ -1684,9 +1688,9 @@ const SCHRITTE = [
   { ziel: ".legende-box", ansicht: "planung", titel: "Mathe-Lektionen lesen", text: "Hohes Kästchen = Doppellektion, flaches = Einzellektion. Grün = danach ist Zeit zum Besprechen. Mit dem Knopf links lässt sich der Stundenplan aus- und einblenden.",
     vorher: () => { merke("raster", "auf"); zeichnen(); } },
   { ziel: ".raster", ansicht: "planung", titel: "Wochenraster", text: "Für jede Person: an welchen Tagen und wann Mathe ist. Termine, die nach der Checkliste nicht gehen, sind schon weg – auch Tage, an denen die Person schon einen Besuch hat (alle Fächer, Stand letztes Einlesen), und Wochen mit schon 2 Besuchen. Gleiche Lektion wie ein anderer Besuch (Doppelbesuch) bleibt möglich." },
-  { ziel: "#frageFeld .woche", ansicht: "planung", titel: "Grosse Ansicht: alle Termine", text: "Ein Klick aufs Raster öffnet die grosse Ansicht, Woche für Woche. Mit der Maus über einem Termin stehen Klasse und Zeit danach. Termin anklicken = übernehmen. Danach öffnet sich das Praktikumstool direkt bei dieser Lektion: dort «Besuch eintragen».",
+  { ziel: "#frageFeld .woche", ansicht: "planung", titel: "Grosse Ansicht: so übernimmst du", text: "Das ist DER Weg: aufs Raster klicken (oder «Ich übernehme») – die grosse Ansicht zeigt Woche für Woche alle möglichen Termine. Termin anklicken und bestätigen: Damit ist er hier als gebucht erfasst, und das Praktikumstool öffnet sich in einem neuen Fenster direkt bei dieser Lektion. Dort «Besuch eintragen» – fertig. Mit der Maus über einem Termin stehen Klasse und Zeit danach.",
     vorher: () => { const r = document.querySelector(".raster"); if (r) r.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
-  { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Ich übernehme", text: "Oder direkt hier: «Ich übernehme» bucht – im Praktikumstool gleich mit eintragen. «Erledigt» klickt man später in «Meine Termine»." },
+  { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Ich übernehme", text: "«Ich übernehme» öffnet dieselbe grosse Ansicht. «Tool ↗» ganz rechts springt nur ins Praktikumstool, ohne zu buchen. Klappt etwas im Tool nicht: in «Meine Termine» «Termin ändern» oder «Abgeben»." },
   { ziel: ".aktivleiste .knopf", ansicht: "planung", titel: "Liste für Excel kopieren", text: "Kopiert die Liste, so wie sie gefiltert ist – dann in Excel oder eine Mail einfügen." },
   { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "Hier hast du alle deine Termine im Überblick, nach Tag geordnet und filterbar nach Halbtag, Profil, Quartal. Pro Termin, von links nach rechts: «✓ Erledigt» nach dem Besuch, «Termin ändern», «Abgeben» (aus deiner Liste nehmen), «Tool ↗» ins Praktikumstool und «Achtung / Bemerkung» – entweder ein Pflichtbesuch später (z.B. im Quartal) oder nur eine Bemerkung. Die Hinweise rechts warnen, wenn die Person am selben Tag oder in derselben Woche schon Besuche hat – ein Doppelbesuch zur selben Zeit zählt nicht.", vorher: () => geheZu("termine") },
   { ziel: "nav button[data-ansicht=halbtag]", ansicht: "halbtag", titel: "Halbtagespraktikum", text: "Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als PAAR untereinander – «Beide übernehmen» für den Doppelbesuch. Wer allein ist, steht als EINZELN da. Die Filter hier sind eigene, unabhängig von Profil & Quartal.", vorher: () => geheZu("halbtag") },
