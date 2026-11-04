@@ -42,6 +42,7 @@ button.knopf:hover { background: var(--grau); }
 .kontakte > div, .kontakte details > div { margin: 2px 0 2px 12px; }
 .kontakte details summary { margin-left: 12px; }
 a.bericht { text-decoration: none; margin-left: 3px; }
+.ber-knoepfe { display: inline-flex; gap: 2px; padding: 2px; border: 1px dashed #cfc3ad; border-radius: 6px; }
 a.bericht:hover { text-decoration: underline; }
 .akt { display: flex; gap: 4px; align-items: center; }
 .akt-rechts { margin-left: auto; padding-left: 4px; }
@@ -596,7 +597,7 @@ function berechnen() {
         const info = protokollInfo(datei); if (!info.gruppe) continue;
         const passend = person.praktika.filter((x) => x.gruppe === info.gruppe);
         const x = passend.find((x) => x.jahr === info.jahr) || (passend.length === 1 ? passend[0] : null);
-        if (x && !(x.berichte || []).some((b) => b.datei === o + "/" + datei)) (x.berichte ||= []).push({ datei: o + "/" + datei, wer: (datei.match(/PK0\d\s+([a-z]{2,3})\b/i) || [])[1] || "" });
+        if (x && !(x.berichteWeg && x.berichteWeg.has(o + "/" + datei)) && !(x.berichte || []).some((b) => b.datei === o + "/" + datei)) (x.berichte ||= []).push({ datei: o + "/" + datei, wer: (datei.match(/PK0\d\s+([a-z]{2,3})\b/i) || [])[1] || "" });
       }
     }
   }
@@ -666,8 +667,9 @@ function standBestimmen(x, altBesuch) {
   x.notizen = x.eintraege.filter((e) => e.typ === "notiz");
   // Berichte: je Dateiname der neueste Eintrag; «bericht_weg» entfernt ihn
   const ber = {};
-  for (const e of x.eintraege) { if (e.typ === "bericht") ber[e.datei] = e; if (e.typ === "bericht_weg") delete ber[e.datei]; }
+  for (const e of x.eintraege) { if (e.typ === "bericht") ber[e.datei] = { ...e, app: true }; if (e.typ === "bericht_weg") delete ber[e.datei]; }
   x.berichte = Object.values(ber);
+  x.berichteWeg = new Set(x.eintraege.filter((e) => e.typ === "bericht_weg").map((e) => e.datei));
 }
 
 function noetigBestimmen(x) {
@@ -826,7 +828,8 @@ function aktionen(x) {
   if (S.ansicht === "termine") {
     k.push(`<button class="knopf klein" title="z.B. «muss im Quartal besucht werden» oder eine Bemerkung zur Person" onclick="achtungSetzen(REFS[${ref(x.person.id)}])">Achtung / Bemerkung</button>`);
     k.push(`<button class="knopf klein" title="Bericht (PDF/Word) in den Ordner der Person unter «Protokolle» legen" onclick="berichtHochladen(${ref(x.idpraktikum)})">Bericht ↑</button>`);
-    if (x.berichte && x.berichte.length) k.push(berichtLinks(x) + (x.berichte || []).slice(-1).map((b) => ` <a href="#" class="bericht" title="E-Mail-Entwurf mit diesem Bericht im Anhang" onclick="event.preventDefault();mailZuBericht(${ref(x.idpraktikum)}, ${ref(b.datei)})">✉</a>`).join(""));
+    for (const b of (x.berichte || []).filter((b) => b.app && b.wer === S.ich)) k.push(`<span class="ber-knoepfe" title="${esc(b.datei)}">
+      <button class="knopf klein" title="Bericht öffnen" onclick="berichtOeffnen(${ref(b.datei)})">📄 öffnen</button><button class="knopf klein" title="E-Mail-Entwurf mit diesem Bericht im Anhang (öffnet in Outlook)" onclick="mailZuBericht(${ref(x.idpraktikum)}, ${ref(b.datei)})">✉ E-Mail</button><button class="knopf klein" title="Falsch hochgeladen? Bericht löschen" onclick="berichtLoeschen(${ref(x.idpraktikum)}, ${ref(b.datei)})">✕</button></span>`);
     const letzte = x.notizen && x.notizen.length ? x.notizen[x.notizen.length - 1] : null;
     return reihe(k, tool) + (letzte ? `<div class="klein leise" style="white-space:normal;max-width:300px;margin-top:3px">✎ ${esc(letzte.text)} <i>(${esc(letzte.wer)})</i></div>` : "");
   }
@@ -1116,6 +1119,19 @@ function mailEntwurf(x, datei, dateiname) {
     const fehlt = [!(k.student && k.student.mail) && "Studierende", !pxl.length && "Mathe-PxL", !cc.length && "Mentor/in"].filter(Boolean);
     meldung(`Bericht abgelegt. E-Mail-Entwurf «${a.download}»: oben rechts in der Download-Leiste anklicken – öffnet in Outlook mit dem Bericht im Anhang.${fehlt.length ? " Adresse fehlt: " + fehlt.join(", ") + " – bitte von Hand ergänzen." : ""}`);
   });
+}
+async function berichtLoeschen(i, j) {
+  const id = REFS[i], pfad = REFS[j];
+  const ok = await frage(`Diesen Bericht löschen?\n${pfad}`, { art: "wahl", wert: "ja", optionen: [["ja", "Ja, löschen"]] });
+  if (ok !== "ja") return;
+  try {
+    const t = pfad.split("/"); const name = t.pop();
+    let d = await protokollBasis(false); for (const y of t) d = await d.getDirectoryHandle(y);
+    await d.removeEntry(name);
+  } catch (e) { /* Datei schon weg */ }
+  if (S.protokolle) { const o = pfad.split("/")[0]; if (S.protokolle[o]) S.protokolle[o] = S.protokolle[o].filter((n) => o + "/" + n !== pfad); }
+  await eintragen({ typ: "bericht_weg", praktikum: id, datei: pfad });
+  meldung("Bericht gelöscht.");
 }
 async function mailZuBericht(i, j) {
   const x = R.praktika.find((p) => p.idpraktikum === REFS[i]), pfad = REFS[j];
@@ -1503,7 +1519,7 @@ const HILFE = [
     <li>Termin passt nicht mehr: <b>Anpassen</b> → «Termin ändern» oder «Wieder abgeben». Danach öffnet sich das Tool – dort auch anpassen.</li>
     <li>Unter dem Namen: <b>Kontakte</b> (Mathe-PxL, zuständige PxL, Mentor/in mit E-Mail).</li>
     <li><b>Achtung / Bemerkung</b>: z.B. «muss im Quartal besucht werden» oder nur eine Bemerkung.</li>
-    <li><b>Bericht ↑</b>: Bericht (PDF oder Word) hochladen. Er landet im gemeinsamen Ordner unter <b>Protokolle/Name der Person</b> (fehlt der Ordner, wird er angelegt), benannt wie gewohnt «UB Nachname PK03 kürzel JJMMTT». Bei den Studierenden erscheint dann 📄. Gleichzeitig entsteht ein <b>E-Mail-Entwurf</b> mit dem Bericht im Anhang an Studierende, Mathe-PxL und Mentor/in – in der Download-Leiste des Browsers anklicken, er öffnet in Outlook. Text anpassen, senden. ✉ erstellt den Entwurf nochmals.</li></ol>
+    <li><b>Bericht ↑</b>: Bericht (PDF oder Word) hochladen. Er landet im gemeinsamen Ordner unter <b>Protokolle/Name der Person</b> (fehlt der Ordner, wird er angelegt), benannt wie gewohnt «UB Nachname PK03 kürzel JJMMTT». Bei den Studierenden erscheint dann 📄. Gleichzeitig entsteht ein <b>E-Mail-Entwurf</b> mit dem Bericht im Anhang an Studierende, Mathe-PxL und Mentor/in – in der Download-Leiste des Browsers anklicken, er öffnet in Outlook. Text anpassen, senden. Danach stehen beim Termin <b>📄 öffnen</b> · <b>✉ E-Mail</b> (Entwurf nochmals erstellen) · <b>✕</b> (falsch hochgeladen? löschen).</li></ol>
     <p class="leise">⚠ rechts = Regel verletzt (z.B. Buchung ausserhalb dieser Seite). Ein Doppelbesuch zur selben Zeit ist kein Problem.</p>`],
   ["halbtag", "Halbtagespraktikum", "Was ist anders?", `<ol class="schritte">
     <li>Reiter <b>Halbtagespraktikum</b>. Filter nach <b>Periode</b> (A–D) statt nach Tag.</li>
