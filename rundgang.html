@@ -51,12 +51,16 @@ button.knopf.klein { font-size: 13px; padding: 3px 8px; }
 .kachel.gruppe { background: var(--grau); border: 0; display: flex; gap: 10px; padding: 8px; }
 .kachel.gruppe > .kachel { min-width: 90px; }
 .rot { color: var(--achtung); } .gruen { color: #3c7a3c; }
-.mitfilter { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 16px; align-items: start; }
-@media (max-width: 900px) { .mitfilter { grid-template-columns: 1fr; } }
+.mitfilter { display: block; }
 .inhalt { min-width: 0; overflow-x: auto; }
-.filterbox { background: #fff; border: 1px solid var(--linie); border-radius: 8px; position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow: auto; }
-.fkopf { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--linie); background: var(--ph-sand); border-radius: 8px 8px 0 0; }
-.fsek { padding: 6px 12px 10px; border-bottom: 1px solid var(--linie); }
+.filterbox { background: #fff; border: 1px solid var(--linie); border-radius: 8px; margin-bottom: 10px; }
+.fkopf { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 12px; background: var(--ph-sand); border-radius: 8px; cursor: pointer; list-style: none; }
+.fkopf::-webkit-details-marker { display: none; }
+.fkopf b::before { content: "▸ "; } details.filterbox[open] > .fkopf b::before { content: "▾ "; }
+details.filterbox[open] > .fkopf { border-bottom: 1px solid var(--linie); border-radius: 8px 8px 0 0; }
+.fgitter { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.fsek { padding: 6px 12px 10px; border-right: 1px solid var(--linie); }
+.fsek:last-child { border-right: 0; }
 .fblock { padding: 7px 0; border-top: 1px dashed #e2d9c8; }
 .fsek > .fblock:first-of-type, .fsek > summary + .fblock { border-top: 0; }
 .fblock .ftitel { display: block; font-size: 12.5px; margin: 0 0 4px; }
@@ -147,7 +151,10 @@ div.name { font-weight: 600; cursor: pointer; color: var(--akzent); }
 table.regeln td { padding: 3px 8px 3px 0; }
 details.karte summary { cursor: pointer; }
 .legende-box { background: #fff; border: 1px solid var(--linie); border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; font-size: 13.5px; }
-.legende-kopf { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 4px; }
+.legende-kopf { display: flex; justify-content: space-between; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+.legende-kopf::-webkit-details-marker { display: none; }
+.legende-kopf b::before { content: "▸ "; } details.legende-box[open] .legende-kopf b::before { content: "▾ "; }
+details.legende-box[open] .legende-kopf { margin-bottom: 4px; }
 .legende-zeilen { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 4px 18px; margin: 6px 0; }
 .legende-zeilen .rz { width: 80px; margin-right: 6px; }
 .legende-text { color: var(--tinte); }
@@ -731,6 +738,13 @@ function achtungZeichen(x) {
 }
 function aktionen(x) {
   const k = [];
+  if (S.ansicht !== "termine") {
+    // Übernehmen geht über das Raster (grosse Ansicht). Nur ohne Stundenplan: von Hand.
+    if (x.wer === S.ich && x.stand !== "besucht") return `<button class="knopf klein" title="Aus meiner Liste nehmen – im Praktikumstool die Buchung auch löschen" onclick="handlung('abgeben',${ref(x.idpraktikum)})">Termin wieder abgeben</button>`;
+    if ((x.stand === "offen" || x.stand === "nicht nötig") && !lektionenIm(x, { alleTage: true }).length)
+      return `<button class="knopf klein" title="Kein Stundenplan eingelesen – Termin von Hand eingeben" onclick="uebernehmen(${ref(x.idpraktikum)})">Ich übernehme</button>`;
+    return "";
+  }
   if (x.stand === "offen" || x.stand === "nicht nötig" || (x.stand === "gebucht" && !x.wer)) k.push(`<button class="knopf klein" title="Zeigt alle möglichen Termine – anklicken bucht und öffnet das Praktikumstool" onclick="uebernehmen(${ref(x.idpraktikum)})">Ich übernehme</button>`);
   if (x.wer === S.ich && x.stand !== "besucht") {
     if (S.ansicht === "termine") k.push(`<button class="knopf klein haupt" title="Der Besuch hat stattgefunden" onclick="erledigt(${ref(x.idpraktikum)})">✓ Erledigt</button>`);
@@ -751,9 +765,9 @@ function reihe(k, tool) { return `<div class="akt">${k.join("")}<span class="akt
 /* Mathe-Lektionen als kleines Wochenraster Mo–Fr; Klick öffnet alle möglichen Termine */
 function legende() {
   const zu = lies("raster") === "zu";
-  return `<div class="legende-box">
-    <div class="legende-kopf"><b>So liest du die Spalte «Mathe-Lektionen»</b>
-      <button class="knopf klein" onclick="rasterUmschalten()">${zu ? "▸ Stundenplan einblenden" : "▾ Stundenplan ausblenden"}</button></div>
+  return `<details class="legende-box" ${lies("legende") === "auf" ? "open" : ""} ontoggle="merke('legende', this.open ? 'auf' : 'zu')">
+    <summary class="legende-kopf"><b>So liest du die Spalte «Mathe-Lektionen»</b>
+      <button class="knopf klein" onclick="event.preventDefault();event.stopPropagation();rasterUmschalten()">${zu ? "▸ Stundenplan einblenden" : "▾ Stundenplan ausblenden"}</button></summary>
     <div class="legende-text">Für jede Person ein kleiner Wochenplan Mo–Fr. Jedes Kästchen ist eine <b>Mathe-Lektion, die man besuchen kann</b>.</div>
     <div class="legende-zeilen">
       <div><span class="rz">9:10–9:55</span> flaches Kästchen = <b>Einzellektion</b> (eine Lektion, 45 Min)</div>
@@ -761,8 +775,8 @@ function legende() {
       <div><span class="rz frei">10:15–11:00</span> grün = nach dieser Mathe-Lektion hat die Person <b>frei für die Besprechung</b> (mind. ${BESPRECHUNG_MIN} Min oder Schulschluss)</div>
       <div><span class="rz">13:35–14:20</span> weiss = danach geht der Unterricht gleich weiter</div>
     </div>
-    <div class="legende-text">→ <b>Auf den Wochenplan klicken</b>: alle Termine Woche für Woche. Dort einen Termin anklicken = <b>übernehmen</b>.</div>
-  </div>`;
+    <div class="legende-text">→ <b>Auf den Wochenplan klicken</b>: alle Termine Woche für Woche. Dort einen Termin anklicken = <b>übernehmen</b> – das Praktikumstool öffnet sich gleich bei dieser Lektion.</div>
+  </details>`;
 }
 function rasterUmschalten() { merke("raster", lies("raster") === "zu" ? "auf" : "zu"); zeichnen();
 }
@@ -991,10 +1005,10 @@ function filterLeiste(ansicht, anzahl) {
   const gruppe = (titel, inhalt) => `<section class="fsek"><h4>${titel}</h4>${inhalt}</section>`;
   const klapp = (titel, aktiv, inhalt) => { const offen = S.offeneGruppen ? S.offeneGruppen.has(titel) : false;
     return `<details class="fsek" ${offen ? "open" : ""} ontoggle="gruppeMerken('${titel}',this.open)"><summary><h4>${titel}</h4>${aktiv.length ? `<span class="faktiv">${esc(aktiv.join(" · "))}</span>` : ""}</summary>${inhalt}</details>`; };
-  return `<aside class="filterbox">
-    <div class="fkopf"><b>Filter</b><button class="knopf klein" onclick="filterLeeren()">zurücksetzen</button></div>
-    ${gruppe("Auswahl", grund)}${klapp("Wann", wannAktiv, wann)}${klapp("Wo", woAktiv, wo)}${klapp("Weitere", weitereAktiv, weitere)}
-  </aside>`;
+  return `<details class="filterbox" ${lies("filterbox") === "zu" ? "" : "open"} ontoggle="merke('filterbox', this.open ? 'auf' : 'zu')">
+    <summary class="fkopf"><b>Filter</b><button class="knopf klein" onclick="event.preventDefault();event.stopPropagation();filterLeeren()">zurücksetzen</button></summary>
+    <div class="fgitter">${gruppe("Auswahl", grund)}${klapp("Wann", wannAktiv, wann)}${klapp("Wo", woAktiv, wo)}${klapp("Weitere", weitereAktiv, weitere)}</div>
+  </details>`;
 }
 /* Über der Liste: Anzahl, aktive Filter zum Wegklicken, Liste kopieren */
 function aktivLeiste(ansicht, anzahl) {
@@ -1179,8 +1193,7 @@ function ansichtHalbtag() {
 }
 function paarAktionen([a, b]) {
   const k = [];
-  if ([a, b].some((x) => x.stand === "offen")) k.push(`<button class="knopf klein" onclick="termineZeigen(${ref(a.idpraktikum)}, ${ref(b.idpraktikum)})">Beide übernehmen</button>`);
-  for (const x of [a, b]) if (x.link) k.push(`<button class="knopf klein" title="${esc(x.person.name)} im Praktikumstool" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ${esc(x.person.name.split(" ")[0])} ↗</button>`);
+  for (const x of [a, b]) if (x.wer === S.ich && x.stand !== "besucht") k.push(`<button class="knopf klein" title="Aus meiner Liste nehmen – im Praktikumstool die Buchung auch löschen" onclick="handlung('abgeben',${ref(x.idpraktikum)})">${esc(x.person.name.split(" ")[0])}: Termin wieder abgeben</button>`);
   return k.join("<br>");
 }
 function periode(x) {
@@ -1681,16 +1694,16 @@ const SCHRITTE = [
   { ziel: "#ich", ansicht: "start", titel: "Wer bin ich?", text: "Oben rechts das eigene Kürzel wählen (hier im Beispiel: clu). Dann gehören «Ich übernehme» und «Meine Termine» dir. Den Rundgang kann man jederzeit mit «✕ Beenden» abbrechen oder unten direkt zu einem Schritt springen.", vorher: () => { S.ich = "clu"; merke("ich", "clu"); zeichnen(); } },
   { ziel: "nav button[data-ansicht=planung]", ansicht: "planung", titel: "Profil & Quartal", text: "Hier wird geplant: alle Profil-, Quartals- und Spezialpraktika des Studienjahrs.", vorher: () => geheZu("planung") },
   { ziel: ".filterbox .fsek", ansicht: "planung", titel: "Grundauswahl", text: "Welche Praktika, ob ein Besuch nötig ist, und der Stand (offen, übernommen, besucht). Ein Klick schaltet um." },
-  { ziel: ".filterbox details", ansicht: "planung", titel: "Wann", text: "Aufklappen: Zeitraum, Tag, Vormittag/Nachmittag, Einzel- oder Doppellektion und «danach Zeit zum Besprechen».", vorher: () => { const d = document.querySelector(".filterbox details"); if (d) d.open = true; } },
+  { ziel: ".filterbox details", ansicht: "planung", titel: "Wann", text: "Der ganze Filter lässt sich oben auf- und zuklappen. Aufklappen: Zeitraum, Tag, Vormittag/Nachmittag, Einzel- oder Doppellektion und «danach Zeit zum Besprechen».", vorher: () => { const d = document.querySelector(".filterbox details"); if (d) d.open = true; } },
   { ziel: ".aktivleiste", ansicht: "planung", titel: "Was gerade gefiltert ist", text: "Über der Liste stehen die aktiven Filter. Mit ✕ ist einer wieder weg." },
   { ziel: "#app table.liste tbody tr .name", ansicht: "planung", titel: "Name anklicken", text: "Ein Klick auf den Namen öffnet rechts die Grundinformationen: alle Praktika, wer schon besucht hat, Bemerkungen und Achtung-Vermerke.",
     vorher: () => { const n = document.querySelector("#app table.liste tbody tr .name"); if (n) n.click(); }, nachher: () => detailZu() },
-  { ziel: ".legende-box", ansicht: "planung", titel: "Mathe-Lektionen lesen", text: "Hohes Kästchen = Doppellektion, flaches = Einzellektion. Grün = danach ist Zeit zum Besprechen. Mit dem Knopf links lässt sich der Stundenplan aus- und einblenden.",
-    vorher: () => { merke("raster", "auf"); zeichnen(); } },
+  { ziel: ".legende-box", ansicht: "planung", titel: "Mathe-Lektionen lesen", text: "Hohes Kästchen = Doppellektion, flaches = Einzellektion. Grün = danach ist Zeit zum Besprechen. Die Erklärung lässt sich auf- und zuklappen, der Knopf rechts blendet den Stundenplan aus und ein.",
+    vorher: () => { merke("raster", "auf"); merke("legende", "auf"); zeichnen(); } },
   { ziel: ".raster", ansicht: "planung", titel: "Wochenraster", text: "Für jede Person: an welchen Tagen und wann Mathe ist. Termine, die nach der Checkliste nicht gehen, sind schon weg – auch Tage, an denen die Person schon einen Besuch hat (alle Fächer, Stand letztes Einlesen), und Wochen mit schon 2 Besuchen. Gleiche Lektion wie ein anderer Besuch (Doppelbesuch) bleibt möglich." },
   { ziel: "#frageFeld .woche", ansicht: "planung", titel: "Grosse Ansicht: so übernimmst du", text: "Das ist DER Weg: aufs Raster klicken (oder «Ich übernehme») – die grosse Ansicht zeigt Woche für Woche alle möglichen Termine. Termin anklicken und bestätigen: Damit ist er hier als gebucht erfasst, und das Praktikumstool öffnet sich in einem neuen Fenster direkt bei dieser Lektion. Dort «Besuch eintragen» – fertig. Mit der Maus über einem Termin stehen Klasse und Zeit danach.",
     vorher: () => { const r = document.querySelector(".raster"); if (r) r.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
-  { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Ich übernehme", text: "«Ich übernehme» öffnet dieselbe grosse Ansicht. «Tool ↗» ganz rechts springt nur ins Praktikumstool, ohne zu buchen. Klappt etwas im Tool nicht: in «Meine Termine» «Termin ändern» oder «Abgeben»." },
+  { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Termin wieder abgeben", text: "Hinten in der Liste steht nur noch «Termin wieder abgeben» – bei deinen eigenen Buchungen, falls es im Praktikumstool doch nicht klappt. Übernehmen geht immer über das Raster." },
   { ziel: ".aktivleiste .knopf", ansicht: "planung", titel: "Liste für Excel kopieren", text: "Kopiert die Liste, so wie sie gefiltert ist – dann in Excel oder eine Mail einfügen." },
   { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "Hier hast du alle deine Termine im Überblick, nach Tag geordnet und filterbar nach Halbtag, Profil, Quartal. Pro Termin, von links nach rechts: «✓ Erledigt» nach dem Besuch, «Termin ändern», «Abgeben» (aus deiner Liste nehmen), «Tool ↗» ins Praktikumstool und «Achtung / Bemerkung» – entweder ein Pflichtbesuch später (z.B. im Quartal) oder nur eine Bemerkung. Die Hinweise rechts warnen, wenn die Person am selben Tag oder in derselben Woche schon Besuche hat – ein Doppelbesuch zur selben Zeit zählt nicht.", vorher: () => geheZu("termine") },
   { ziel: "nav button[data-ansicht=halbtag]", ansicht: "halbtag", titel: "Halbtagespraktikum", text: "Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als PAAR untereinander – «Beide übernehmen» für den Doppelbesuch. Wer allein ist, steht als EINZELN da. Die Filter hier sind eigene, unabhängig von Profil & Quartal.", vorher: () => geheZu("halbtag") },
