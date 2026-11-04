@@ -141,7 +141,13 @@ input.eingabe { font-size: 14px; padding: 4px 6px; border: 1px solid #ccc; borde
 .raster .rz { display: block; width: 100%; }
 .rz.doppel { padding: 7px 2px; border-color: #9a9a9a; font-weight: 600; }
 .rz.frei { background: #dcefd8; border-color: #8cc084; color: #1f4d1a; }
-th.pspalte, td.pspalte { width: 210px; min-width: 210px; }
+th.pspalte, td.pspalte { width: 210px; min-width: 210px; border-left: 3px solid var(--ph-braun) !important; }
+.p-halbtag { background: #f2f6fa; } .p-profil { background: #faf5ea; } .p-quartal { background: #f1f7ef; }
+thead th.p-halbtag, thead th.p-profil, thead th.p-quartal { text-align: center; font-size: 14px; color: var(--ph-braun-dunkel); }
+thead tr.unterkopf th { font-weight: 400; font-size: 11.5px; color: var(--leise); padding-top: 0; }
+th.p-info { border-bottom: 2px solid var(--ph-braun); }
+td.pspalte .ue + .ue { border-top: 1px dotted #cfc3ad; padding-top: 2px; margin-top: 2px; }
+td.p-bem, th.p-bem { border-left: 3px solid var(--ph-braun) !important; }
 .ue { display: grid; grid-template-columns: 52px 54px auto 34px; gap: 4px; align-items: center; font-size: 12.5px; margin: 1px 0; font-variant-numeric: tabular-nums; }
 .ue .chip { font-size: 12px; text-align: center; }
 .ue-j { color: var(--leise); } .ue-d { color: var(--tinte); } .ue-w { text-align: left; }
@@ -1278,7 +1284,8 @@ function ansichtStudierende() {
     <label class="haken"><input type="checkbox" ${fw("nurBemerkung", false) ? "checked" : ""} onchange="setzeFilter('nurBemerkung',this.checked)"> nur mit Bemerkung</label>
     <span class="leise klein">${liste.length} Personen</span>
   </div>
-  <table class="liste"><thead><tr><th></th><th>Name</th><th>Studiengang</th><th>Fächer</th><th class="pspalte">Halbtag</th><th class="pspalte">Profil</th><th class="pspalte">Quartal</th><th>Achtung / Bemerkung</th><th></th></tr></thead><tbody>
+  <table class="liste"><thead><tr><th colspan="4" class="p-info">Person</th><th class="pspalte p-halbtag">Halbtag</th><th class="pspalte p-profil">Profil</th><th class="pspalte p-quartal">Quartal</th><th colspan="2" class="p-bem">Achtung / Bemerkung</th></tr>
+    <tr class="unterkopf"><th></th><th>Name</th><th>Studiengang</th><th>Fächer</th>${["p-halbtag", "p-profil", "p-quartal"].map((c) => `<th class="pspalte ${c}">Jahr${c === "p-halbtag" ? " Periode" : ""} · Besuch am · Stand · von</th>`).join("")}<th class="p-bem"></th><th></th></tr></thead><tbody>
   ${liste.map((p) => { const a = (p.achtungen || []).length || p.praktika.some((x) => x.achtung && x.achtung.length);
     const bem = [...(p.achtungen || []).map((x) => `<div class="rot">⚠ im ${esc(x.fuer)} besuchen${x.text ? ": " + esc(x.text) : ""}
         <button class="knopf klein" title="ändern" onclick="achtungSetzen(REFS[${ref(p.id)}], REFS[${ref(x.id)}])">ändern</button>
@@ -1286,7 +1293,7 @@ function ansichtStudierende() {
                  ...p.notizen.slice(-1).map((x) => `<div>${esc(x.text.slice(0, 80))}</div>`), ...(!p.notizen.length && p.alt && p.alt.bemerkung ? [`<div class="leise">${esc(p.alt.bemerkung.slice(0, 80))}</div>`] : [])].join("");
     return `<tr class="${a ? "zeile-achtung" : ""}"><td>${a ? `<span class="achtung">⚠</span>` : ""}</td><td class="name" onclick="detailZeigen(REFS[${ref(p.id)}])">${esc(p.name)}</td>
     <td>${esc(p.studiengang || "")}</td><td class="klein">${esc((p.faecher || []).join(", "))}</td>
-    <td class="pspalte">${zelle(p, "Halbtag")}</td><td class="pspalte">${zelle(p, "Profil")}</td><td class="pspalte">${zelle(p, "Quartal")}</td><td class="klein">${bem}</td>
+    <td class="pspalte p-halbtag">${zelle(p, "Halbtag")}</td><td class="pspalte p-profil">${zelle(p, "Profil")}</td><td class="pspalte p-quartal">${zelle(p, "Quartal")}</td><td class="klein p-bem">${bem}</td>
     <td style="white-space:nowrap"><button class="knopf klein" onclick="achtungSetzen(REFS[${ref(p.id)}])">Achtung / Bemerkung</button></td></tr>`; }).join("")}
   </tbody></table>`;
 }
