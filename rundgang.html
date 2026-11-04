@@ -915,6 +915,8 @@ function terminGesperrt(x, datum, zeit) {
   const von = datumAus(x.von), bis = datumAus(x.bis);
   if (von && datum < von) return "vor Beginn des Praktikums";
   if (bis && datum > bis) return "nach Ende des Praktikums";
+  // Halbtagespraktikum: eigene Regeln – Checkliste Profil/Quartal und Besuchsgrenzen gelten nicht
+  if (x.gruppe === "Halbtag") return "";
   if (bis && datum === bis && regel("letzterTag")) return "letzter Praktikumstag";
   const ersteTage = Number(regel("profilErsteTage")) || 0;
   if (von && x.gruppe === "Profil" && ersteTage) {
@@ -951,6 +953,8 @@ function terminWarnungen(x, datum, zeit) {
   const von = datumAus(x.von), bis = datumAus(x.bis);
   if (von && datum < von) w.push("vor Beginn des Praktikums");
   if (bis && datum > bis) w.push("nach Ende des Praktikums");
+  // Halbtagespraktikum: eigene Regeln (Doppelbesuche am selben Vormittag sind normal)
+  if (x.gruppe === "Halbtag") return w;
   if (bis && datum === bis) w.push("nicht am letzten Praktikumstag");
   if (von && x.gruppe === "Profil") {
     let tage = 0; for (let d = new Date(von + "T12:00"); d.toISOString().slice(0, 10) < datum; d.setDate(d.getDate() + 1)) if (d.getDay() % 6) tage++;
@@ -1347,7 +1351,8 @@ const HILFE = [
     <li>Reiter <b>Halbtagespraktikum</b>. Filter nach <b>Periode</b> (A–D) statt nach Tag.</li>
     <li>Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als <b>Paar</b> untereinander.</li>
     <li>Klick auf den Wochenplan des Paars bucht den <b>Doppelbesuch</b> für beide.</li>
-    <li>Im Tool bei <b>beiden</b> den Besuch eintragen.</li></ol>`],
+    <li>Im Tool bei <b>beiden</b> den Besuch eintragen.</li></ol>
+    <p class="leise">Die Regeln von Profil und Quartal (erste Tage, letzter Tag, ein Besuch pro Vormittag, zwei pro Woche) gelten hier nicht.</p>`],
   ["studierende", "Studierende", "Alle Praktika einer Person", `<ol class="schritte">
     <li>Reiter <b>Studierende</b>: eine Zeile pro Person, Halbtag · Profil · Quartal.</li>
     <li>Suchen beim Tippen, filtern nach Studienjahr. Abgeschlossene sind im <b>Archiv</b>.</li>
