@@ -712,9 +712,9 @@ function sollKarte(sj) {
 }
 function geheZu(a, filter) { S.ansicht = a; merke("ansicht", a); if (filter) Object.assign(S.filter, filter); zeichnen(); window.scrollTo(0, 0); }
 
-function standChip(x, kurz = false) {
+function standChip(x, kurz = false, ohneWer = false) {
   const cls = { offen: "s-offen", "übernommen": "s-uebernommen", gebucht: "s-gebucht", besucht: "s-besucht", "nicht nötig": "s-nicht" }[x.stand] || "s-nicht";
-  const wer = x.wer ? ` · ${esc(x.wer)}` : x.dozentTool ? ` · ${esc(x.dozentTool)}` : "";
+  const wer = ohneWer ? "" : x.wer ? ` · ${esc(x.wer)}` : x.dozentTool ? ` · ${esc(x.dozentTool)}` : "";
   const t = !kurz && x.termin && x.stand !== "besucht" ? ` · ${esc(kurzDatum(x.termin.datum))} ${esc(x.termin.zeit || "")}` : "";
   const doppelt = x.doppelt && x.doppelt.length ? ` <span class="hinweis" title="Mehrere haben übernommen – bitte absprechen">doppelt: ${esc(x.doppelt.join(", "))}</span>` : "";
   // Wer übernimmt, bucht gleichzeitig im Praktikumstool – darum gibt es nur «gebucht»
@@ -731,13 +731,12 @@ function aktionen(x) {
   const k = [];
   if (x.stand === "offen" || x.stand === "nicht nötig" || (x.stand === "gebucht" && !x.wer)) k.push(`<button class="knopf klein" onclick="uebernehmen(${ref(x.idpraktikum)})">Ich übernehme</button>`);
   if (x.wer === S.ich && x.stand !== "besucht") {
-    k.push(`<button class="knopf klein" onclick="uebernehmen(${ref(x.idpraktikum)}, true)">Termin</button>`);
-    if (S.ansicht === "termine") k.push(`<button class="knopf klein" onclick="erledigt(${ref(x.idpraktikum)})">Erledigt</button>`);
-    k.push(`<button class="knopf klein" onclick="handlung('abgeben',${ref(x.idpraktikum)})">Abgeben</button>`);
+    if (S.ansicht === "termine") k.push(`<button class="knopf klein haupt" title="Der Besuch hat stattgefunden" onclick="erledigt(${ref(x.idpraktikum)})">✓ Erledigt</button>`);
+    k.push(`<button class="knopf klein" title="Anderen Termin wählen (im Praktikumstool auch umbuchen)" onclick="uebernehmen(${ref(x.idpraktikum)}, true)">Termin ändern</button>`);
+    k.push(`<button class="knopf klein" title="Aus meiner Liste nehmen – jemand anderes kann übernehmen (im Praktikumstool die Buchung löschen)" onclick="handlung('abgeben',${ref(x.idpraktikum)})">Abgeben</button>`);
   }
   if (x.link) k.push(`<button class="knopf klein" title="Im Praktikumstool öffnen (Fenster rechts)" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>`);
   if (S.ansicht === "termine") {
-    k.push(`<button class="knopf klein" title="Notiz zu diesem Praktikum" onclick="notizZu(REFS[${ref(x.idpraktikum)}])">Notiz${x.notizen && x.notizen.length ? " (" + x.notizen.length + ")" : ""}</button>`);
     k.push(`<button class="knopf klein" title="z.B. «muss im Quartal besucht werden» oder eine Bemerkung zur Person" onclick="achtungSetzen(REFS[${ref(x.person.id)}])">Achtung / Bemerkung</button>`);
     const letzte = x.notizen && x.notizen.length ? x.notizen[x.notizen.length - 1] : null;
     return k.join(" ") + (letzte ? `<div class="klein leise" style="white-space:normal;max-width:300px;margin-top:3px">✎ ${esc(letzte.text)} <i>(${esc(letzte.wer)})</i></div>` : "");
@@ -897,11 +896,17 @@ function terminWarnungen(x, datum, zeit) {
   const arb = x.gruppe === "Profil" ? S.einst.arbeitssitzungProfil : x.gruppe === "Quartal" ? S.einst.arbeitssitzungQuartal : "";
   if (arb && datum === arb && vormittag(zeit)) w.push("Vormittag der Arbeitssitzung");
   // eigene Besuche: in der Regel ein Besuch pro Halbtag
-  const meine = R.praktika.filter((y) => y !== x && y.wer === S.ich && y.termin && y.termin.datum === datum && vormittag(y.termin.zeit) === vormittag(zeit));
+  // ausser genau zur selben Zeit (Doppelbesuch: zwei Studierende in derselben Lektion)
+  const meine = R.praktika.filter((y) => y !== x && y.wer === S.ich && y.termin && y.termin.datum === datum && y.termin.zeit !== zeit && vormittag(y.termin.zeit) === vormittag(zeit));
   if (meine.length) w.push(`am selben ${vormittag(zeit) ? "Vormittag" : "Nachmittag"} schon: ${meine.map((y) => y.person.name).join(", ")}`);
   // die Person: nicht 2 Besuche am selben Tag, höchstens 2 pro Woche
-  const besuche = [...(x.besuche || []).map((v) => v.datum), ...(x.lektionen || []).filter((l) => l.gebucht && l.gebucht.length).map((l) => l.datum),
-                   ...R.praktika.filter((y) => y !== x && y.person === x.person && y.termin).map((y) => y.termin.datum)];
+  // Ein Besuch = eine Person (Dozent/in) an einem Tag; eine Doppellektion zählt einmal.
+  // Nicht mitgezählt: dieser Mathe-Besuch selbst und Besuche genau zur selben Zeit.
+  const eigen = (v) => (v.datum === datum && v.zeit === zeit) || (x.termin && v.datum === x.termin.datum && (v.mathe || v.zeit === x.termin.zeit));
+  const roh = [...(x.besuche || []).map((v) => ({ datum: v.datum, zeit: v.zeit, wer: v.dozent, mathe: v.fach === "MA" })),
+               ...(x.besuche ? [] : (x.lektionen || []).filter((l) => l.gebucht && l.gebucht.length).map((l) => ({ datum: l.datum, zeit: l.zeit, wer: l.gebucht.join(), mathe: true }))),
+               ...R.praktika.filter((y) => y !== x && y.person === x.person && y.termin).map((y) => ({ datum: y.termin.datum, zeit: y.termin.zeit, wer: y.wer }))];
+  const besuche = [...new Set(roh.filter((v) => !eigen(v)).map((v) => v.datum + "|" + v.wer))].map((k) => k.split("|")[0]);
   if (besuche.includes(datum)) w.push("an diesem Tag hat die Person schon einen Besuch");
   const kw = (iso) => { const d = new Date(iso + "T12:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
   const maxW = Number(regel("maxProWoche")) || 2;
@@ -1014,7 +1019,7 @@ function filterLeeren() {
 
 function listeKopieren() {
   const t = document.querySelector("#app table.liste"); if (!t) return;
-  const text = [...t.rows].map((r) => [...r.cells].map((c) => c.innerText.replace(/\s*\n\s*/g, " · ").replace(/Ich übernehme|Erledigt|Abgeben|Termin|Tool ↗|\+ Notiz/g, "").trim()).join("\t")).join("\n");
+  const text = [...t.rows].map((r) => [...r.cells].map((c) => c.innerText.replace(/\s*\n\s*/g, " · ").replace(/Ich übernehme|Erledigt|Abgeben|Termin ändern|Termin|Tool ↗|\+ Notiz|Achtung \/ Bemerkung|✓/g, "").trim()).join("\t")).join("\n");
   const ersatz = () => { const a = document.createElement("textarea"); a.value = text; document.body.appendChild(a); a.select(); document.execCommand("copy"); a.remove(); meldung("Liste kopiert – in Excel oder eine Mail einfügen."); };
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => meldung("Liste kopiert – in Excel oder eine Mail einfügen."), ersatz);
   else ersatz();
@@ -1105,7 +1110,7 @@ function ansichtTermine() {
   ${Object.entries(tage).map(([d, xs]) => xs.map((x, i) => { const w = x.termin ? terminWarnungen(x, x.termin.datum, x.termin.zeit) : [];
     return `<tr><td style="white-space:nowrap">${i === 0 ? `<b>${esc(tagText(d))}</b>` : ""}</td><td>${esc(x.termin ? x.termin.zeit : "")}</td>
     <td class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</td><td>${esc(x.gruppe)}</td>
-    <td>${esc(x.schulort)}<div class="leise klein">${esc(x.schulhaus)}</div></td><td>${standChip(x)}</td>
+    <td>${esc(x.schulort)}<div class="leise klein">${esc(x.schulhaus)}</div></td><td>${standChip(x, true, true)}</td>
     <td>${w.map((t) => `<div class="hinweis">⚠ ${esc(t)}</div>`).join("")}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`; }).join("")).join("")}
   </tbody></table>` : `<div class="leer">Noch keine Besuche übernommen.</div>`}`;
 }
@@ -1251,7 +1256,8 @@ function ansichtHilfe() {
     <li><b>Stand</b>: <span class="chip s-offen">offen</span> noch niemand ·
       <span class="chip s-gebucht">gebucht</span> übernommen und im Praktikumstool eingetragen – beides gehört zusammen ·
       <span class="chip s-besucht">besucht</span> hat stattgefunden.</li>
-    <li><b>Notiz</b>: bei jedem Praktikum in der Zeile – z.B. «Termin mit PxL abgesprochen».</li></ul>`)}
+    <li>In <b>Meine Termine</b> je Zeile: <b>✓ Erledigt</b> · <b>Termin ändern</b> · <b>Abgeben</b> (aus der eigenen Liste nehmen, im Tool die Buchung löschen) · <b>Tool ↗</b> · <b>Achtung / Bemerkung</b> (Pflichtbesuch später oder nur eine Bemerkung).</li>
+    <li>Hinweise wie «an diesem Tag schon ein Besuch» zählen Besuche anderer Fächer mit. Ein Doppelbesuch genau zur selben Zeit ist kein Problem.</li></ul>`)}
   ${k("4 · Studierende und Achtung", `<ul><li>Reiter <b>Studierende</b>: alle Praktika einer Person auf einen Blick, Klick auf den Namen zeigt den Verlauf.</li>
     <li><b>⚠ Achtung</b>: «im Profil / Quartal besuchen» mit Begründung – dann ist der Besuch dort Pflicht und erscheint mit ⚠.</li>
     <li>Bemerkungen zur Person im Detail; Achtung lässt sich ändern oder löschen.</li></ul>`)}
@@ -1673,7 +1679,7 @@ const SCHRITTE = [
     vorher: () => { const r = document.querySelector(".raster"); if (r) r.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
   { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Ich übernehme", text: "Oder direkt hier: «Ich übernehme» bucht – im Praktikumstool gleich mit eintragen. «Erledigt» klickt man später in «Meine Termine»." },
   { ziel: ".aktivleiste .knopf", ansicht: "planung", titel: "Liste für Excel kopieren", text: "Kopiert die Liste, so wie sie gefiltert ist – dann in Excel oder eine Mail einfügen." },
-  { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "Hier hast du alle deine Termine im Überblick, nach Tag geordnet und filterbar nach Halbtag, Profil, Quartal. Pro Termin kannst du: den Termin wechseln («Termin»), ins Praktikumstool springen («Tool ↗»), nach dem Besuch «Erledigt» klicken und – wenn nötig – eine «Notiz» oder «Achtung / Bemerkung» hinzufügen (z.B. «muss im Quartal besucht werden»).", vorher: () => geheZu("termine") },
+  { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "Hier hast du alle deine Termine im Überblick, nach Tag geordnet und filterbar nach Halbtag, Profil, Quartal. Pro Termin, von links nach rechts: «✓ Erledigt» nach dem Besuch, «Termin ändern», «Abgeben» (aus deiner Liste nehmen), «Tool ↗» ins Praktikumstool und «Achtung / Bemerkung» – entweder ein Pflichtbesuch später (z.B. im Quartal) oder nur eine Bemerkung. Die Hinweise rechts warnen, wenn die Person am selben Tag oder in derselben Woche schon Besuche hat – ein Doppelbesuch zur selben Zeit zählt nicht.", vorher: () => geheZu("termine") },
   { ziel: "nav button[data-ansicht=halbtag]", ansicht: "halbtag", titel: "Halbtagespraktikum", text: "Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als PAAR untereinander – «Beide übernehmen» für den Doppelbesuch. Wer allein ist, steht als EINZELN da. Die Filter hier sind eigene, unabhängig von Profil & Quartal.", vorher: () => geheZu("halbtag") },
   { ziel: "nav button[data-ansicht=studierende]", ansicht: "studierende", titel: "Studierende", text: "Eine Zeile je Person: Halbtag, Profil, Quartal je mit Datum · Stand · Kürzel (NN = unbekannt). Suche beim Tippen, Filter nach Studienjahr, Sortierung. Abgeschlossene sind im Archiv.", vorher: () => geheZu("studierende") },
   { ansicht: "start", titel: "Los geht's", text: "Echte Seite in Chrome oder Edge öffnen, einmal den Ordner «Mathematik Sek1 - TM - Praxisbesuche» aus OneDrive wählen, Kürzel wählen – fertig. Die Hilfe oben erklärt alles nochmals.", vorher: () => geheZu("start"), ende: true },
