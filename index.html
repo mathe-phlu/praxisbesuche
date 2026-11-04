@@ -836,21 +836,6 @@ function aktionen(x) {
 function reihe(k, tool) { return `<div class="akt">${k.join("")}<span class="akt-rechts">${tool}</span></div>`; }
 /* Mathe-Lektionen als kleine Knöpfe: Wochentag + Zeit, Klick springt im Tool zur Lektion */
 /* Mathe-Lektionen als kleines Wochenraster Mo–Fr; Klick öffnet alle möglichen Termine */
-function legende() {
-  const zu = lies("raster") === "zu";
-  return `<details class="legende-box" ${lies("legende") === "auf" ? "open" : ""} ontoggle="merke('legende', this.open ? 'auf' : 'zu')">
-    <summary class="legende-kopf"><b>So liest du die Spalte «Mathe-Lektionen»</b>
-      <button class="knopf klein" onclick="event.preventDefault();event.stopPropagation();rasterUmschalten()">${zu ? "▸ Stundenplan einblenden" : "▾ Stundenplan ausblenden"}</button></summary>
-    <div class="leg-gitter">
-      <div class="leg-paar"><span class="rz">9:10</span> <b>Einzellektion</b> <span class="leise">(45 Min)</span></div>
-      <div class="leg-paar"><span class="rz doppel">8:20</span> <b>Doppellektion</b> <span class="leise">(2 Lektionen)</span></div>
-      <div class="leg-paar"><span class="rz frei">10:15</span> <b>danach frei</b> <span class="leise">zum Besprechen</span></div>
-      <div class="leg-paar"><span class="rz">13:35</span> <b>danach Unterricht</b> <span class="leise">kein Besprechen</span></div>
-    </div>
-    <div class="leg-schritte"><b>So buchst du:</b>
-      <span>① Wochenplan anklicken</span><span>② Termin wählen</span><span>③ «Übernehmen» – das Praktikumstool öffnet sich bei dieser Woche: dort «Besuch eintragen»</span></div>
-  </details>`;
-}
 function rasterUmschalten() { merke("raster", lies("raster") === "zu" ? "auf" : "zu"); zeichnen();
 }
 function lektionenZelle(x, partner) {
