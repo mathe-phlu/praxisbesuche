@@ -319,9 +319,24 @@ async function datenOrdner(h) {
   S.wurzel = h;
   S.ordner = h.name === "Daten" ? h : await h.getDirectoryHandle("Daten", { create: true });
 }
+/* Ist das der richtige Ordner? Er enthält Daten/stamm/praktika.json */
+async function istPraxisOrdner(h) {
+  try {
+    const d = h.name === "Daten" ? h : await h.getDirectoryHandle("Daten");
+    await (await d.getDirectoryHandle("stamm")).getFileHandle("praktika.json");
+    return true;
+  } catch (e) { return false; }
+}
 async function ordnerWaehlen() {
   if (!window.showDirectoryPicker) { meldung("Diese Seite braucht Chrome oder Edge (Ordnerzugriff)."); return; }
-  const h = await showDirectoryPicker({ id: "praxisbesuche", mode: "readwrite" });
+  let h;
+  try { h = await showDirectoryPicker({ id: "praxisbesuche", mode: "readwrite", startIn: "documents" }); } catch (e) { return; }
+  if (!(await istPraxisOrdner(h))) {
+    const w = await frage(`Im Ordner «${h.name}» sind keine Praxisbesuche-Daten.\n\nGewählt werden muss der synchronisierte Teams-Ordner «Praxisbesuche» (darin liegen «Daten» und «Werkzeuge»).`,
+      { art: "wahl", wert: "nochmal", optionen: [["nochmal", "Anderen Ordner wählen"], ["neu", "Trotzdem hier neu anfangen (nur Rike / Maurus)"]] });
+    if (w === "nochmal") return ordnerWaehlen();
+    if (w !== "neu") return;
+  }
   await IDB.set("ordner", h);
   await datenOrdner(h);
   await allesLaden();
@@ -563,8 +578,14 @@ function ansichtOhneOrdner() {
   const wartet = S.ordnerWartet;
   return `<div class="karte" style="max-width:640px">
     <h2>Gemeinsamen Ordner verbinden</h2>
-    <p>Bitte den gemeinsamen Ordner <b>«Praxisbesuche»</b> wählen (SharePoint/Teams, mit OneDrive synchronisiert) –
-       den Ordner, in dem diese Seite liegt. Die Seite liest und schreibt nur in dessen Unterordner «Daten».</p>
+    <p>Die Seite arbeitet mit dem gemeinsamen Teams-Ordner <b>«Praxisbesuche»</b>. Ihn einmal hier auswählen – Chrome/Edge merkt sich die Wahl.</p>
+    <ol class="klein">
+      <li>Den Ordner zuerst in Teams synchronisieren: Kanal → <b>Dateien</b> → Ordner «Praxisbesuche» → <b>Synchronisieren</b>
+          (oder «Verknüpfung zu OneDrive hinzufügen»).</li>
+      <li>Dann unten «Ordner wählen …». Im Fenster links unter <b>«Hochschule Luzern»</b> bzw. <b>OneDrive</b> den Ordner <b>Praxisbesuche</b> anklicken
+          (nicht «Daten» darin) und «Auswählen» → «Bearbeiten erlauben».</li>
+    </ol>
+    <p class="leise klein">Nur wer Zugriff auf den Teams-Ordner hat, kann ihn wählen – ohne ihn zeigt und speichert die Seite nichts.</p>
     ${wartet ? `<p><button class="knopf haupt" onclick="zugriffErlauben()">Zugriff auf «${esc(wartet.name)}» erlauben</button></p>` : ""}
     <p><button class="knopf ${wartet ? "" : "haupt"}" onclick="ordnerWaehlen()">Ordner wählen …</button></p>
     <p class="leise klein">Funktioniert in Chrome und Edge. Beim ersten Mal den Ordner wählen und «Bearbeiten erlauben» bestätigen.</p>
