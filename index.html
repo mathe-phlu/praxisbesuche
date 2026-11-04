@@ -45,6 +45,22 @@ a.bericht { text-decoration: none; margin-left: 3px; }
 .ber-knoepfe { display: inline-flex; gap: 2px; padding: 2px; border: 1px dashed #cfc3ad; border-radius: 6px; }
 a.bericht:hover { text-decoration: underline; }
 .einrichten { max-width: 720px; }
+.sk-reihe { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 14px; }
+.sk { border-radius: 12px; padding: 14px 16px 16px; cursor: pointer; border: 1px solid transparent; border-top: 6px solid var(--f); background: var(--h); color: var(--tinte); transition: transform .12s, box-shadow .12s; }
+.sk:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+.sk h3 { margin: 0 0 6px; color: var(--d); font-family: var(--hand); font-weight: 400; font-size: 24px; }
+.sk .z { font-size: 38px; font-weight: 700; color: var(--d); line-height: 1.1; }
+.sk .z-von { font-size: 20px; font-weight: 600; opacity: .7; }
+.sk .klein { color: #555; }
+.sk-balken { height: 8px; border-radius: 4px; background: rgba(0,0,0,.08); margin: 8px 0 6px; overflow: hidden; }
+.sk-balken > div { height: 100%; background: var(--f); border-radius: 4px; }
+.sk-halbtag { --f: #4f8fcf; --h: #eaf3fc; --d: #163a5c; }
+.sk-profil { --f: #d9a823; --h: #fdf5dc; --d: #5a430a; }
+.sk-quartal { --f: #5aa64e; --h: #ecf7e9; --d: #1c4a17; }
+.sk-termine { --f: var(--ph-braun); --h: var(--ph-sand); --d: var(--ph-braun-dunkel); }
+.sk-studierende { --f: #8a6bb8; --h: #f3eefa; --d: #3e2a63; }
+.sk-grau { --f: #9a9a9a; --h: #f5f5f3; --d: #3a3a3a; }
+.sk table td { padding: 2px 4px; }
 .start-kopf { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 details.akk > summary { cursor: pointer; list-style: none; }
@@ -786,29 +802,34 @@ function ansichtStart() {
   const offenQ = q.filter((p) => p.stand === "offen").length;
   const ziel = Math.ceil(S.einst.quote * prof.length), eingeteilt = prof.filter((p) => p.stand !== "offen" && p.stand !== "nicht nötig").length;
   const zahl = Object.keys(S.praktika).length;
+  const balken = (wert, von) => `<div class="sk-balken"><div style="width:${von ? Math.min(100, Math.round(100 * wert / von)) : 0}%"></div></div>`;
+  const naechste = meine.filter((x) => x.termin && x.stand !== "besucht").sort((a, b) => (a.termin.datum + a.termin.zeit).localeCompare(b.termin.datum + b.termin.zeit))[0];
+  const karte = (farbe, titel, ziel, inhalt) => `<div class="sk sk-${farbe}" onclick="${ziel}"><h3>${titel}</h3>${inhalt}</div>`;
   return `<div class="start-kopf"><h2>Studienjahr ${sjText(sj)}</h2>
     <button class="knopf haupt gross" onclick="typeof rundgangStart === 'function' ? rundgangStart() : window.open('rundgang.html')">▶ Rundgang: die Seite in 2 Minuten</button></div>
   ${zahl ? "" : `<div class="karte"><b>Noch keine Daten.</b> Unter «Aktualisieren» die Datei aus dem Praktikumstool einlesen.</div>`}
-  <div class="start">
-    <div class="karte" onclick="geheZu('planung')"><h3>Profil &amp; Quartal planen</h3>
-      <div class="zwei"><div><div class="z">${offenQ}</div><div class="leise">Quartal: nötig und noch offen<br>(von ${q.length} nötigen)</div></div>
-        <div><div class="z">${eingeteilt}<span class="leise" style="font-size:.5em"> / ${ziel}</span></div><div class="leise">Profil: eingeteilt<br>von Ziel ${ziel} (${Math.round(S.einst.quote * 100)} %)</div></div></div></div>
-    <div class="karte" onclick="geheZu('halbtag')"><h3>Halbtagespraktikum</h3>
-      <div class="z">${ht.filter((p) => p.stand === "offen").length}</div><div class="leise">offen von ${ht.length}</div></div>
-    <div class="karte" onclick="geheZu('studierende')"><h3>Studierende</h3>
-      <div class="z">${Object.values(R.personen).filter((p) => !p.archiv).length}</div><div class="leise">aktuell · ${Object.values(R.personen).filter((p) => p.archiv).length} im Archiv (alle Praktika abgeschlossen)</div></div>
-    <div class="karte" onclick="geheZu('termine')"><h3>Meine Termine ${S.ich ? "(" + esc(S.ich) + ")" : ""}</h3>
-      <div class="z">${meine.length}</div><div class="leise">in ${sjText(sj)} übernommen, gebucht oder besucht</div></div>
+  <div class="sk-reihe">
+    ${karte("halbtag", "Halbtagespraktikum", "geheZu('halbtag')", `<div class="z">${ht.filter((p) => p.stand === "offen").length}</div><div>offen von ${ht.length}</div>
+      ${balken(ht.length - ht.filter((p) => p.stand === "offen").length, ht.length)}<div class="klein">${ht.filter((p) => p.stand === "besucht").length} besucht</div>`)}
+    ${karte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", `<div class="z">${eingeteilt}<span class="z-von"> / ${ziel}</span></div><div>eingeteilt · Ziel ${Math.round(S.einst.quote * 100)} % von ${prof.length}</div>
+      ${balken(eingeteilt, ziel)}<div class="klein">Besuch freiwillig, zählt für die Quote</div>`)}
+    ${karte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", `<div class="z">${offenQ}</div><div>nötig und noch offen (von ${q.length})</div>
+      ${balken(q.length - offenQ, q.length)}<div class="klein">Pflicht, wenn das Profil nicht besucht wurde</div>`)}
+  </div>
+  <div class="sk-reihe">
+    ${karte("termine", `Meine Termine ${S.ich ? "· " + esc(S.ich) : ""}`, "geheZu('termine')", S.ich ? `<div class="z">${meine.length}</div><div>gebucht oder besucht in ${sjText(sj)}</div>
+      <div class="klein" style="margin-top:6px">${naechste ? `Nächster: <b>${esc(kurzDatum(naechste.termin.datum))} ${esc(naechste.termin.zeit || "")}</b> · ${esc(naechste.person.name)}` : "Kein offener Termin."}</div>` : `<div>Oben rechts «Ich bin» wählen.</div>`)}
+    ${karte("studierende", "Studierende", "geheZu('studierende')", `<div class="z">${Object.values(R.personen).filter((p) => !p.archiv).length}</div><div>aktuell · ${Object.values(R.personen).filter((p) => p.archiv).length} im Archiv</div>
+      <div class="klein" style="margin-top:6px">Alle Praktika, Verlauf, Protokolle</div>`)}
     ${sollKarte(sj)}
-    <div class="karte" onclick="geheZu('aktualisieren')"><h3>Aktualisieren</h3>
-      <div class="leise">Vor dem Praktikum: Praktikumstool-Export, Spezialfälle und Einstellungen einlesen.</div></div>
+    ${karte("grau", "Aktualisieren", "geheZu('aktualisieren')", `<div class="klein">Vor neuen Praktika: Daten aus dem Praktikumstool, Spezialfälle, Regeln, Einstellungen.</div>`)}
   </div>`;
 }
 function sollKarte(sj) {
   const doz = S.einst.dozierende.filter((d) => d.sollHalbtag || d.sollPQ || d.soll);
   if (!doz.length) return "";
   const ist = (k, gr) => R.praktika.filter((x) => x.jahr === sj && x.wer === k && gr.includes(x.gruppe)).length;
-  return `<div class="karte" style="cursor:default"><h3>Besuche je Dozent/in</h3><table class="klein" style="width:100%">
+  return `<div class="sk sk-grau" style="cursor:default"><h3>Besuche je Dozent/in</h3><table class="klein" style="width:100%">
     <tr class="leise"><td></td><td>Halbtag</td><td>Profil + Quartal</td></tr>
     ${doz.map((d) => { const h = ist(d.kuerzel, ["Halbtag"]), pq = ist(d.kuerzel, ["Profil", "Quartal", "Spezial"]);
       const z = (i, s) => s ? `<span class="${i >= Number(s) ? "gruen" : "rot"}">${i} / ${s}</span>` : i;
