@@ -934,7 +934,7 @@ async function terminGewaehlt(ip, il, ipartner) {
     const termin = { datum: l.datum, zeit: l.zeit, bis: l.bis, lektion: l.id };
     if (!(await eintragen(y.wer === S.ich ? { typ: "termin", praktikum: y.idpraktikum, termin } : { typ: "uebernehmen", praktikum: y.idpraktikum, termin }))) return;
   }
-  meldung(meinesSchon ? "Termin geändert." : partner ? "Doppelbesuch gebucht – unten bei beiden im Tool eintragen." : "Gebucht – jetzt sofort im Praktikumstool eintragen (öffnet sich rechts).");
+  meldung(meinesSchon ? "Termin geändert." : partner ? "Doppelbesuch gebucht – unten bei beiden im Tool eintragen." : "Gebucht – jetzt sofort im Praktikumstool eintragen (öffnet sich als Fenster).");
   // Einzelbesuch: Tool sofort öffnen. Doppelbesuch: zwei Knöpfe, einer pro Person – man öffnet sie selbst nacheinander.
   if (!partner || meinesSchon) { if (x.link) { REFS.push(toolLink(x, a.id)); toolOeffnen(REFS.length - 1); } }
   else doppelToolZeigen(alle.map((y) => { const l = y === x ? a : (y.lektionen || []).find((b) => b.datum === a.datum && b.zeit === a.zeit) || a; REFS.push(toolLink(y, l.id)); return [y.person.name, REFS.length - 1]; }), blockText(a));
@@ -944,15 +944,18 @@ function doppelToolZeigen(personen, wann) {
   const k = document.createElement("div"); k.id = "zweitesTool";
   k.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:70;background:#fff;border:2px solid var(--ph-braun);border-radius:10px;padding:14px 18px;box-shadow:0 8px 30px rgba(0,0,0,.25);max-width:560px";
   k.innerHTML = `<div style="margin-bottom:8px"><b>Doppelbesuch gebucht</b> (${esc(wann)}). Jetzt bei beiden im Praktikumstool «Besuch eintragen»:</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${personen.map(([name, i], n) => `<button class="knopf haupt" onclick="toolOeffnen(${i}, 'praktikumstool${n + 1}'); this.textContent = '✓ ${esc(name.replace(/'/g, ""))}'; this.classList.remove('haupt')">${n + 1}. ${esc(name)} im Tool ↗</button>`).join("")}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${personen.map(([name, i], n) => `<button class="knopf haupt" onclick="toolOeffnen(${i}, 'pbToolPopup${n + 1}'); this.textContent = '✓ ${esc(name.replace(/'/g, ""))}'; this.classList.remove('haupt')">${n + 1}. ${esc(name)} im Tool ↗</button>`).join("")}
     <button class="knopf klein" style="margin-left:auto" onclick="document.getElementById('zweitesTool').remove()">Fertig ✕</button></div>`;
   document.body.appendChild(k);
 }
-function toolOeffnen(i, fenster = "praktikumstool") {
+/* Praktikumstool als Pop-up-Fenster mittig über der Seite: eintragen, Fenster schliessen, weiter hier */
+function toolOeffnen(i, fenster = "pbToolPopup") {
   const link = REFS[i];
   if (!link) return;
-  const b = Math.round(screen.availWidth / 2);
-  window.open(link.startsWith("http") ? link : TOOL + link, fenster, `popup,width=${b},height=${screen.availHeight},left=${b},top=0`);
+  const w = Math.min(1250, Math.round(screen.availWidth * 0.8)), h = Math.round(screen.availHeight * 0.85);
+  const l = Math.round((screen.availWidth - w) / 2 + (screen.availLeft || 0)), t = Math.round((screen.availHeight - h) / 2 + (screen.availTop || 0));
+  const f = window.open(link.startsWith("http") ? link : TOOL + link, fenster, `popup=yes,width=${w},height=${h},left=${l},top=${t}`);
+  if (f) f.focus();
 }
 /* Übernehmen mit Termin: Lektion wählen oder Datum/Zeit eingeben, Checkliste prüfen */
 async function uebernehmen(i, nurTermin = false) {
@@ -1057,7 +1060,7 @@ async function handlung(typ, i) {
   const lekt = x && x.termin ? x.termin.lektion : "";
   if (!(await eintragen({ typ, praktikum: id }))) return;
   if (typ === "abgeben") {
-    meldung("Abgegeben – bitte im Praktikumstool die Buchung löschen (öffnet sich rechts).");
+    meldung("Abgegeben – bitte im Praktikumstool die Buchung löschen (öffnet sich als Fenster).");
     if (x && x.link) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1); }
   } else meldung("Übernommen – bitte im Praktikumstool buchen.");
 }
