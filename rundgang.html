@@ -44,6 +44,11 @@ button.knopf:hover { background: var(--grau); }
 a.bericht { text-decoration: none; margin-left: 3px; }
 .ber-knoepfe { display: inline-flex; gap: 2px; padding: 2px; border: 1px dashed #cfc3ad; border-radius: 6px; }
 a.bericht:hover { text-decoration: underline; }
+.einrichten { max-width: 720px; }
+.einr-schritt { display: grid; grid-template-columns: 34px 1fr; gap: 10px; padding: 10px 0; border-top: 1px dashed var(--linie); }
+.einr-n { width: 28px; height: 28px; border-radius: 50%; background: var(--ph-braun); color: #fff; display: grid; place-items: center; font-weight: 700; }
+.einr-hinweis { background: var(--ph-sand); border-left: 4px solid var(--ph-braun); padding: 10px 12px; border-radius: 6px; margin: 12px 0; }
+button.knopf.gross { font-size: 16px; padding: 8px 18px; }
 .akt { display: flex; gap: 4px; align-items: center; }
 .akt-rechts { margin-left: auto; padding-left: 4px; }
 button.knopf.haupt { background: var(--ph-braun); color: #fff; border-color: var(--ph-braun); }
@@ -750,22 +755,22 @@ function browserFehler() {
 function ansichtOhneOrdner() {
   if (!window.showDirectoryPicker && !window.__testOrdner) return browserFehler();
   const wartet = S.ordnerWartet;
-  return `<div class="karte" style="max-width:640px">
-    <h2>Gemeinsamen Ordner verbinden</h2>
-    <p>Die Seite arbeitet mit dem gemeinsamen Ordner <b>«Praxisbesuche»</b> im Teams-Kanal <b>Praktika</b>. Das Einrichten ist einmalig.</p>
-    <ol>
-      <li><b>OneDrive</b> muss auf dem Rechner laufen (an der PH Teil von Microsoft 365; fehlt es: Software-Center oder Informatikdienste).</li>
-      <li>Den Ordner mit dem eigenen OneDrive verknüpfen:
-        <ul class="klein"><li>Teams → Kanal <b>Praktika</b> → Reiter <b>Freigegeben</b> → oben <b>«…» → «In SharePoint öffnen»</b></li>
-            <li>beim Ordner <b>Praxisbesuche</b> auf das Symbol <b>«Verknüpfung zu OneDrive hinzufügen»</b> klicken (oder Ordner markieren → in der Leiste oben)</li>
-            <li>nach ein paar Minuten erscheint er im Finder/Explorer unter <b>OneDrive – Hochschule Luzern → «Mathematik Sek1 - TM - Praxisbesuche»</b></li></ul></li>
-      <li>Hier <b>«Ordner wählen …»</b> → <b>OneDrive – Hochschule Luzern → Mathematik Sek1 - TM - Praxisbesuche</b> anklicken (nicht «Daten» darin) → «Auswählen» → <b>«Bearbeiten erlauben»</b>.</li>
-      <li>Oben rechts bei <b>«Ich bin»</b> das eigene Kürzel wählen. Fertig – beim nächsten Mal genügt höchstens ein Klick auf «Zugriff erlauben».</li>
-    </ol>
-    <p class="leise klein">Nur wer Zugriff auf den Teams-Ordner hat, kann ihn wählen – ohne ihn zeigt und speichert die Seite nichts.</p>
-    ${wartet ? `<p><button class="knopf haupt" onclick="zugriffErlauben()">Zugriff auf «${esc(wartet.name)}» erlauben</button></p>` : ""}
-    <p><button class="knopf ${wartet ? "" : "haupt"}" onclick="ordnerWaehlen()">Ordner wählen …</button></p>
-    <p class="leise klein">Funktioniert in Chrome und Edge. Beim ersten Mal den Ordner wählen und «Bearbeiten erlauben» bestätigen.</p>
+  const schritt = (n, titel, inhalt) => `<div class="einr-schritt"><div class="einr-n">${n}</div><div><b>${titel}</b>${inhalt}</div></div>`;
+  return `<div class="karte einrichten">
+    <h2>Willkommen – einmal einrichten</h2>
+    <p>Die Seite speichert nichts im Internet. Sie arbeitet mit dem gemeinsamen Ordner <b>«Praxisbesuche»</b> aus dem Teams-Kanal <b>Praktika</b>. Dafür braucht es drei Schritte.</p>
+    ${wartet ? `<p><button class="knopf haupt gross" onclick="zugriffErlauben()">Zugriff auf «${esc(wartet.name)}» erlauben</button></p>` : ""}
+    ${schritt(1, "OneDrive läuft auf dem Rechner", `<div class="klein">An der PH ist es Teil von Microsoft 365 (Wolke oben in der Menüleiste bzw. unten rechts). Fehlt es: Software-Center oder Informatikdienste.</div>`)}
+    ${schritt(2, "Den Ordner mit dem eigenen OneDrive verknüpfen <span class=\"leise klein\">(einmal pro Person)</span>", `<ul class="klein">
+        <li>Teams öffnen → Team <b>Mathematik Sek1 - TM</b> → Kanal <b>Praktika</b> → Reiter <b>Dateien</b> (bzw. «Freigegeben»)</li>
+        <li>oben <b>«…»</b> → <b>«In SharePoint öffnen»</b></li>
+        <li>beim Ordner <b>Praxisbesuche</b>: <b>«Verknüpfung zu OneDrive hinzufügen»</b></li>
+        <li>nach ein paar Minuten liegt er im Finder/Explorer unter <b>OneDrive – Hochschule Luzern → «Mathematik Sek1 - TM - Praxisbesuche»</b></li></ul>`)}
+    ${schritt(3, "Hier den Ordner wählen <span class=\"leise klein\">(einmal pro Browser)</span>", `<div class="klein">Knopf unten → <b>OneDrive – Hochschule Luzern</b> → <b>Mathematik Sek1 - TM - Praxisbesuche</b> anklicken (nicht «Daten» darin) → «Auswählen» → <b>«Bearbeiten erlauben»</b>. Danach oben rechts bei <b>«Ich bin»</b> dein Kürzel wählen.</div>
+        <p><button class="knopf ${wartet ? "" : "haupt"} gross" onclick="ordnerWaehlen()">Ordner wählen …</button></p>`)}
+    <div class="einr-hinweis"><b>Gut zu wissen:</b> Das musst du nur einmal machen. Solange du am <b>selben Rechner im selben Browser</b> arbeitest, merkt sich die Seite den Ordner – höchstens ein Klick auf «Zugriff erlauben».
+      <b>Anderer Rechner oder anderer Browser</b> (z.B. Edge statt Chrome): Schritt 3 nochmals, auf einem neuen Rechner auch Schritt 1–2.</div>
+    <p class="leise klein">Nur in Chrome oder Edge. Nur wer Zugriff auf den Teams-Ordner hat, kann ihn wählen. Zum Anschauen ohne Ordner: <a href="rundgang.html" target="_blank">Rundgang mit Beispieldaten</a>.</p>
   </div>`;
 }
 
@@ -905,7 +910,8 @@ function termineZeigen(i, ip) {
   const d = $("#frage");
   $("#frageText").textContent = `${x.person.name}${partner ? " + " + partner.person.name + " (Doppelbesuch)" : ""} · ${x.gruppe} · ${x.schulort || ""} ${x.schulhaus ? "(" + x.schulhaus + ")" : ""}`;
   $("#frageFeld").innerHTML = `<p class="klein leise" style="margin-top:0">Freie Mathe-Lektionen, die nach der Checkliste möglich sind${gesperrt ? ` (${gesperrt} ausgeblendet: erste Tage, letzter Tag, Arbeitssitzung, oder die Person hat an diesem Tag bzw. in dieser Woche schon genug Besuche – gemäss «Angemeldete Besuche» im Tool beim letzten Einlesen. Andere Fächer können seither gebucht haben: im Tool kurz prüfen)` : ""}.
-      Mit der Maus über einen Termin: Klasse und Zeit danach. <b>Termin anklicken = übernehmen.</b></p>
+      Mit der Maus über einen Termin: Klasse und Zeit danach.</p>
+    <p class="einr-hinweis" style="margin:0 0 8px"><b>Termin anklicken = übernehmen.</b> Das Praktikumstool öffnet sich danach sofort in einem neuen Fenster bei dieser Woche – dort «Besuch eintragen».</p>
     <div class="leg-zeile"><span class="rz">9:10</span> Einzellektion <span class="rz doppel">8:20</span> Doppellektion
       <span class="trenn">|</span> <span class="rz frei">10:15</span> danach frei zum Besprechen <span class="rz">13:35</span> danach Unterricht</div>
     <div class="wochen">${Object.entries(wochen).sort().map(([mo, tage]) => `<div class="woche"><div class="wk">Woche ab ${esc(kurzDatum(mo))}</div>
