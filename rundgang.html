@@ -732,7 +732,7 @@ function aktionen(x) {
   if (x.stand === "offen" || x.stand === "nicht nötig" || (x.stand === "gebucht" && !x.wer)) k.push(`<button class="knopf klein" onclick="uebernehmen(${ref(x.idpraktikum)})">Ich übernehme</button>`);
   if (x.wer === S.ich && x.stand !== "besucht") {
     k.push(`<button class="knopf klein" onclick="uebernehmen(${ref(x.idpraktikum)}, true)">Termin</button>`);
-    k.push(`<button class="knopf klein" onclick="erledigt(${ref(x.idpraktikum)})">Erledigt</button>`);
+    if (S.ansicht === "termine") k.push(`<button class="knopf klein" onclick="erledigt(${ref(x.idpraktikum)})">Erledigt</button>`);
     k.push(`<button class="knopf klein" onclick="handlung('abgeben',${ref(x.idpraktikum)})">Abgeben</button>`);
   }
   if (x.link) k.push(`<button class="knopf klein" title="Im Praktikumstool öffnen (Fenster rechts)" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>`);
@@ -1247,7 +1247,7 @@ function ansichtHilfe() {
   ${k("3 · Termin übernehmen", `<ul><li>Im Raster <b>Mo–Fr</b> stehen die freien Mathe-Lektionen: hohes Kästchen = Doppellektion, grün = danach Zeit zum Besprechen.</li>
     <li>Klick auf das Raster → alle Termine Woche für Woche → Termin anklicken → <b>übernehmen</b>.</li>
     <li>Das Praktikumstool öffnet sich rechts direkt bei der Lektion: dort <b>«Besuch eintragen»</b>. Das bleibt Pflicht.</li>
-    <li>Nach dem Besuch: <b>Erledigt</b>.</li>
+    <li>Nach dem Besuch: im Reiter <b>Meine Termine</b> auf <b>Erledigt</b>.</li>
     <li><b>Stand</b>: <span class="chip s-offen">offen</span> noch niemand ·
       <span class="chip s-gebucht">gebucht</span> übernommen und im Praktikumstool eingetragen – beides gehört zusammen ·
       <span class="chip s-besucht">besucht</span> hat stattgefunden.</li>
@@ -1655,25 +1655,25 @@ setInterval(() => {
 /* Rundgang: führt mit Beispieldaten durch die Seite. Nichts wird gespeichert. */
 window.addEventListener("load", () => setTimeout(rundgangStart, 900));
 const SCHRITTE = [
-  { titel: "Willkommen", text: "In zwei Minuten durch die Praxisbesuche – mit erfundenen Beispieldaten. Mit «Weiter» geht es zum nächsten Schritt.", vorher: () => geheZu("start") },
-  { ziel: "#ich", titel: "Wer bin ich?", text: "Oben rechts das eigene Kürzel wählen. Dann gehören «Ich übernehme» und «Meine Termine» dir. Den Rundgang kann man jederzeit mit «✕ Beenden» abbrechen oder unten direkt zu einem Schritt springen.", vorher: () => { S.ich = "hmo"; zeichnen(); } },
-  { ziel: "nav button[data-ansicht=planung]", titel: "Profil & Quartal", text: "Hier wird geplant: alle Profil-, Quartals- und Spezialpraktika des Studienjahrs.", vorher: () => geheZu("planung") },
-  { ziel: ".filterbox .fsek", titel: "Grundauswahl", text: "Welche Praktika, ob ein Besuch nötig ist, und der Stand (offen, übernommen, besucht). Ein Klick schaltet um." },
-  { ziel: ".filterbox details", titel: "Wann", text: "Aufklappen: Zeitraum, Tag, Vormittag/Nachmittag, Einzel- oder Doppellektion und «danach Zeit zum Besprechen».", vorher: () => { const d = document.querySelector(".filterbox details"); if (d) d.open = true; } },
-  { ziel: ".aktivleiste", titel: "Was gerade gefiltert ist", text: "Über der Liste stehen die aktiven Filter. Mit ✕ ist einer wieder weg." },
-  { ziel: "#app table.liste tbody tr .name", titel: "Name anklicken", text: "Ein Klick auf den Namen öffnet rechts die Grundinformationen: alle Praktika, wer schon besucht hat, Bemerkungen und Achtung-Vermerke.",
+  { ansicht: "start", titel: "Willkommen", text: "In zwei Minuten durch die Praxisbesuche – mit erfundenen Beispieldaten. Mit «Weiter» geht es zum nächsten Schritt.", vorher: () => geheZu("start") },
+  { ziel: "#ich", ansicht: "start", titel: "Wer bin ich?", text: "Oben rechts das eigene Kürzel wählen. Dann gehören «Ich übernehme» und «Meine Termine» dir. Den Rundgang kann man jederzeit mit «✕ Beenden» abbrechen oder unten direkt zu einem Schritt springen.", vorher: () => { S.ich = "hmo"; zeichnen(); } },
+  { ziel: "nav button[data-ansicht=planung]", ansicht: "planung", titel: "Profil & Quartal", text: "Hier wird geplant: alle Profil-, Quartals- und Spezialpraktika des Studienjahrs.", vorher: () => geheZu("planung") },
+  { ziel: ".filterbox .fsek", ansicht: "planung", titel: "Grundauswahl", text: "Welche Praktika, ob ein Besuch nötig ist, und der Stand (offen, übernommen, besucht). Ein Klick schaltet um." },
+  { ziel: ".filterbox details", ansicht: "planung", titel: "Wann", text: "Aufklappen: Zeitraum, Tag, Vormittag/Nachmittag, Einzel- oder Doppellektion und «danach Zeit zum Besprechen».", vorher: () => { const d = document.querySelector(".filterbox details"); if (d) d.open = true; } },
+  { ziel: ".aktivleiste", ansicht: "planung", titel: "Was gerade gefiltert ist", text: "Über der Liste stehen die aktiven Filter. Mit ✕ ist einer wieder weg." },
+  { ziel: "#app table.liste tbody tr .name", ansicht: "planung", titel: "Name anklicken", text: "Ein Klick auf den Namen öffnet rechts die Grundinformationen: alle Praktika, wer schon besucht hat, Bemerkungen und Achtung-Vermerke.",
     vorher: () => { const n = document.querySelector("#app table.liste tbody tr .name"); if (n) n.click(); }, nachher: () => detailZu() },
-  { ziel: ".legende-box", titel: "Mathe-Lektionen lesen", text: "Hohes Kästchen = Doppellektion, flaches = Einzellektion. Grün = danach ist Zeit zum Besprechen. Mit dem Knopf links lässt sich der Stundenplan aus- und einblenden.",
+  { ziel: ".legende-box", ansicht: "planung", titel: "Mathe-Lektionen lesen", text: "Hohes Kästchen = Doppellektion, flaches = Einzellektion. Grün = danach ist Zeit zum Besprechen. Mit dem Knopf links lässt sich der Stundenplan aus- und einblenden.",
     vorher: () => { merke("raster", "auf"); zeichnen(); } },
-  { ziel: ".raster", titel: "Wochenraster", text: "Für jede Person: an welchen Tagen und wann Mathe ist. Termine, die nach der Checkliste nicht gehen, sind schon weg." },
-  { ziel: "#frageFeld .woche", titel: "Grosse Ansicht: alle Termine", text: "Ein Klick aufs Raster öffnet die grosse Ansicht, Woche für Woche. Mit der Maus über einem Termin stehen Klasse und Zeit danach. Termin anklicken = übernehmen. Danach öffnet sich das Praktikumstool direkt bei dieser Lektion: dort «Besuch eintragen».",
+  { ziel: ".raster", ansicht: "planung", titel: "Wochenraster", text: "Für jede Person: an welchen Tagen und wann Mathe ist. Termine, die nach der Checkliste nicht gehen, sind schon weg." },
+  { ziel: "#frageFeld .woche", ansicht: "planung", titel: "Grosse Ansicht: alle Termine", text: "Ein Klick aufs Raster öffnet die grosse Ansicht, Woche für Woche. Mit der Maus über einem Termin stehen Klasse und Zeit danach. Termin anklicken = übernehmen. Danach öffnet sich das Praktikumstool direkt bei dieser Lektion: dort «Besuch eintragen».",
     vorher: () => { const r = document.querySelector(".raster"); if (r) r.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
-  { ziel: "#app table.liste tbody tr td:last-child", titel: "Ich übernehme", text: "Oder direkt hier: «Ich übernehme» bucht – im Praktikumstool gleich mit eintragen. Nach dem Besuch: «Erledigt»." },
-  { ziel: ".aktivleiste .knopf", titel: "Liste für Excel kopieren", text: "Kopiert die Liste, so wie sie gefiltert ist – dann in Excel oder eine Mail einfügen." },
-  { ziel: "nav button[data-ansicht=termine]", titel: "Meine Termine", text: "Alle eigenen Besuche nach Tag, filterbar nach Halbtag, Profil, Quartal. Hier bei jedem Besuch: «Notiz» und «Achtung / Bemerkung» – z.B. «muss im Quartal besucht werden».", vorher: () => geheZu("termine") },
-  { ziel: "nav button[data-ansicht=halbtag]", titel: "Halbtagespraktikum", text: "Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als PAAR untereinander – «Beide übernehmen» für den Doppelbesuch. Wer allein ist, steht als EINZELN da. Die Filter hier sind eigene, unabhängig von Profil & Quartal.", vorher: () => geheZu("halbtag") },
-  { ziel: "nav button[data-ansicht=studierende]", titel: "Studierende", text: "Eine Zeile je Person: Halbtag, Profil, Quartal je mit Datum · Stand · Kürzel (NN = unbekannt). Suche beim Tippen, Filter nach Studienjahr, Sortierung. Abgeschlossene sind im Archiv.", vorher: () => geheZu("studierende") },
-  { titel: "Los geht's", text: "Echte Seite in Chrome oder Edge öffnen, einmal den Ordner «Mathematik Sek1 - TM - Praxisbesuche» aus OneDrive wählen, Kürzel wählen – fertig. Die Hilfe oben erklärt alles nochmals.", vorher: () => geheZu("start"), ende: true },
+  { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Ich übernehme", text: "Oder direkt hier: «Ich übernehme» bucht – im Praktikumstool gleich mit eintragen. «Erledigt» klickt man später in «Meine Termine»." },
+  { ziel: ".aktivleiste .knopf", ansicht: "planung", titel: "Liste für Excel kopieren", text: "Kopiert die Liste, so wie sie gefiltert ist – dann in Excel oder eine Mail einfügen." },
+  { ziel: "nav button[data-ansicht=termine]", ansicht: "termine", titel: "Meine Termine", text: "Alle eigenen Besuche nach Tag, filterbar nach Halbtag, Profil, Quartal. Hier bei jedem Besuch: «Notiz» und «Achtung / Bemerkung» – z.B. «muss im Quartal besucht werden».", vorher: () => geheZu("termine") },
+  { ziel: "nav button[data-ansicht=halbtag]", ansicht: "halbtag", titel: "Halbtagespraktikum", text: "Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als PAAR untereinander – «Beide übernehmen» für den Doppelbesuch. Wer allein ist, steht als EINZELN da. Die Filter hier sind eigene, unabhängig von Profil & Quartal.", vorher: () => geheZu("halbtag") },
+  { ziel: "nav button[data-ansicht=studierende]", ansicht: "studierende", titel: "Studierende", text: "Eine Zeile je Person: Halbtag, Profil, Quartal je mit Datum · Stand · Kürzel (NN = unbekannt). Suche beim Tippen, Filter nach Studienjahr, Sortierung. Abgeschlossene sind im Archiv.", vorher: () => geheZu("studierende") },
+  { ansicht: "start", titel: "Los geht's", text: "Echte Seite in Chrome oder Edge öffnen, einmal den Ordner «Mathematik Sek1 - TM - Praxisbesuche» aus OneDrive wählen, Kürzel wählen – fertig. Die Hilfe oben erklärt alles nochmals.", vorher: () => geheZu("start"), ende: true },
 ];
 let schritt = 0, uhr = null;
 function rundgangStart() {
@@ -1685,6 +1685,8 @@ function zeige(i) {
   document.querySelectorAll(".tour-licht").forEach((e) => e.classList.remove("tour-licht"));
   schritt = Math.max(0, Math.min(SCHRITTE.length - 1, i));
   const s = SCHRITTE[schritt];
+  if (s.ansicht && S.ansicht !== s.ansicht) geheZu(s.ansicht);
+  if (s.ansicht === "planung" && lies("raster") === "zu") { merke("raster", "auf"); zeichnen(); }
   if (s.vorher) s.vorher();
   setTimeout(() => {
     const t = document.getElementById("tour");

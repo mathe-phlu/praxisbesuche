@@ -713,7 +713,7 @@ function aktionen(x) {
   if (x.stand === "offen" || x.stand === "nicht nötig" || (x.stand === "gebucht" && !x.wer)) k.push(`<button class="knopf klein" onclick="uebernehmen(${ref(x.idpraktikum)})">Ich übernehme</button>`);
   if (x.wer === S.ich && x.stand !== "besucht") {
     k.push(`<button class="knopf klein" onclick="uebernehmen(${ref(x.idpraktikum)}, true)">Termin</button>`);
-    k.push(`<button class="knopf klein" onclick="erledigt(${ref(x.idpraktikum)})">Erledigt</button>`);
+    if (S.ansicht === "termine") k.push(`<button class="knopf klein" onclick="erledigt(${ref(x.idpraktikum)})">Erledigt</button>`);
     k.push(`<button class="knopf klein" onclick="handlung('abgeben',${ref(x.idpraktikum)})">Abgeben</button>`);
   }
   if (x.link) k.push(`<button class="knopf klein" title="Im Praktikumstool öffnen (Fenster rechts)" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>`);
@@ -1228,7 +1228,7 @@ function ansichtHilfe() {
   ${k("3 · Termin übernehmen", `<ul><li>Im Raster <b>Mo–Fr</b> stehen die freien Mathe-Lektionen: hohes Kästchen = Doppellektion, grün = danach Zeit zum Besprechen.</li>
     <li>Klick auf das Raster → alle Termine Woche für Woche → Termin anklicken → <b>übernehmen</b>.</li>
     <li>Das Praktikumstool öffnet sich rechts direkt bei der Lektion: dort <b>«Besuch eintragen»</b>. Das bleibt Pflicht.</li>
-    <li>Nach dem Besuch: <b>Erledigt</b>.</li>
+    <li>Nach dem Besuch: im Reiter <b>Meine Termine</b> auf <b>Erledigt</b>.</li>
     <li><b>Stand</b>: <span class="chip s-offen">offen</span> noch niemand ·
       <span class="chip s-gebucht">gebucht</span> übernommen und im Praktikumstool eingetragen – beides gehört zusammen ·
       <span class="chip s-besucht">besucht</span> hat stattgefunden.</li>
