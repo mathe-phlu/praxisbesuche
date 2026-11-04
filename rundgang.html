@@ -1104,7 +1104,7 @@ async function berichtOeffnen(i) {
     window.open(URL.createObjectURL(f), "_blank");
   } catch (e) { meldung("Bericht nicht gefunden – vielleicht noch nicht synchronisiert. (Protokolle/" + pfad + ")"); }
 }
-/* E-Mail-Entwurf als .eml mit Anhang: Doppelklick öffnet ihn in Outlook als neue Nachricht (X-Unsent) */
+/* E-Mail an Studierende (An), Mathe-PxL (An) und Mentor/in (Cc) vorbereiten */
 function mailEntwurf(x, datei, dateiname) {
   const k = x.kontakte || {};
   const pxl = (k.pxl || []).filter((p) => p.mathe && p.mail);
@@ -1121,23 +1121,21 @@ function mailEntwurf(x, datei, dateiname) {
     `Im Anhang finden Sie das Protokoll zu meinem Unterrichtsbesuch Mathematik${datum ? " vom " + datum : ""} (${x.gruppe}praktikum). Vielen Dank für den Einblick in Ihren Unterricht.\n\n` +
     (duNamen.length ? `Hallo ${duNamen.join(", hallo ")}\n\nEuch schicke ich das Protokoll zur Kenntnis – herzlichen Dank für die Begleitung.\n\n` : "") +
     `Freundliche Grüsse\n${ich.name || S.ich}`;
-  const b64 = (u8) => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(s).replace(/.{76}/g, "$&\r\n"); };
-  const utf = (t) => b64(new TextEncoder().encode(t));
-  const kopf = (t) => `=?UTF-8?B?${btoa(String.fromCharCode(...new TextEncoder().encode(t)))}?=`;
-  const typ = /\.pdf$/i.test(dateiname) ? "application/pdf" : "application/octet-stream";
-  datei.arrayBuffer().then((buf) => {
-    const g = "----praxisbesuche" + Math.random().toString(36).slice(2);
-    const eml = [`X-Unsent: 1`, `To: ${an.join(", ")}`, ...(cc.length ? [`Cc: ${cc.join(", ")}`] : []), `Subject: ${kopf(betreff)}`, `MIME-Version: 1.0`,
-      `Content-Type: multipart/mixed; boundary="${g}"`, ``, `--${g}`, `Content-Type: text/plain; charset=UTF-8`, `Content-Transfer-Encoding: base64`, ``, utf(text), ``,
-      `--${g}`, `Content-Type: ${typ}; name="${kopf(dateiname)}"`, `Content-Disposition: attachment; filename*=UTF-8''${encodeURIComponent(dateiname)}`,
-      `Content-Transfer-Encoding: base64`, ``, b64(new Uint8Array(buf)), ``, `--${g}--`, ``].join("\r\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([eml], { type: "message/rfc822" }));
-    a.download = dateiname.replace(/\.[a-z0-9]+$/i, "") + ".eml";
-    document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1000);
-    const fehlt = [!(k.student && k.student.mail) && "Studierende", !pxl.length && "Mathe-PxL", !cc.length && "Mentor/in"].filter(Boolean);
-    meldung(`Bericht abgelegt. E-Mail-Entwurf «${a.download}»: oben rechts in der Download-Leiste anklicken – öffnet in Outlook mit dem Bericht im Anhang.${fehlt.length ? " Adresse fehlt: " + fehlt.join(", ") + " – bitte von Hand ergänzen." : ""}`);
-  });
+  // Neue Nachricht im E-Mail-Programm (mailto): Empfänger, Betreff, Text. Den Anhang erlaubt der Browser nicht – Bericht hineinziehen.
+  const href = `mailto:${an.map(encodeURIComponent).join(",")}?` + [cc.length ? "cc=" + cc.map(encodeURIComponent).join(",") : "", "subject=" + encodeURIComponent(betreff), "body=" + encodeURIComponent(text)].filter(Boolean).join("&");
+  const fehlt = [!(k.student && k.student.mail) && "Studierende", !pxl.length && "Mathe-PxL", !cc.length && "Mentor/in"].filter(Boolean);
+  const d = $("#frage");
+  $("#frageText").textContent = "E-Mail mit dem Bericht";
+  $("#frageFeld").innerHTML = `<p>An: ${esc(an.join(", ") || "–")}${cc.length ? "<br>Cc: " + esc(cc.join(", ")) : ""}</p>
+    ${fehlt.length ? `<p class="hinweis">Adresse fehlt: ${esc(fehlt.join(", "))} – bitte in der E-Mail ergänzen.</p>` : ""}
+    <p><a class="knopf haupt" style="text-decoration:none;display:inline-block" href="${esc(href)}" onclick="setTimeout(() => $('#frage').close(), 300)">✉ E-Mail öffnen</a></p>
+    <p class="klein leise">Danach den Bericht in die E-Mail ziehen: <b>${esc(dateiname)}</b><br>
+      <button class="knopf klein" type="button" onclick="berichtHerunterladen()">Bericht in den Download-Ordner legen</button> (dann aus der Download-Leiste in die E-Mail ziehen)</p>`;
+  S.mailDatei = { datei, dateiname };
+  $("#frageOk").style.display = "none";
+  d.returnValue = ""; d.showModal();
+  d.onclose = () => { $("#frageOk").style.display = ""; };
+
 }
 async function berichtLoeschen(i, j) {
   const id = REFS[i], pfad = REFS[j];
@@ -1151,6 +1149,11 @@ async function berichtLoeschen(i, j) {
   if (S.protokolle) { const o = pfad.split("/")[0]; if (S.protokolle[o]) S.protokolle[o] = S.protokolle[o].filter((n) => o + "/" + n !== pfad); }
   await eintragen({ typ: "bericht_weg", praktikum: id, datei: pfad });
   meldung("Bericht gelöscht.");
+}
+function berichtHerunterladen() {
+  const m = S.mailDatei; if (!m) return;
+  const a = document.createElement("a"); a.href = URL.createObjectURL(m.datei); a.download = m.dateiname;
+  document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1000);
 }
 async function mailZuBericht(i, j) {
   const x = R.praktika.find((p) => p.idpraktikum === REFS[i]), pfad = REFS[j];
@@ -1538,7 +1541,7 @@ const HILFE = [
     <li>Termin passt nicht mehr: <b>Anpassen</b> → «Termin ändern» oder «Wieder abgeben». Danach öffnet sich das Tool – dort auch anpassen.</li>
     <li>Unter dem Namen: <b>Kontakte</b> (Mathe-PxL, zuständige PxL, Mentor/in mit E-Mail).</li>
     <li><b>Achtung / Bemerkung</b>: z.B. «muss im Quartal besucht werden» oder nur eine Bemerkung.</li>
-    <li><b>Bericht ↑</b>: Bericht (PDF oder Word) hochladen. Er landet im gemeinsamen Ordner unter <b>Protokolle/Name der Person</b> (fehlt der Ordner, wird er angelegt), benannt wie gewohnt «UB Nachname PK03 kürzel JJMMTT». Bei den Studierenden erscheint dann 📄. Gleichzeitig entsteht ein <b>E-Mail-Entwurf</b> mit dem Bericht im Anhang an Studierende, Mathe-PxL und Mentor/in – in der Download-Leiste des Browsers anklicken, er öffnet in Outlook. Text anpassen, senden. Danach stehen beim Termin <b>📄 öffnen</b> · <b>✉ E-Mail</b> (Entwurf nochmals erstellen) · <b>✕</b> (falsch hochgeladen? löschen).</li></ol>
+    <li><b>Bericht ↑</b>: Bericht (PDF oder Word) hochladen. Er landet im gemeinsamen Ordner unter <b>Protokolle/Name der Person</b> (fehlt der Ordner, wird er angelegt), benannt wie gewohnt «UB Nachname PK03 kürzel JJMMTT». Bei den Studierenden erscheint dann 📄. Gleich danach: <b>✉ E-Mail öffnen</b> – eine neue Nachricht an Studierende, Mathe-PxL und Mentor/in mit Betreff und Text. Den Bericht hineinziehen, Text anpassen, senden. Danach stehen beim Termin <b>📄 öffnen</b> · <b>✉ E-Mail</b> (Entwurf nochmals erstellen) · <b>✕</b> (falsch hochgeladen? löschen).</li></ol>
     <p class="leise">⚠ rechts = Regel verletzt (z.B. Buchung ausserhalb dieser Seite). Ein Doppelbesuch zur selben Zeit ist kein Problem.</p>`],
   ["halbtag", "Halbtagespraktikum", "Was ist anders?", `<ol class="schritte">
     <li>Reiter <b>Halbtagespraktikum</b>. Filter nach <b>Periode</b> (A–D) statt nach Tag.</li>
@@ -1998,7 +2001,7 @@ const SCHRITTE = [
     vorher: () => { const b = document.querySelector("#app table.liste tbody tr td:last-child .knopf.haupt"); if (b) b.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
   { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Termin wieder abgeben", text: "Bei deinen eigenen Buchungen steht dort «Termin wieder abgeben» – falls es im Praktikumstool doch nicht klappt. Danach öffnet sich das Tool, damit du die Buchung dort auch löschst." },
   { ziel: ".aktivleiste .knopf", ansicht: "planung", titel: "Liste für Excel kopieren", text: "Kopiert die Liste, so wie sie gefiltert ist – dann in Excel oder eine Mail einfügen." },
-  { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "Hier hast du alle deine Termine im Überblick, nach Tag geordnet und filterbar nach Halbtag, Profil, Quartal. Pro Termin: «✓ Erledigt» nach dem Besuch; «Anpassen» – Termin ändern oder wieder abgeben, danach öffnet sich das Praktikumstool, damit du es dort auch anpasst; «Achtung / Bemerkung» – Pflichtbesuch später (z.B. im Quartal) oder nur eine Bemerkung; «Bericht ↑» legt deinen Bericht in den Ordner der Person unter «Protokolle» und erstellt gleichzeitig einen E-Mail-Entwurf mit dem Bericht im Anhang (an Studierende, Mathe-PxL, Mentor/in) – in der Download-Leiste anklicken, er öffnet in Outlook; danach «📄 öffnen», «✉ E-Mail» (Entwurf nochmals) und «✕» (falsch hochgeladen? löschen); ganz rechts «Tool ↗». Unter dem Namen klappen die «Kontakte» auf: Mathe-PxL, zuständige PxL und Mentor/in mit E-Mail. Die Hinweise rechts melden, falls doch etwas gegen eine Regel verstösst (z.B. Buchungen, die ausserhalb dieser Seite gemacht wurden).", vorher: () => geheZu("termine") },
+  { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "Hier hast du alle deine Termine im Überblick, nach Tag geordnet und filterbar nach Halbtag, Profil, Quartal. Pro Termin: «✓ Erledigt» nach dem Besuch; «Anpassen» – Termin ändern oder wieder abgeben, danach öffnet sich das Praktikumstool, damit du es dort auch anpasst; «Achtung / Bemerkung» – Pflichtbesuch später (z.B. im Quartal) oder nur eine Bemerkung; «Bericht ↑» legt deinen Bericht in den Ordner der Person unter «Protokolle» und öffnet gleich danach eine neue E-Mail an Studierende, Mathe-PxL und Mentor/in mit Betreff und Text – Bericht hineinziehen, senden; danach «📄 öffnen», «✉ E-Mail» (Entwurf nochmals) und «✕» (falsch hochgeladen? löschen); ganz rechts «Tool ↗». Unter dem Namen klappen die «Kontakte» auf: Mathe-PxL, zuständige PxL und Mentor/in mit E-Mail. Die Hinweise rechts melden, falls doch etwas gegen eine Regel verstösst (z.B. Buchungen, die ausserhalb dieser Seite gemacht wurden).", vorher: () => geheZu("termine") },
   { ziel: "#protokolle", ansicht: "termine", titel: "Protokolle im Verlauf", text: "Klick auf einen Namen: Im Verlauf stehen unter «Protokolle» alle Berichte der Person aus dem gemeinsamen Ordner – auch die alten. Vor einem Besuch z.B. kurz den Halbtagsbericht anschauen.",
     vorher: () => { const n = document.querySelector("#app table.liste tbody tr .name"); if (n) n.click(); }, nachher: () => detailZu() },
   { ziel: "nav button[data-ansicht=studierende]", ansicht: "studierende", titel: "Studierende", text: "Eine Zeile je Person: Halbtag, Profil, Quartal je mit Datum · Stand · Kürzel (NN = unbekannt). Suche beim Tippen, Filter nach Studienjahr, Sortierung. Abgeschlossene sind im Archiv.", vorher: () => geheZu("studierende") },
