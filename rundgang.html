@@ -341,7 +341,7 @@ const S = {
   offeneGruppen: new Set(JSON.parse(lies("offen") || "[]")),
   filter: (() => { const f = JSON.parse(lies("filter") || "{}");
     for (const k of ["praktikum", "suche", "tag"]) delete f[k];
-    if (lies("filterV") !== "2") { delete f.bespr; merke("filterV", "2"); merke("filter", JSON.stringify(f)); }
+    if (lies("filterV") !== "3") { delete f.bespr; merke("filterV", "3"); merke("filter", JSON.stringify(f)); }
     for (const k of ["noetig", "stand", "tageszeit", "lektart"]) if (f[k] !== undefined && !Array.isArray(f[k])) delete f[k];
     return f; })(),
 };
@@ -399,7 +399,7 @@ function besprechung(l) { return l.frei === null || (l.frei !== undefined && l.f
 function lektionenIm(x, { nurFrei = true, alleTage = false } = {}) {
   const von = fw("von", ""), bis = fw("bis", ""), tage = fa("tage"), tz = fa("tageszeit");
   const planung = S.ansicht === "planung";
-  const art = planung ? fa("lektart") : [], bespr = planung && fw("bespr", true);
+  const art = planung ? fa("lektart") : [], bespr = planung && fw("bespr", false);
   const passt = (x.lektionen || []).filter((l) => {
     if (art.length && !art.includes((l.anzahl || 1) > 1 ? "doppel" : "einzel")) return false;
     if (von && l.datum < von) return false;
@@ -417,7 +417,7 @@ function lektionenIm(x, { nurFrei = true, alleTage = false } = {}) {
   return !mit.length && x.noetig === "ja" ? passt : mit;
 }
 function ohneBesprechungTrotzdem(x, l) {
-  return S.ansicht === "planung" && fw("bespr", true) && x.noetig === "ja" && l.length && !l.some(besprechung);
+  return S.ansicht === "planung" && fw("bespr", false) && x.noetig === "ja" && l.length && !l.some(besprechung);
 }
 /* Luftlinie in km zwischen zwei Schulorten (Koordinaten aus stamm/orte.json) */
 function km(a, b) {
@@ -1343,13 +1343,13 @@ function filterLeiste(ansicht, anzahl) {
   // Wann
   const wannAktiv = [fw("von", "") && "ab " + kurzDatum(fw("von", "")), fw("bis", "") && "bis " + kurzDatum(fw("bis", "")),
     fa("tage").join(" "), fa("tageszeit").map((t) => t === "vormittag" ? "Vormittag" : "Nachmittag").join(" "),
-    fa("lektart").map((t) => t === "einzel" ? "Einzel" : "Doppel").join(" "), fw("bespr", true) && "Besprechung"].filter(Boolean);
+    fa("lektart").map((t) => t === "einzel" ? "Einzel" : "Doppel").join(" "), fw("bespr", false) && "Besprechung"].filter(Boolean);
   let wann = `<div class="fblock"><span class="ftitel">Zeitraum</span><input type="date" value="${esc(fw("von", ""))}" onchange="setzeFilter('von',this.value)"> bis <input type="date" value="${esc(fw("bis", ""))}" onchange="setzeFilter('bis',this.value)"></div>`;
   if (planung) {
     wann += `<div class="fblock"><span class="ftitel">Tag</span>${knoepfe("tage", [["Mo", "Mo"], ["Di", "Di"], ["Mi", "Mi"], ["Do", "Do"], ["Fr", "Fr"]])}</div>`;
     wann += `<div class="fblock"><span class="ftitel">Tageszeit</span>${knoepfe("tageszeit", [["vormittag", "Vormittag"], ["nachmittag", "Nachmittag"]])}</div>`;
     wann += `<div class="fblock"><span class="ftitel">Art der Mathe-Lektion</span>${knoepfe("lektart", [["einzel", "Einzellektion"], ["doppel", "Doppellektion"]])}</div>`;
-    wann += `<div class="fblock"><label class="haken" title="Nach dem Mathe-Block mind. ${BESPRECHUNG_MIN} Min frei oder Schulschluss"><input type="checkbox" ${fw("bespr", true) ? "checked" : ""} onchange="setzeFilter('bespr',this.checked)"> danach Zeit zum Besprechen</label></div>
+    wann += `<div class="fblock"><label class="haken" title="Nach dem Mathe-Block mind. ${BESPRECHUNG_MIN} Min frei oder Schulschluss"><input type="checkbox" ${fw("bespr", false) ? "checked" : ""} onchange="setzeFilter('bespr',this.checked)"> danach Zeit zum Besprechen</label></div>
       <div class="leise klein" style="padding-top:4px">Tag, Tageszeit und Lektion beziehen sich auf die freien Mathe-Lektionen im Stundenplan.</div>`;
   }
   // Wo
@@ -1388,7 +1388,7 @@ function aktivLeiste(ansicht, anzahl) {
     if (fa("tage").length) weg("tage", fa("tage").join(", "));
     if (fa("tageszeit").length) weg("tageszeit", fa("tageszeit").map((t) => t === "vormittag" ? "Vormittag" : "Nachmittag").join(", "));
     if (fa("lektart").length) weg("lektart", fa("lektart").map((t) => t === "einzel" ? "Einzellektion" : "Doppellektion").join(", "));
-    if (fw("bespr", true)) c.push(`<button type="button" class="aktivchip" onclick="setzeFilter('bespr',false)" title="Filter ausschalten">danach Zeit zum Besprechen ✕</button>`);
+    if (fw("bespr", false)) c.push(`<button type="button" class="aktivchip" onclick="setzeFilter('bespr',false)" title="Filter ausschalten">danach Zeit zum Besprechen ✕</button>`);
   }
   if (fw("ort", "")) weg("ort", "Ort: " + fw("ort", ""));
   if (fw("umOrt", "") && fw("umKm", "")) weg("umKm", `${fw("umKm", "")} km um ${fw("umOrt", "")}`);
@@ -1417,7 +1417,7 @@ function listeKopieren() {
 function filtern(liste, ansicht) {
   const sj = fw("jahr", S.einst.studienjahr);
   const von = fw("von", ""), bis = fw("bis", "");
-  const lektFilter = fa("tage").length || fa("tageszeit").length || fa("lektart").length || fw("bespr", true) || von || bis;
+  const lektFilter = fa("tage").length || fa("tageszeit").length || fa("lektart").length || fw("bespr", false) || von || bis;
   const noetig = fa("noetig"), stand = fa("stand"), perioden = fa("perioden");
   const standGruppe = (x) => x.stand === "besucht" ? "besucht" : ["übernommen", "gebucht"].includes(x.stand) ? "eingeteilt" : "offen";
   return liste.filter((x) => {
