@@ -825,17 +825,19 @@ function ansichtStart() {
   const zahl = Object.keys(S.praktika).length;
   const balken = (wert, von) => `<div class="sk-balken"><div style="width:${von ? Math.min(100, Math.round(100 * wert / von)) : 0}%"></div></div>`;
   const naechste = meine.filter((x) => x.termin && x.stand !== "besucht").sort((a, b) => (a.termin.datum + a.termin.zeit).localeCompare(b.termin.datum + b.termin.zeit))[0];
+  const dabei = (p) => p.stand !== "offen" && p.stand !== "nicht nötig";
+  // gleich aufgebaut: grosse Zahl = eingeteilt, dahinter / Ziel, Balken, noch offen bzw. Ziel erreicht
+  const zielKarte = (farbe, titel, wohin, ist, soll, was) => `<div class="sk sk-${farbe}" onclick="${wohin}"><h3>${titel}</h3>
+    <div class="z">${ist}<span class="z-von"> / ${soll}</span></div><div>eingeteilt · Ziel: ${was}</div>
+    ${balken(ist, soll)}<div class="klein">${soll && ist >= soll ? "<b>Ziel erreicht ✓</b>" : `noch offen: <b>${Math.max(0, soll - ist)}</b>`}</div></div>`;
   const karte = (farbe, titel, ziel, inhalt) => `<div class="sk sk-${farbe}" onclick="${ziel}"><h3>${titel}</h3>${inhalt}</div>`;
   return `<div class="start-kopf"><h2>Studienjahr ${sjText(sj)}</h2>
     <button class="knopf haupt gross" onclick="typeof rundgangStart === 'function' ? rundgangStart() : window.open('rundgang.html')">▶ Rundgang: die Seite in 2 Minuten</button></div>
   ${zahl ? "" : `<div class="karte"><b>Noch keine Daten.</b> Unter «Aktualisieren» die Datei aus dem Praktikumstool einlesen.</div>`}
   <div class="sk-reihe">
-    ${karte("halbtag", "Halbtagespraktikum", "geheZu('halbtag')", `<div class="z">${ht.filter((p) => p.stand === "offen").length}</div><div>offen von ${ht.length}</div>
-      ${balken(ht.length - ht.filter((p) => p.stand === "offen").length, ht.length)}<div class="klein">${ht.filter((p) => p.stand === "besucht").length} besucht</div>`)}
-    ${karte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", `<div class="z">${eingeteilt}<span class="z-von"> / ${ziel}</span></div><div>eingeteilt · Ziel ${Math.round(S.einst.quote * 100)} % von ${prof.length}</div>
-      ${balken(eingeteilt, ziel)}<div class="klein">Besuch freiwillig, zählt für die Quote</div>`)}
-    ${karte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", `<div class="z">${offenQ}</div><div>nötig und noch offen (von ${q.length})</div>
-      ${balken(q.length - offenQ, q.length)}<div class="klein">Pflicht, wenn das Profil nicht besucht wurde</div>`)}
+    ${zielKarte("halbtag", "Halbtagespraktikum", "geheZu('halbtag')", ht.filter(dabei).length, ht.length, "alle besuchen")}
+    ${zielKarte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", eingeteilt, ziel, `Quote ${Math.round(S.einst.quote * 100)} % von ${prof.length}`)}
+    ${zielKarte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", q.filter(dabei).length, q.length, "alle, bei denen der Besuch nötig ist")}
   </div>
   <div class="sk-reihe">
     ${karte("termine", `Meine Termine ${S.ich ? "· " + esc(S.ich) : ""}`, "geheZu('termine')", S.ich ? `<div class="z">${meine.length}</div><div>gebucht oder besucht in ${sjText(sj)}</div>
