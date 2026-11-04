@@ -45,6 +45,8 @@ a.bericht { text-decoration: none; margin-left: 3px; }
 .ber-knoepfe { display: inline-flex; gap: 2px; padding: 2px; border: 1px dashed #cfc3ad; border-radius: 6px; }
 a.bericht:hover { text-decoration: underline; }
 .einrichten { max-width: 720px; }
+.start-kopf { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 details.akk > summary { cursor: pointer; list-style: none; }
 details.akk > summary::-webkit-details-marker { display: none; }
 details.akk > summary h3, details.akk > summary b { display: inline; margin: 0; }
@@ -161,7 +163,7 @@ input.eingabe { font-size: 14px; padding: 4px 6px; border: 1px solid #ccc; borde
 .raster .rz { display: block; width: 100%; }
 .rz.doppel { padding: 7px 2px; border-color: #9a9a9a; font-weight: 600; }
 .rz.frei { background: #dcefd8; border-color: #8cc084; color: #1f4d1a; }
-th.pspalte, td.pspalte { width: 210px; min-width: 210px; border-left: 3px solid var(--ph-braun) !important; }
+th.pspalte, td.pspalte { width: 200px; min-width: 200px; border-left: 3px solid var(--ph-braun) !important; }
 td.p-halbtag { background: #f1f6fc; } td.p-profil { background: #fdf8e6; } td.p-quartal { background: #f0f8ee; }
 table.liste thead th.p-halbtag { background: #cfe2f5; color: #163a5c; }
 table.liste thead th.p-profil { background: #f5e2a6; color: #4d3a08; }
@@ -172,7 +174,7 @@ table.liste thead tr.unterkopf th.p-halbtag { background: #e6f0fa; } table.liste
 th.p-info { border-bottom: 2px solid var(--ph-braun); }
 td.pspalte .ue + .ue { border-top: 1px dotted #cfc3ad; padding-top: 2px; margin-top: 2px; }
 td.p-bem, th.p-bem { border-left: 3px solid var(--ph-braun) !important; }
-.ue { display: grid; grid-template-columns: 58px 54px 76px 40px; gap: 6px; align-items: center; font-size: 12.5px; margin: 1px 0; font-variant-numeric: tabular-nums; }
+.ue { display: grid; grid-template-columns: 62px 82px 52px; gap: 6px; align-items: center; font-size: 12.5px; margin: 1px 0; font-variant-numeric: tabular-nums; }
 .ue > * { text-align: right; } .ue .chip { justify-self: stretch; }
 .ue .chip { font-size: 12px; text-align: center; }
 .ue-j { color: var(--leise); } .ue-d { color: var(--tinte); }
@@ -196,7 +198,9 @@ details.karte summary { cursor: pointer; }
 @media (max-width: 760px) { .hilfe { grid-template-columns: 1fr; } }
 .hilfe-nav { display: flex; flex-direction: column; gap: 6px; }
 .hilfe-nav button { text-align: left; font: inherit; background: #fff; border: 1px solid var(--linie); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
-.hilfe-nav button span { display: block; font-size: 12.5px; color: var(--leise); }
+.hilfe-nav button { color: var(--tinte); }
+.hilfe-nav button b { color: var(--ph-braun-dunkel); font-size: 15px; }
+.hilfe-nav button span { display: block; font-size: 13px; color: #444; }
 .hilfe-nav button.an { background: var(--ph-sand); border-color: var(--ph-braun); }
 .hilfe-text { max-width: 720px; font-size: 15px; }
 .schritte li { margin: 8px 0; line-height: 1.45; }
@@ -782,12 +786,13 @@ function ansichtStart() {
   const offenQ = q.filter((p) => p.stand === "offen").length;
   const ziel = Math.ceil(S.einst.quote * prof.length), eingeteilt = prof.filter((p) => p.stand !== "offen" && p.stand !== "nicht nötig").length;
   const zahl = Object.keys(S.praktika).length;
-  return `<h2>Studienjahr ${sjText(sj)}</h2>
+  return `<div class="start-kopf"><h2>Studienjahr ${sjText(sj)}</h2>
+    <button class="knopf haupt gross" onclick="typeof rundgangStart === 'function' ? rundgangStart() : window.open('rundgang.html')">▶ Rundgang: die Seite in 2 Minuten</button></div>
   ${zahl ? "" : `<div class="karte"><b>Noch keine Daten.</b> Unter «Aktualisieren» die Datei aus dem Praktikumstool einlesen.</div>`}
   <div class="start">
     <div class="karte" onclick="geheZu('planung')"><h3>Profil &amp; Quartal planen</h3>
-      <div class="z">${offenQ}</div><div class="leise">Quartalsbesuche nötig und noch offen (von ${q.length})</div>
-      <div style="margin-top:8px">Profil: ${eingeteilt} von Ziel ${ziel} eingeteilt</div></div>
+      <div class="zwei"><div><div class="z">${offenQ}</div><div class="leise">Quartal: nötig und noch offen<br>(von ${q.length} nötigen)</div></div>
+        <div><div class="z">${eingeteilt}<span class="leise" style="font-size:.5em"> / ${ziel}</span></div><div class="leise">Profil: eingeteilt<br>von Ziel ${ziel} (${Math.round(S.einst.quote * 100)} %)</div></div></div></div>
     <div class="karte" onclick="geheZu('halbtag')"><h3>Halbtagespraktikum</h3>
       <div class="z">${ht.filter((p) => p.stand === "offen").length}</div><div class="leise">offen von ${ht.length}</div></div>
     <div class="karte" onclick="geheZu('studierende')"><h3>Studierende</h3>
@@ -890,7 +895,7 @@ function buchenZelle(x, partner) {
   if (!l.length) return `<span class="leise klein">keine passende Lektion</span>`;
   const tage = ["Mo", "Di", "Mi", "Do", "Fr"].filter((t) => l.some((a) => wochentag(a.datum) === t));
   return `<button class="knopf klein haupt" title="Alle möglichen Termine anzeigen – anklicken bucht" onclick="termineZeigen(${ref(x.idpraktikum)}${partner ? ", " + ref(partner.idpraktikum) : ""})">${partner ? "Termine (beide) ▸" : "Termine ▸"}</button>
-    <div class="leise klein" style="margin-top:2px">${tage.join(" ")} · ${l.length} Termin${l.length === 1 ? "" : "e"}</div>`;
+    <div class="leise klein" style="margin-top:2px">${tage.join(" · ")} · ${l.length} Termin${l.length === 1 ? "" : "e"}</div>`;
 }
 function termineZeigen(i, ip) {
   const x = R.praktika.find((p) => p.idpraktikum === REFS[i]);
@@ -1495,7 +1500,7 @@ function ansichtStudierende() {
     const d = x.termin ? x.termin.datum : x.datum;
     const stand = { "übernommen": "gebucht" }[x.stand] || x.stand;
     const wer = ["besucht", "gebucht", "übernommen"].includes(x.stand) ? (x.wer || "NN") : "";
-    return `<div class="ue"><span class="ue-j">${sjText(x.jahr)}${per ? " " + per : ""}</span><span class="ue-d">${d ? esc(datumText(d).replace(/\.20(\d\d)$/, ".$1")) : ""}</span><span class="chip ${cls}">${esc(stand)}</span><b class="ue-w">${esc(wer)}${berichtLinks(x, true)}</b></div>`;
+    return `<div class="ue"><span class="ue-j">${sjText(x.jahr)}${per ? " " + per : ""}</span><span class="chip ${cls}">${esc(stand)}</span><b class="ue-w">${esc(wer)}${berichtLinks(x, true)}</b></div>`;
   };
   const zelle = (p, g) => {
     const xs = p.praktika.filter((x) => x.gruppe === g);
@@ -1515,7 +1520,7 @@ function ansichtStudierende() {
     <span class="leise klein">${liste.length} Personen</span>
   </div>
   <table class="liste"><thead><tr><th colspan="4" class="p-info">Person</th><th class="pspalte p-halbtag">Halbtag</th><th class="pspalte p-profil">Profil</th><th class="pspalte p-quartal">Quartal</th><th colspan="2" class="p-bem">Achtung / Bemerkung</th></tr>
-    <tr class="unterkopf"><th></th><th>Name</th><th>Studiengang</th><th>Fächer</th>${["p-halbtag", "p-profil", "p-quartal"].map((c) => `<th class="pspalte ${c}"><div class="ue"><span>${c === "p-halbtag" ? "Jahr Per." : "Jahr"}</span><span>Besuch am</span><span style="text-align:center">Stand</span><span>von</span></div></th>`).join("")}<th class="p-bem"></th><th></th></tr></thead><tbody>
+    <tr class="unterkopf"><th></th><th>Name</th><th>Studiengang</th><th>Fächer</th>${["p-halbtag", "p-profil", "p-quartal"].map((c) => `<th class="pspalte ${c}"><div class="ue"><span>${c === "p-halbtag" ? "Jahr Per." : "Jahr"}</span><span style="text-align:center">Stand</span><span>von</span></div></th>`).join("")}<th class="p-bem"></th><th></th></tr></thead><tbody>
   ${liste.map((p) => { const a = (p.achtungen || []).length || p.praktika.some((x) => x.achtung && x.achtung.length);
     const bem = [...(p.achtungen || []).map((x) => `<div class="rot">⚠ im ${esc(x.fuer)} besuchen${x.text ? ": " + esc(x.text) : ""}
         <button class="knopf klein" title="ändern" onclick="achtungSetzen(REFS[${ref(p.id)}], REFS[${ref(x.id)}])">ändern</button>
