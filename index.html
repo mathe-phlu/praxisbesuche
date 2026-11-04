@@ -333,7 +333,7 @@ async function ordnerWaehlen() {
   try { h = await showDirectoryPicker({ id: "praxisbesuche", mode: "readwrite", startIn: "documents" }); } catch (e) { return; }
   if (!(await istPraxisOrdner(h))) {
     const w = await frage(`Im Ordner «${h.name}» sind keine Praxisbesuche-Daten.\n\nGewählt werden muss der synchronisierte Teams-Ordner «Praxisbesuche» (darin liegen «Daten» und «Werkzeuge»).`,
-      { art: "wahl", wert: "nochmal", optionen: [["nochmal", "Anderen Ordner wählen"], ["neu", "Trotzdem hier neu anfangen (nur Rike / Maurus)"]] });
+      { art: "wahl", wert: "nochmal", optionen: [["nochmal", "Anderen Ordner wählen"], ["neu", "Trotzdem hier neu anfangen (nur beim allerersten Einrichten)"]] });
     if (w === "nochmal") return ordnerWaehlen();
     if (w !== "neu") return;
   }
@@ -904,7 +904,7 @@ function aktivLeiste(ansicht, anzahl) {
   if (fw("nurMeine", false)) weg("nurMeine", "nur meine");
   if (fw("nurAchtung", false)) weg("nurAchtung", "nur ⚠");
   return `<div class="aktivleiste"><b>${anzahl}</b> ${anzahl === 1 ? "Eintrag" : "Einträge"}${c.length ? " · " + c.join(" ") : ' <span class="leise klein">· keine Einschränkung</span>'}
-    <span style="margin-left:auto"></span><button class="knopf klein" onclick="listeKopieren()" title="Die Liste, wie sie gerade gefiltert ist, für Excel oder eine Mail">Liste kopieren</button></div>`;
+    <span style="margin-left:auto"></span><button class="knopf klein" onclick="listeKopieren()" title="Kopiert die Liste, so wie sie gerade gefiltert ist, in die Zwischenablage – danach in Excel oder eine Mail einfügen (Cmd+V / Ctrl+V)">Liste für Excel kopieren</button></div>`;
 }
 function filterWeg(k) { delete S.filter[k]; merke("filter", JSON.stringify(S.filter)); zeichnen();
 }
@@ -999,7 +999,7 @@ function ansichtTermine() {
     <div class="kachel"><div class="t">Tage</div><div class="z">${Object.keys(tage).filter((t) => t !== "ohne Termin").length}</div></div>
     <div class="kachel"><div class="t">besucht</div><div class="z">${meine.filter((x) => x.stand === "besucht").length}</div></div></div>
   <div class="filter"><label>Studienjahr<select onchange="setzeFilter('jahr',this.value)">${jahre().map((j) => `<option value="${j}" ${j === sj ? "selected" : ""}>${sjText(j)}</option>`).join("")}</select></label>
-    <button class="knopf klein" onclick="listeKopieren()">Liste kopieren</button></div>
+    <button class="knopf klein" onclick="listeKopieren()" title="Kopiert die Liste in die Zwischenablage – danach in Excel oder eine Mail einfügen (Cmd+V / Ctrl+V)">Liste für Excel kopieren</button></div>
   ${meine.length ? `<table class="liste"><thead><tr><th>Tag</th><th>Zeit</th><th>Name</th><th>Prakt.</th><th>Schule</th><th>Stand</th><th>Hinweise</th><th></th></tr></thead><tbody>
   ${Object.entries(tage).map(([d, xs]) => xs.map((x, i) => { const w = x.termin ? terminWarnungen(x, x.termin.datum, x.termin.zeit) : [];
     return `<tr><td style="white-space:nowrap">${i === 0 ? `<b>${esc(tagText(d))}</b>` : ""}</td><td>${esc(x.termin ? x.termin.zeit : "")}</td>
@@ -1087,7 +1087,7 @@ function ansichtStudierende() {
   return `<h2>Studierende${archiv ? " – Archiv" : ""}</h2>
   <div class="filter">
     <label title="Komma = oder · Leerzeichen = und · -Wort = ohne">Suche (Name, Ort, Schulhaus)<input type="search" value="${esc(fw("ssuche", ""))}" onchange="setzeFilter('ssuche',this.value)" placeholder="z.B. Sursee, Hochdorf -Neu"></label>
-    <button class="knopf klein" onclick="listeKopieren()">Liste kopieren</button>
+    <button class="knopf klein" onclick="listeKopieren()" title="Kopiert die Liste in die Zwischenablage – danach in Excel oder eine Mail einfügen (Cmd+V / Ctrl+V)">Liste für Excel kopieren</button>
     <label>Studiengang<select onchange="setzeFilter('sg',this.value)"><option value="alle">alle</option>${sgs.map((s) => `<option ${s === sg ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></label>
     <label class="haken" title="Archiv: alle Praktika abgeschlossen oder seit zwei Jahren kein Praktikum"><input type="checkbox" ${archiv ? "checked" : ""} onchange="setzeFilter('archiv',this.checked)"> Archiv zeigen (${imArchiv} abgeschlossen)</label>
     <label class="haken"><input type="checkbox" ${fw("nurAchtung", false) ? "checked" : ""} onchange="setzeFilter('nurAchtung',this.checked)"> nur mit ⚠ Achtung</label>
@@ -1103,7 +1103,7 @@ function ansichtStudierende() {
     return `<tr class="${a ? "zeile-achtung" : ""}"><td>${a ? `<span class="achtung">⚠</span>` : ""}</td><td class="name" onclick="detailZeigen(REFS[${ref(p.id)}])">${esc(p.name)}</td>
     <td>${esc(p.studiengang || "")}</td><td class="klein">${esc((p.faecher || []).join(", "))}</td>
     <td>${zelle(p, "Halbtag")}</td><td>${zelle(p, "Profil")}</td><td>${zelle(p, "Quartal")}</td><td class="klein">${bem}</td>
-    <td style="white-space:nowrap"><button class="knopf klein" onclick="achtungSetzen(REFS[${ref(p.id)}])">⚠ Achtung</button></td></tr>`; }).join("")}
+    <td style="white-space:nowrap"><button class="knopf klein" onclick="achtungSetzen(REFS[${ref(p.id)}])">Achtung / Bemerkung</button></td></tr>`; }).join("")}
   </tbody></table>`;
 }
 
@@ -1129,7 +1129,7 @@ function ansichtHilfe() {
     <li>Bemerkungen zur Person im Detail; Achtung lässt sich ändern oder löschen.</li></ul>`)}
   ${k("5 · Halbtagespraktikum", `<ul><li>Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als <b>Paar</b> in einer Zeile.</li>
     <li><b>Beide übernehmen</b> trägt den Doppelbesuch für beide ein; im Tool beide eintragen.</li></ul>`)}
-  ${k("6 · Aktualisieren (Rike, Maurus)", `<ul><li>Vor jedem Praktikum: «Praktikumstool öffnen und Daten holen», im Tool das Lesezeichen klicken.</li>
+  ${k("6 · Aktualisieren", `<ul><li><b>In der Regel muss hier nichts gemacht werden.</b></li><li>Nur vor neuen Praktika (eine Person für alle): «Praktikumstool öffnen und Daten holen», im Tool das Lesezeichen klicken.</li>
     <li>Spezialfälle (Excel) einlesen, Regeln aus der Checkliste übernehmen, Orte suchen lassen.</li></ul>`)}
   </div>
   <p class="leise klein">Gespeichert wird im gemeinsamen Ordner. Änderungen der anderen erscheinen nach der Synchronisation (meist innert einer Minute; sofort: ↻ oben rechts).</p>`;
@@ -1162,7 +1162,7 @@ function detailZeigen(id, oeffnen = true) {
       <div class="wer">${esc(a.wer)}, ${datumText(a.zeit)} ·
         <button class="knopf klein" onclick="achtungSetzen(REFS[${ref(p.id)}], REFS[${ref(a.id)}])">ändern</button>
         <button class="knopf klein" onclick="achtungWeg(REFS[${ref(p.id)}], REFS[${ref(a.id)}])">löschen</button></div></div>`).join("") || '<p class="leise klein">Kein Vermerk.</p>'}
-    <p><button class="knopf" onclick="achtungSetzen(REFS[${ref(p.id)}])">⚠ Achtung setzen …</button></p>
+    <p><button class="knopf" onclick="achtungSetzen(REFS[${ref(p.id)}])">⚠ Achtung oder Bemerkung …</button></p>
     <h3>Bemerkungen zur Person</h3>
     ${a && a.bemerkung ? `<div class="notiz">${esc(a.bemerkung)}<div class="wer">alte Liste</div></div>` : ""}
     ${p.notizen.map(notiz).join("")}
@@ -1176,14 +1176,16 @@ async function achtungSetzen(id, alteId) {
   const d = $("#frage");
   const alt = alteId ? (R.personen[id].achtungen || []).find((a) => a.id === alteId) : null;
   $("#frageText").textContent = `${alt ? "Achtung ändern" : "Achtung"} für ${R.personen[id].name}`;
-  $("#frageFeld").innerHTML = `<label class="klein leise">Wo muss die Person besucht werden?</label>
-    <select id="aFuer"><option value="Profil">im Profilpraktikum</option><option value="Quartal">im Quartalspraktikum</option><option value="Halbtag">im Halbtagespraktikum</option></select>
-    <label class="klein leise" style="display:block;margin-top:8px">Begründung</label><textarea id="aText" placeholder="z.B. im Halbtagespraktikum fachlich unsicher">${alt ? esc(alt.text || "") : ""}</textarea>`;
+  $("#frageFeld").innerHTML = `<label class="klein leise">Was möchtest du festhalten?</label>
+    <select id="aFuer"><option value="Profil">⚠ Muss im Profilpraktikum besucht werden</option><option value="Quartal">⚠ Muss im Quartalspraktikum besucht werden</option>
+      <option value="Halbtag">⚠ Muss im Halbtagespraktikum besucht werden</option>${alt ? "" : '<option value="bemerkung">Nur eine Bemerkung (kein Pflichtbesuch)</option>'}</select>
+    <label class="klein leise" style="display:block;margin-top:8px">Text / Begründung</label><textarea id="aText" placeholder="z.B. im Halbtagespraktikum fachlich unsicher">${alt ? esc(alt.text || "") : ""}</textarea>`;
   if (alt) $("#aFuer").value = alt.fuer;
   d.returnValue = ""; d.showModal();
   await new Promise((ok) => (d.onclose = ok));
   if (d.returnValue !== "ok") return;
   const fuer = $("#aFuer").value, text = $("#aText").value.trim();
+  if (fuer === "bemerkung") { if (text && await eintragen({ typ: "bemerkung", person: id, text })) meldung("Bemerkung gespeichert."); return; }
   if (alt && !(await eintragen({ typ: "achtung_weg", person: id, bezug: alt.id }))) return;
   if (await eintragen({ typ: "achtung", person: id, fuer, text })) meldung(alt ? "Achtung geändert." : "Achtung gesetzt – erscheint in der Planung mit ⚠.");
 }
@@ -1214,7 +1216,7 @@ function ansichtAktualisieren() {
   const proJahr = {};
   for (const p of Object.values(S.praktika)) proJahr[p.jahr + " " + p.gruppe] = (proJahr[p.jahr + " " + p.gruppe] || 0) + 1;
   return `<h2>Aktualisieren</h2>
-  <p class="leise">Einmal vor den Praktika, durch Rike oder Maurus. Alles wird hier im Browser gelesen – nichts geht an einen anderen Dienst.</p>
+  <p><b>In der Regel muss hier nichts gemacht werden.</b> Nur vor neuen Praktika holt eine Person für alle die Daten aus dem Praktikumstool. Alles wird hier im Browser gelesen – nichts geht an einen anderen Dienst.</p>
   <div class="karte"><h3>1 · Praktika aus dem Praktikumstool</h3>
     <p>Studienjahre <input class="eingabe" id="holJahre" value="${esc(`${jahrPlus(e.studienjahr, -4)} bis ${e.studienjahr}`)}" size="16">
        <label class="klein"><input type="checkbox" id="holPlan" checked> mit Stundenplänen (Mathe-Lektionen) für ${sjText(e.studienjahr)}</label></p>
