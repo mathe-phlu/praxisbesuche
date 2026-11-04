@@ -957,12 +957,27 @@ async function terminGewaehlt(ip, il, ipartner) {
   }
   meldung(meinesSchon ? "Termin geändert." : `Gebucht${partner ? " (beide)" : ""} – jetzt sofort im Praktikumstool eintragen (öffnet sich rechts).`);
   if (x.link) { REFS.push(toolLink(x, a.id)); toolOeffnen(REFS.length - 1); }
+  // Doppelbesuch: der Browser erlaubt pro Klick nur ein Fenster – für die zweite Person ein eigener Knopf
+  if (partner && partner.link && !meinesSchon) {
+    const lp = (partner.lektionen || []).find((b) => b.datum === a.datum && b.zeit === a.zeit) || a;
+    REFS.push(toolLink(partner, lp.id));
+    zweitesToolZeigen(partner.person.name, REFS.length - 1);
+  }
 }
-function toolOeffnen(i) {
+function zweitesToolZeigen(name, i) {
+  const alt = document.getElementById("zweitesTool"); if (alt) alt.remove();
+  const k = document.createElement("div"); k.id = "zweitesTool";
+  k.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:70;background:#fff;border:2px solid var(--ph-braun);border-radius:10px;padding:12px 16px;box-shadow:0 8px 30px rgba(0,0,0,.25);display:flex;gap:10px;align-items:center";
+  k.innerHTML = `<span>Doppelbesuch: auch bei <b>${esc(name)}</b> im Praktikumstool eintragen.</span>
+    <button class="knopf haupt" onclick="toolOeffnen(${i}, 'praktikumstool2'); document.getElementById('zweitesTool').remove()">Jetzt ${esc(name.split(" ").slice(-1)[0])} im Tool öffnen</button>
+    <button class="knopf klein" onclick="document.getElementById('zweitesTool').remove()">✕</button>`;
+  document.body.appendChild(k);
+}
+function toolOeffnen(i, fenster = "praktikumstool") {
   const link = REFS[i];
   if (!link) return;
   const b = Math.round(screen.availWidth / 2);
-  window.open(link.startsWith("http") ? link : TOOL + link, "praktikumstool", `popup,width=${b},height=${screen.availHeight},left=${b},top=0`);
+  window.open(link.startsWith("http") ? link : TOOL + link, fenster, `popup,width=${b},height=${screen.availHeight},left=${b},top=0`);
 }
 /* Übernehmen mit Termin: Lektion wählen oder Datum/Zeit eingeben, Checkliste prüfen */
 async function uebernehmen(i, nurTermin = false) {
