@@ -131,6 +131,10 @@ input.eingabe { font-size: 14px; padding: 4px 6px; border: 1px solid #ccc; borde
 .raster .rz { display: block; width: 100%; }
 .rz.doppel { padding: 7px 2px; border-color: #9a9a9a; font-weight: 600; }
 .rz.frei { background: #dcefd8; border-color: #8cc084; color: #1f4d1a; }
+th.pspalte, td.pspalte { width: 210px; min-width: 210px; }
+.ue { display: grid; grid-template-columns: 52px 54px auto 34px; gap: 4px; align-items: center; font-size: 12.5px; margin: 1px 0; font-variant-numeric: tabular-nums; }
+.ue .chip { font-size: 12px; text-align: center; }
+.ue-j { color: var(--leise); } .ue-d { color: var(--tinte); } .ue-w { text-align: left; }
 .paar { color: var(--ph-braun-dunkel); font-weight: 600; margin-bottom: 3px; text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 .einzeln { color: var(--leise); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 .pname { padding: 3px 0; border-top: 1px dashed #e2d9c8; }
@@ -510,7 +514,13 @@ function standBestimmen(x, altBesuch) {
   // aus der alten Liste (gleiches Jahr)
   const a = x.person && x.person.alt;
   const feld = { Halbtag: "pk01", Profil: "pk02", Quartal: "pk03", Abschluss: "diplom" }[x.gruppe];
-  const alt = altBesuch || (a && a[feld] && a[feld].sj === x.jahr ? a[feld] : null);
+  let alt = altBesuch || (a && a[feld] && a[feld].sj === x.jahr ? a[feld] : null);
+  if (!altBesuch && alt && x.gruppe === "Halbtag") {
+    const per = (periode(x).match(/Periode ([A-D])/) || [])[1];
+    const altPer = (alt.periode || "").trim();
+    // passt nur, wenn die Periode stimmt; ohne Periode in der alten Liste: nur das Praktikum mit Mathe-Besuch
+    if (altPer ? altPer !== per : !(x.fachbesuche > 0)) alt = null;
+  }
   let wer = alt && alt.wer ? alt.wer : "", stand = alt && alt.status ? alt.status : "", art = alt && alt.art ? alt.art : "", datum = alt && alt.datum ? alt.datum : "";
   if (stand === "besucht" && !wer) stand = "";
   if (x.quelle === "tool" && x.fachbesuche > 0 && stand !== "besucht") stand = x.jahr < S.einst.studienjahr ? "besucht" : "gebucht";
@@ -706,9 +716,13 @@ function aktionen(x) {
     k.push(`<button class="knopf klein" onclick="handlung('abgeben',${ref(x.idpraktikum)})">Abgeben</button>`);
   }
   if (x.link) k.push(`<button class="knopf klein" title="Im Praktikumstool öffnen (Fenster rechts)" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>`);
-  k.push(`<button class="knopf klein" title="Notiz zu diesem Praktikum" onclick="notizZu(REFS[${ref(x.idpraktikum)}])">Notiz${x.notizen && x.notizen.length ? " (" + x.notizen.length + ")" : ""}</button>`);
-  const letzte = x.notizen && x.notizen.length ? x.notizen[x.notizen.length - 1] : null;
-  return k.join(" ") + (letzte ? `<div class="klein leise" style="white-space:normal;max-width:260px;margin-top:3px">✎ ${esc(letzte.text)} <i>(${esc(letzte.wer)})</i></div>` : "");
+  if (S.ansicht === "termine") {
+    k.push(`<button class="knopf klein" title="Notiz zu diesem Praktikum" onclick="notizZu(REFS[${ref(x.idpraktikum)}])">Notiz${x.notizen && x.notizen.length ? " (" + x.notizen.length + ")" : ""}</button>`);
+    k.push(`<button class="knopf klein" title="z.B. «muss im Quartal besucht werden» oder eine Bemerkung zur Person" onclick="achtungSetzen(REFS[${ref(x.person.id)}])">Achtung / Bemerkung</button>`);
+    const letzte = x.notizen && x.notizen.length ? x.notizen[x.notizen.length - 1] : null;
+    return k.join(" ") + (letzte ? `<div class="klein leise" style="white-space:normal;max-width:300px;margin-top:3px">✎ ${esc(letzte.text)} <i>(${esc(letzte.wer)})</i></div>` : "");
+  }
+  return k.join(" ");
 }
 /* Mathe-Lektionen als kleine Knöpfe: Wochentag + Zeit, Klick springt im Tool zur Lektion */
 /* Mathe-Lektionen als kleines Wochenraster Mo–Fr; Klick öffnet alle möglichen Termine */
@@ -1139,8 +1153,13 @@ function periode(x) {
   return n;
 }
 
+let sucheUhr = null;
+function sucheTippen(v) {
+  clearTimeout(sucheUhr);
+  sucheUhr = setTimeout(() => { setzeFilter("ssuche", v); const e = $("#sSuche"); if (e) { e.focus(); e.setSelectionRange(v.length, v.length); } }, 300);
+}
 function ansichtStudierende() {
-  const such = fw("ssuche", "").toLowerCase().trim(), sg = fw("sg", "alle"), archiv = fw("archiv", false);
+  const such = fw("ssuche", "").toLowerCase().trim(), sg = fw("sg", "alle"), archiv = fw("archiv", false), sjF = fw("sSj", "alle"), sort = fw("sSort", "name");
   const sj = S.einst.studienjahr;
   const imArchiv = Object.values(R.personen).filter((p) => p.archiv).length;
   let liste = Object.values(R.personen).filter((p) => archiv ? p.archiv : !p.archiv);
@@ -1148,16 +1167,29 @@ function ansichtStudierende() {
   if (such) liste = liste.filter((p) => passtSuche([p.name, p.studiengang, ...(p.praktika.map((x) => x.schulort + " " + x.schulhaus))].join(" "), such));
   if (fw("nurAchtung", false)) liste = liste.filter((p) => (p.achtungen || []).length || p.praktika.some((x) => x.achtung && x.achtung.length));
   if (fw("nurBemerkung", false)) liste = liste.filter((p) => p.notizen.length || (p.alt && p.alt.bemerkung));
-  liste.sort((a, b) => a.name.localeCompare(b.name));
+  if (sjF !== "alle") liste = liste.filter((p) => p.praktika.some((x) => x.jahr === sjF));
+  const jahrgang = (p) => (p.alt && (p.alt.studiengang || "").match(/\d{2}/) || [])[0] || (p.praktika.find((x) => x.gruppe === "Halbtag") || {}).jahr || "";
+  liste.sort((a, b) => sort === "studiengang" ? (a.studiengang || "").localeCompare(b.studiengang || "") || a.name.localeCompare(b.name)
+    : sort === "jahrgang" ? String(jahrgang(b)).localeCompare(String(jahrgang(a))) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name));
+  // je Praktikum eine Zeile: Studienjahr (Periode) · Datum · Stand · Kürzel (NN = unbekannt)
+  const eintrag = (x) => {
+    const cls = { offen: "s-offen", "übernommen": "s-uebernommen", gebucht: "s-gebucht", besucht: "s-besucht" }[x.stand] || "s-nicht";
+    const per = x.gruppe === "Halbtag" ? (periode(x).match(/Periode ([A-D])/) || [, ""])[1] : "";
+    const d = x.termin ? x.termin.datum : x.datum;
+    const stand = { "übernommen": "reserviert", gebucht: "gebucht" }[x.stand] || x.stand;
+    const wer = ["besucht", "gebucht", "übernommen"].includes(x.stand) ? (x.wer || "NN") : "";
+    return `<div class="ue"><span class="ue-j">${sjText(x.jahr)}${per ? " " + per : ""}</span><span class="ue-d">${d ? esc(datumText(d).replace(/\.20(\d\d)$/, ".$1")) : ""}</span><span class="chip ${cls}">${esc(stand)}</span><b class="ue-w">${esc(wer)}</b></div>`;
+  };
   const zelle = (p, g) => {
     const xs = p.praktika.filter((x) => x.gruppe === g);
-    if (!xs.length) return `<span class="leise">–</span>`;
-    return xs.map((x) => `<div>${sjText(x.jahr)} ${standChip(x, true)}${g === "Quartal" ? ` <span class="n-${x.noetig === "später" ? "spaeter" : x.noetig} klein">${esc(x.noetig)}</span>` : ""}</div>`).join("");
+    return xs.length ? xs.map(eintrag).join("") : `<span class="leise">–</span>`;
   };
   const sgs = [...new Set(Object.values(R.personen).map((p) => (p.studiengang || "").replace(/[\s.\d]/g, "")).filter(Boolean))].sort();
   return `<h2>Studierende${archiv ? " – Archiv" : ""}</h2>
   <div class="filter">
-    <label title="Komma = oder · Leerzeichen = und · -Wort = ohne">Suche (Name, Ort, Schulhaus)<input type="search" value="${esc(fw("ssuche", ""))}" onchange="setzeFilter('ssuche',this.value)" placeholder="z.B. Sursee, Hochdorf -Neu"></label>
+    <label title="Komma = oder · Leerzeichen = und · -Wort = ohne">Suche (Name, Ort, Schulhaus)<input type="search" id="sSuche" value="${esc(fw("ssuche", ""))}" oninput="sucheTippen(this.value)" placeholder="z.B. Arnold oder Sursee"></label>
+    <label>Studienjahr<select onchange="setzeFilter('sSj',this.value)"><option value="alle">alle</option>${jahre().map((j) => `<option value="${j}" ${j === sjF ? "selected" : ""}>${sjText(j)}</option>`).join("")}</select></label>
+    <label>Sortieren<select onchange="setzeFilter('sSort',this.value)">${[["name", "Name"], ["studiengang", "Studiengang"], ["jahrgang", "Jahrgang"]].map(([v, t]) => `<option value="${v}" ${v === sort ? "selected" : ""}>${t}</option>`).join("")}</select></label>
     <button class="knopf klein" onclick="listeKopieren()" title="Kopiert die Liste in die Zwischenablage – danach in Excel oder eine Mail einfügen (Cmd+V / Ctrl+V)">Liste für Excel kopieren</button>
     <label>Studiengang<select onchange="setzeFilter('sg',this.value)"><option value="alle">alle</option>${sgs.map((s) => `<option ${s === sg ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></label>
     <label class="haken" title="Archiv: alle Praktika abgeschlossen oder seit zwei Jahren kein Praktikum"><input type="checkbox" ${archiv ? "checked" : ""} onchange="setzeFilter('archiv',this.checked)"> Archiv zeigen (${imArchiv} abgeschlossen)</label>
@@ -1165,7 +1197,7 @@ function ansichtStudierende() {
     <label class="haken"><input type="checkbox" ${fw("nurBemerkung", false) ? "checked" : ""} onchange="setzeFilter('nurBemerkung',this.checked)"> nur mit Bemerkung</label>
     <span class="leise klein">${liste.length} Personen</span>
   </div>
-  <table class="liste"><thead><tr><th></th><th>Name</th><th>Studiengang</th><th>Fächer</th><th>Halbtag</th><th>Profil</th><th>Quartal</th><th>Achtung / Bemerkung</th><th></th></tr></thead><tbody>
+  <table class="liste"><thead><tr><th></th><th>Name</th><th>Studiengang</th><th>Fächer</th><th class="pspalte">Halbtag</th><th class="pspalte">Profil</th><th class="pspalte">Quartal</th><th>Achtung / Bemerkung</th><th></th></tr></thead><tbody>
   ${liste.map((p) => { const a = (p.achtungen || []).length || p.praktika.some((x) => x.achtung && x.achtung.length);
     const bem = [...(p.achtungen || []).map((x) => `<div class="rot">⚠ im ${esc(x.fuer)} besuchen${x.text ? ": " + esc(x.text) : ""}
         <button class="knopf klein" title="ändern" onclick="achtungSetzen(REFS[${ref(p.id)}], REFS[${ref(x.id)}])">ändern</button>
@@ -1173,7 +1205,7 @@ function ansichtStudierende() {
                  ...p.notizen.slice(-1).map((x) => `<div>${esc(x.text.slice(0, 80))}</div>`), ...(!p.notizen.length && p.alt && p.alt.bemerkung ? [`<div class="leise">${esc(p.alt.bemerkung.slice(0, 80))}</div>`] : [])].join("");
     return `<tr class="${a ? "zeile-achtung" : ""}"><td>${a ? `<span class="achtung">⚠</span>` : ""}</td><td class="name" onclick="detailZeigen(REFS[${ref(p.id)}])">${esc(p.name)}</td>
     <td>${esc(p.studiengang || "")}</td><td class="klein">${esc((p.faecher || []).join(", "))}</td>
-    <td>${zelle(p, "Halbtag")}</td><td>${zelle(p, "Profil")}</td><td>${zelle(p, "Quartal")}</td><td class="klein">${bem}</td>
+    <td class="pspalte">${zelle(p, "Halbtag")}</td><td class="pspalte">${zelle(p, "Profil")}</td><td class="pspalte">${zelle(p, "Quartal")}</td><td class="klein">${bem}</td>
     <td style="white-space:nowrap"><button class="knopf klein" onclick="achtungSetzen(REFS[${ref(p.id)}])">Achtung / Bemerkung</button></td></tr>`; }).join("")}
   </tbody></table>`;
 }
