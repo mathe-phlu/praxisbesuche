@@ -550,8 +550,10 @@ function zeichnen() {
   REFS.length = 0;
   for (const b of document.querySelectorAll("#nav button")) b.classList.toggle("aktiv", b.dataset.ansicht === S.ansicht);
   const ich = $("#ich");
-  const doz = S.einst.dozierende.map((d) => d.kuerzel);
-  ich.innerHTML = `<option value="">–</option>` + doz.map((k) => `<option ${k === S.ich ? "selected" : ""}>${esc(k)}</option>`).join("");
+  // nur Dozierende mit Namen (ohne Namen = frühere, nur für den Verlauf)
+  const mitName = S.einst.dozierende.filter((d) => d.name);
+  const doz = (mitName.length ? mitName : S.einst.dozierende);
+  ich.innerHTML = `<option value="">–</option>` + doz.map((d) => `<option value="${esc(d.kuerzel)}" ${d.kuerzel === S.ich ? "selected" : ""}>${esc(d.kuerzel)}${d.name ? " – " + esc(d.name) : ""}</option>`).join("");
   if (!window.showDirectoryPicker && !window.__testOrdner) $("#ordnerstatus").innerHTML = '<b style="color:#fff;background:#a33a2e;padding:2px 8px;border-radius:4px">Falscher Browser – speichert nicht</b>';
   else $("#ordnerstatus").innerHTML = S.ordner ? `Ordner: ${esc((S.wurzel || S.ordner).name)}` : "";
   const app = $("#app");
