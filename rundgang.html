@@ -971,7 +971,7 @@ function termineZeigen(i, ip) {
   $("#frageFeld").innerHTML = `<p class="klein leise" style="margin-top:0">Freie Mathe-Lektionen, die nach der Checkliste möglich sind${gesperrt ? ` (${gesperrt} ausgeblendet: erste Tage, letzter Tag, Arbeitssitzung, oder die Person hat an diesem Tag bzw. in dieser Woche schon genug Besuche – gemäss «Angemeldete Besuche» im Tool beim letzten Einlesen. Andere Fächer können seither gebucht haben: im Tool kurz prüfen)` : ""}.
       Mit der Maus über einen Termin: Klasse und Zeit danach.</p>
     ${ohneBesprechungTrotzdem(x, l) ? `<p class="einr-hinweis" style="margin:0 0 8px;border-color:#c0392b"><b>Muss besucht werden</b>, hat aber keinen Termin mit Zeit zum Besprechen direkt danach – darum hier alle Termine (Besprechung z. B. später oder online).</p>` : ""}
-    <p class="einr-hinweis" style="margin:0 0 8px"><b>Termin anklicken = übernehmen.</b> Das Praktikumstool öffnet sich danach sofort in einem neuen Fenster bei dieser Woche – dort «Besuch eintragen».</p>
+    <p class="einr-hinweis" style="margin:0 0 8px"><b>Termin anklicken = übernehmen.</b> Das Praktikumstool öffnet sich danach sofort in einem eigenen Fenster rechts daneben, bei dieser Woche – dort «Besuch eintragen».</p>
     <div class="leg-zeile"><span class="rz">9:10</span> Einzellektion <span class="rz doppel">8:20</span> Doppellektion
       <span class="trenn">|</span> <span class="rz frei">10:15</span> danach frei zum Besprechen <span class="rz">13:35</span> danach Unterricht</div>
     <div class="wochen">${Object.entries(wochen).sort().map(([mo, tage]) => `<div class="woche"><div class="wk">Woche ab ${esc(kurzDatum(mo))}</div>
@@ -1019,10 +1019,14 @@ function doppelToolZeigen(personen, wann) {
   document.body.appendChild(k);
 }
 /* Praktikumstool als Pop-up-Fenster mittig über der Seite: eintragen, Fenster schliessen, weiter hier */
+/* Tool-Fenster rechts neben diesem Fenster, volle Höhe: hat es rechts Platz, dort; sonst die rechte Bildschirmhälfte */
 function popupMasse() {
-  const w = Math.min(1250, Math.round(screen.availWidth * 0.8)), h = Math.round(screen.availHeight * 0.85);
-  const l = Math.round((screen.availWidth - w) / 2 + (screen.availLeft || 0)), t = Math.round((screen.availHeight - h) / 2 + (screen.availTop || 0));
-  return `popup=yes,width=${w},height=${h},left=${l},top=${t}`;
+  const al = screen.availLeft || 0, at = screen.availTop || 0, aw = screen.availWidth, ah = screen.availHeight;
+  const rechts = al + aw - (window.screenX + window.outerWidth);
+  let w, l;
+  if (rechts >= 650) { w = rechts; l = window.screenX + window.outerWidth; }
+  else { w = Math.max(700, Math.round(aw / 2)); l = al + aw - w; }
+  return `popup=yes,width=${Math.round(w)},height=${ah},left=${Math.round(l)},top=${at}`;
 }
 function toolOeffnen(i, fenster = "pbFenster", vorab = null) {
   const link = REFS[i];
