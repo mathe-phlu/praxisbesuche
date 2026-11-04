@@ -37,6 +37,8 @@ h3 { font-size: 17px; margin: 22px 0 8px; }
 .klein { font-size: 13px; }
 button.knopf { font-size: 14px; padding: 6px 12px; border-radius: 6px; border: 1px solid #bbb; background: #fff; cursor: pointer; }
 button.knopf:hover { background: var(--grau); }
+.akt { display: flex; gap: 4px; align-items: center; }
+.akt-rechts { margin-left: auto; padding-left: 4px; }
 button.knopf.haupt { background: var(--ph-braun); color: #fff; border-color: var(--ph-braun); }
 button.knopf.haupt:hover { background: var(--ph-braun-dunkel); }
 h2, h3 { color: var(--ph-braun-dunkel); }
@@ -696,7 +698,7 @@ function geheZu(a, filter) { S.ansicht = a; merke("ansicht", a); if (filter) Obj
 function standChip(x, kurz = false, ohneWer = false) {
   const cls = { offen: "s-offen", "übernommen": "s-uebernommen", gebucht: "s-gebucht", besucht: "s-besucht", "nicht nötig": "s-nicht" }[x.stand] || "s-nicht";
   const wer = ohneWer ? "" : x.wer ? ` · ${esc(x.wer)}` : x.dozentTool ? ` · ${esc(x.dozentTool)}` : "";
-  const t = !kurz && x.termin && x.stand !== "besucht" ? ` · ${esc(kurzDatum(x.termin.datum))} ${esc(x.termin.zeit || "")}` : "";
+  const t = "";   // der Termin steht in «Meine Termine», nicht beim Stand
   const doppelt = x.doppelt && x.doppelt.length ? ` <span class="hinweis" title="Mehrere haben übernommen – bitte absprechen">doppelt: ${esc(x.doppelt.join(", "))}</span>` : "";
   // Wer übernimmt, bucht gleichzeitig im Praktikumstool – darum gibt es nur «gebucht»
   const text = { "übernommen": "gebucht" }[x.stand] || x.stand;
@@ -716,14 +718,16 @@ function aktionen(x) {
     k.push(`<button class="knopf klein" title="Anderen Termin wählen (im Praktikumstool auch umbuchen)" onclick="uebernehmen(${ref(x.idpraktikum)}, true)">Termin ändern</button>`);
     k.push(`<button class="knopf klein" title="Aus meiner Liste nehmen – jemand anderes kann übernehmen (im Praktikumstool die Buchung löschen)" onclick="handlung('abgeben',${ref(x.idpraktikum)})">Abgeben</button>`);
   }
-  if (x.link) k.push(`<button class="knopf klein" title="Im Praktikumstool öffnen (Fenster rechts)" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>`);
+  const tool = x.link ? `<button class="knopf klein" title="Im Praktikumstool öffnen (Fenster rechts)" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>` : "";
   if (S.ansicht === "termine") {
     k.push(`<button class="knopf klein" title="z.B. «muss im Quartal besucht werden» oder eine Bemerkung zur Person" onclick="achtungSetzen(REFS[${ref(x.person.id)}])">Achtung / Bemerkung</button>`);
     const letzte = x.notizen && x.notizen.length ? x.notizen[x.notizen.length - 1] : null;
-    return k.join(" ") + (letzte ? `<div class="klein leise" style="white-space:normal;max-width:300px;margin-top:3px">✎ ${esc(letzte.text)} <i>(${esc(letzte.wer)})</i></div>` : "");
+    return reihe(k, tool) + (letzte ? `<div class="klein leise" style="white-space:normal;max-width:300px;margin-top:3px">✎ ${esc(letzte.text)} <i>(${esc(letzte.wer)})</i></div>` : "");
   }
-  return k.join(" ");
+  return reihe(k, tool);
 }
+/* Knöpfe nebeneinander, «Tool ↗» immer ganz rechts */
+function reihe(k, tool) { return `<div class="akt">${k.join("")}<span class="akt-rechts">${tool}</span></div>`; }
 /* Mathe-Lektionen als kleine Knöpfe: Wochentag + Zeit, Klick springt im Tool zur Lektion */
 /* Mathe-Lektionen als kleines Wochenraster Mo–Fr; Klick öffnet alle möglichen Termine */
 function legende() {
@@ -1148,7 +1152,6 @@ function ansichtHalbtag() {
 function paarAktionen([a, b]) {
   const k = [];
   if ([a, b].some((x) => x.stand === "offen")) k.push(`<button class="knopf klein" onclick="termineZeigen(${ref(a.idpraktikum)}, ${ref(b.idpraktikum)})">Beide übernehmen</button>`);
-  for (const x of [a, b]) if (x.wer === S.ich && x.stand !== "besucht") k.push(`<button class="knopf klein" onclick="erledigt(${ref(x.idpraktikum)})">Erledigt ${esc(x.person.name.split(" ")[0])}</button>`);
   for (const x of [a, b]) if (x.link) k.push(`<button class="knopf klein" title="${esc(x.person.name)} im Praktikumstool" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ${esc(x.person.name.split(" ")[0])} ↗</button>`);
   return k.join("<br>");
 }
