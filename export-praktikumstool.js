@@ -80,7 +80,9 @@
     for (let i = 0; i < liste.length; i++) {
       hinweis.textContent = `Stundenpläne ${i + 1} / ${liste.length} …`;
       const html = await (await fetch(liste[i].link, { credentials: "include" })).text();
-      liste[i].lektionen = matheLektionen(new DOMParser().parseFromString(html, "text/html"));
+      const seite = new DOMParser().parseFromString(html, "text/html");
+      liste[i].lektionen = matheLektionen(seite);
+      liste[i].besuche = angemeldeteBesuche(seite);
       await new Promise((r) => setTimeout(r, 150));
     }
   }
@@ -175,6 +177,15 @@
       window.addEventListener("message", antwort);
       fenster.postMessage({ typ: "praxisbesuche-hallo" }, "*");
     });
+  }
+
+  // Tabelle «Angemeldete Besuche»: alle gebuchten Besuche (alle Fächer) mit Datum, Zeit, Fach, Dozent/in
+  function angemeldeteBesuche(doc) {
+    const t = [...doc.querySelectorAll("table")].find((t) => t.rows[0] && /Datum/.test(t.rows[0].textContent) && /Dozierende/.test(t.rows[0].textContent));
+    if (!t) return [];
+    return [...t.rows].slice(1).map((r) => [...r.cells].map((c) => c.textContent.trim().replace(/\s+/g, " "))).filter((z) => z.length >= 5)
+      .map((z) => { const m = z[0].match(/(\d\d)\.(\d\d)\.(\d{4})/);
+        return { datum: m ? `${m[3]}-${m[2]}-${m[1]}` : z[0], zeit: z[1], dauer: z[2], fach: z[3], dozent: z[4].split("/")[0].trim(), klasse: z[5] || "" }; });
   }
 
   function jahreAus(text) {

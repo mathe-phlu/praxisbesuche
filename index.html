@@ -516,7 +516,22 @@ function standBestimmen(x, altBesuch) {
   if (x.quelle === "tool" && x.fachbesuche > 0 && stand !== "besucht") stand = x.jahr < S.einst.studienjahr ? "besucht" : "gebucht";
   // Im Praktikumstool gebuchte Besuche: wer (Name der Mathe-Dozierenden) und wann (Lektion) aus dem Stundenplan
   let termin = null;
-  if (x.quelle === "tool" && x.lektionen) {
+  if (x.quelle === "tool" && x.besuche) {
+    const doz = (S.einst.dozierende || []).filter((d) => d.name);
+    for (const v of x.besuche.filter((v) => v.fach === "MA")) {
+      const text = v.dozent.toLowerCase();
+      const d = doz.find((d) => d.name.toLowerCase().split(/\s+/).every((t) => text.includes(t)));
+      if (!wer) wer = d ? d.kuerzel : "";
+      x.dozentTool = v.dozent;
+      if (!d || d.kuerzel === wer) {
+        const l = (x.lektionen || []).find((l) => l.datum === v.datum && l.zeit === v.zeit) || {};
+        termin ||= { datum: v.datum, zeit: v.zeit, bis: l.bis || "", lektion: l.id || "", imTool: true };
+      }
+      stand = v.datum < new Date().toISOString().slice(0, 10) ? "besucht" : "gebucht";
+      if (stand === "besucht" && !datum) datum = v.datum;
+    }
+  }
+  if (x.quelle === "tool" && x.lektionen && !x.besuche) {
     const doz = (S.einst.dozierende || []).filter((d) => d.name);
     for (const l of x.lektionen) for (const g of l.gebucht || []) {
       const text = g.toLowerCase();
@@ -670,7 +685,7 @@ function geheZu(a, filter) { S.ansicht = a; merke("ansicht", a); if (filter) Obj
 
 function standChip(x, kurz = false) {
   const cls = { offen: "s-offen", "übernommen": "s-uebernommen", gebucht: "s-gebucht", besucht: "s-besucht", "nicht nötig": "s-nicht" }[x.stand] || "s-nicht";
-  const wer = x.wer ? ` · ${esc(x.wer)}` : "";
+  const wer = x.wer ? ` · ${esc(x.wer)}` : x.dozentTool ? ` · ${esc(x.dozentTool)}` : "";
   const t = !kurz && x.termin && x.stand !== "besucht" ? ` · ${esc(kurzDatum(x.termin.datum))} ${esc(x.termin.zeit || "")}` : "";
   const doppelt = x.doppelt && x.doppelt.length ? ` <span class="hinweis" title="Mehrere haben übernommen – bitte absprechen">doppelt: ${esc(x.doppelt.join(", "))}</span>` : "";
   return `<span class="chip ${cls}">${esc(x.stand)}${wer}${t}</span>${doppelt}`;
@@ -847,7 +862,7 @@ function terminWarnungen(x, datum, zeit) {
   const meine = R.praktika.filter((y) => y !== x && y.wer === S.ich && y.termin && y.termin.datum === datum && vormittag(y.termin.zeit) === vormittag(zeit));
   if (meine.length) w.push(`am selben ${vormittag(zeit) ? "Vormittag" : "Nachmittag"} schon: ${meine.map((y) => y.person.name).join(", ")}`);
   // die Person: nicht 2 Besuche am selben Tag, höchstens 2 pro Woche
-  const besuche = [...(x.lektionen || []).filter((l) => l.gebucht && l.gebucht.length).map((l) => l.datum),
+  const besuche = [...(x.besuche || []).map((v) => v.datum), ...(x.lektionen || []).filter((l) => l.gebucht && l.gebucht.length).map((l) => l.datum),
                    ...R.praktika.filter((y) => y !== x && y.person === x.person && y.termin).map((y) => y.termin.datum)];
   if (besuche.includes(datum)) w.push("an diesem Tag hat die Person schon einen Besuch");
   const kw = (iso) => { const d = new Date(iso + "T12:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
