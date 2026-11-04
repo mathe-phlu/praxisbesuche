@@ -169,6 +169,8 @@ table.regeln td { padding: 3px 8px 3px 0; }
 details.karte summary { cursor: pointer; }
 .legende-box { background: #fff; border: 1px solid var(--linie); border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; font-size: 13.5px; }
 .leg-gitter { display: grid; grid-template-columns: repeat(2, minmax(0, max-content)); gap: 6px 28px; margin: 8px 0; align-items: center; }
+.leg-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; margin: 0 0 10px; padding: 6px 8px; background: var(--ph-sand); border-radius: 6px; }
+.leg-zeile .rz { width: 44px; } .leg-zeile .trenn { color: #c9b896; margin: 0 6px; }
 .leg-paar { display: flex; align-items: center; gap: 8px; }
 .leg-paar .rz { width: 46px; }
 .leg-schritte { display: flex; flex-wrap: wrap; gap: 6px 14px; padding-top: 8px; border-top: 1px dashed var(--linie); }
@@ -890,6 +892,20 @@ function lektionenZelle(x, partner) {
   return `<div class="raster" title="Klick: alle Termine anzeigen" onclick="termineZeigen(${ref(x.idpraktikum)}${partner ? ", " + ref(partner.idpraktikum) : ""})">${spalten}</div>`;
 }
 /* Fenster mit allen möglichen Mathe-Terminen, Woche für Woche */
+/* Spalte «Buchen»: ein Knopf öffnet die grosse Ansicht; darunter klein, an welchen Tagen Mathe ist */
+function buchenZelle(x, partner) {
+  if (x.wer === S.ich && x.stand !== "besucht")
+    return `<button class="knopf klein" title="Aus meiner Liste nehmen – danach öffnet sich das Praktikumstool, dort die Buchung löschen" onclick="handlung('abgeben',${ref(x.idpraktikum)})">Termin wieder abgeben</button>`;
+  if (x.stand === "besucht") return "";
+  if (!x.lektionen) return (x.stand === "offen" || x.stand === "nicht nötig")
+    ? `<button class="knopf klein" title="Kein Stundenplan eingelesen – Termin von Hand eingeben" onclick="uebernehmen(${ref(x.idpraktikum)})">Ich übernehme</button>` : "";
+  if (x.wer && x.wer !== S.ich) return "";
+  const l = lektionenIm(x);
+  if (!l.length) return `<span class="leise klein">keine passende Lektion</span>`;
+  const tage = ["Mo", "Di", "Mi", "Do", "Fr"].filter((t) => l.some((a) => wochentag(a.datum) === t));
+  return `<button class="knopf klein haupt" title="Alle möglichen Termine anzeigen – anklicken bucht" onclick="termineZeigen(${ref(x.idpraktikum)}${partner ? ", " + ref(partner.idpraktikum) : ""})">${partner ? "Termine (beide) ▸" : "Termine ▸"}</button>
+    <div class="leise klein" style="margin-top:2px">${tage.join(" ")} · ${l.length} Termin${l.length === 1 ? "" : "e"}</div>`;
+}
 function termineZeigen(i, ip) {
   const x = R.praktika.find((p) => p.idpraktikum === REFS[i]);
   const partner = ip !== undefined ? R.praktika.find((p) => p.idpraktikum === REFS[ip]) : null;
@@ -901,7 +917,9 @@ function termineZeigen(i, ip) {
   const d = $("#frage");
   $("#frageText").textContent = `${x.person.name}${partner ? " + " + partner.person.name + " (Doppelbesuch)" : ""} · ${x.gruppe} · ${x.schulort || ""} ${x.schulhaus ? "(" + x.schulhaus + ")" : ""}`;
   $("#frageFeld").innerHTML = `<p class="klein leise" style="margin-top:0">Freie Mathe-Lektionen, die nach der Checkliste möglich sind${gesperrt ? ` (${gesperrt} ausgeblendet: erste Tage, letzter Tag, Arbeitssitzung, oder die Person hat an diesem Tag bzw. in dieser Woche schon genug Besuche – gemäss «Angemeldete Besuche» im Tool beim letzten Einlesen. Andere Fächer können seither gebucht haben: im Tool kurz prüfen)` : ""}.
-      Grün = danach Zeit zum Besprechen. Mit der Maus über einen Termin: Klasse und Zeit danach. <b>Termin anklicken = übernehmen.</b></p>
+      Mit der Maus über einen Termin: Klasse und Zeit danach. <b>Termin anklicken = übernehmen.</b></p>
+    <div class="leg-zeile"><span class="rz">9:10</span> Einzellektion <span class="rz doppel">8:20</span> Doppellektion
+      <span class="trenn">|</span> <span class="rz frei">10:15</span> danach frei zum Besprechen <span class="rz">13:35</span> danach Unterricht</div>
     <div class="wochen">${Object.entries(wochen).sort().map(([mo, tage]) => `<div class="woche"><div class="wk">Woche ab ${esc(kurzDatum(mo))}</div>
       ${Object.entries(tage).map(([tag, ls]) => `<div class="wt"><div class="rk">${tag}${ls.length ? " " + esc(ls[0].datum.slice(8, 10) + "." + ls[0].datum.slice(5, 7) + ".") : ""}</div>
         ${ls.map((a) => `<button type="button" class="rz knopfz ${(a.anzahl || 1) > 1 ? "doppel" : ""} ${besprechung(a) ? "frei" : ""}" title="${esc(blockText(a))}"
@@ -1282,15 +1300,14 @@ function ansichtPlanung() {
   </div>
   <div class="mitfilter">${filterLeiste("planung", liste.length)}<div class="inhalt">
   ${aktivLeiste("planung", liste.length)}
-  ${legende()}
-  ${liste.length ? `<table class="liste spalten"><thead><tr><th></th><th>Name</th><th>Prakt.</th><th>Zeitraum</th><th>Schule</th><th title="Besuch nötig?">nötig</th><th>Stand</th><th>Mathe-Lektionen</th><th></th></tr></thead><tbody>
+  ${liste.length ? `<table class="liste spalten"><thead><tr><th></th><th>Name</th><th>Prakt.</th><th>Zeitraum</th><th>Schule</th><th title="Besuch nötig?">nötig</th><th>Stand</th><th>Buchen</th></tr></thead><tbody>
   ${liste.map((x) => `<tr class="${x.achtung.length ? "zeile-achtung" : ""}">
     <td>${achtungZeichen(x)}</td>
     <td class="name" title="Fächer: ${esc((x.faecher || []).join(", "))}" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}<div class="leise klein">${esc(x.person.studiengang || "")} · ${esc((x.faecher || []).join(", "))}</div></td>
     <td>${esc(x.gruppe)}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
     <td class="noetig"><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}" title="${esc(x.warum)}">${esc({ optional: "opt.", später: "später" }[x.noetig] || x.noetig)}</span>${x.achtung.length ? `<div class="klein rot" title="${esc(x.achtung.map((f) => f.hinweis).join(" · "))}">⚠ Pflicht</div>` : ""}</td>
-    <td>${standChip(x)}</td><td>${lektionenZelle(x)}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`).join("")}
+    <td>${standChip(x)}</td><td style="white-space:nowrap">${buchenZelle(x)}</td></tr>`).join("")}
   </tbody></table>` : `<div class="leer">Keine Praktika für diese Auswahl.</div>`}</div></div>`;
 }
 
@@ -1370,16 +1387,14 @@ function ansichtHalbtag() {
   <div class="kacheln">${k("Personen", alle.length)}${k("Paare / einzeln", `${zeilen.filter((z) => z.length === 2).length} / ${zeilen.filter((z) => z.length === 1).length}`)}${k("eingeteilt", alle.filter((p) => ["übernommen", "gebucht"].includes(p.stand)).length)}${k("besucht", alle.filter((p) => p.stand === "besucht").length)}${k("offen", alle.filter((p) => p.stand === "offen").length)}</div>
   <div class="mitfilter">${filterLeiste("halbtag", liste.length)}<div class="inhalt">
   ${aktivLeiste("halbtag", liste.length)}
-  ${legende()}
-  ${zeilen.length ? `<table class="liste spalten"><thead><tr><th>Studierende</th><th>Periode</th><th>Zeitraum</th><th>Schule</th><th>Stand</th><th>Mathe-Lektionen</th><th></th></tr></thead><tbody>
+  ${zeilen.length ? `<table class="liste spalten"><thead><tr><th>Studierende</th><th>Periode</th><th>Zeitraum</th><th>Schule</th><th>Stand</th><th>Buchen</th></tr></thead><tbody>
   ${zeilen.map((z) => { const x = z[0];
     return `<tr class="${z.some((y) => y.achtung.length) ? "zeile-achtung" : ""}">
     <td><div class="klein ${z.length === 2 ? "paar" : "einzeln"}">${z.length === 2 ? "Paar · Doppelbesuch" : "einzeln"}</div>${z.map(name).join("")}</td>
     <td class="klein">${esc(periode(x))}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
     <td>${z.map((y) => `<div>${standChip(y)}</div>`).join("")}</td>
-    <td>${lektionenZelle(x, z[1])}</td>
-    <td style="white-space:nowrap">${z.length === 2 ? paarAktionen(z) : aktionen(x)}</td></tr>`; }).join("")}
+    <td style="white-space:nowrap">${z.length === 2 && !z.some((y) => y.wer === S.ich) ? buchenZelle(x, z[1]) : z.map((y) => buchenZelle(y)).filter(Boolean).join("<br>")}</td></tr>`; }).join("")}
   </tbody></table>` : `<div class="leer">Keine Halbtagespraktika für diese Auswahl.</div>`}</div></div>`;
 }
 function paarAktionen([a, b]) {
@@ -1463,11 +1478,11 @@ const HILFE = [
     <li>Reiter <b>Profil &amp; Quartal</b> öffnen.</li>
     <li>Standardmässig ausgeblendet: Personen, die du schon besucht hast («nicht schon von mir besucht» – mit ✕ ausschalten).</li>
     <li>Oben den <b>Filter</b> aufklappen: Praktikum, Besuch nötig, Stand. Bei Bedarf <b>Wann</b> (Tag, Vormittag, Doppellektion), <b>Wo</b> (Ort, Umkreis) und <b>Weitere</b>.</li>
-    <li>In der Spalte <b>Mathe-Lektionen</b> siehst du pro Person den Wochenplan Mo–Fr.</li>
+    <li>In der Spalte <b>Buchen</b> steht unter «Termine ▸», an welchen Tagen Mathe ist und wie viele Termine möglich sind.</li>
     <li>Aktive Filter stehen über der Liste – mit ✕ sind sie wieder weg.</li></ol>
     ${legendeKurz()}`],
   ["uebernehmen", "Termin übernehmen", "Buchen – hier und im Tool", `<ol class="schritte">
-    <li>Auf den <b>Wochenplan</b> der Person klicken.</li>
+    <li>In der Spalte <b>Buchen</b> auf <b>Termine ▸</b> klicken.</li>
     <li>Die grosse Ansicht zeigt alle möglichen Termine, Woche für Woche. Termine, die gegen die Regeln verstossen, sind schon weg.</li>
     <li>Termin anklicken → <b>Übernehmen</b>. Jetzt ist er hier als <span class="chip s-gebucht">gebucht</span> erfasst.</li>
     <li>Das Praktikumstool öffnet sich bei dieser Woche: dort <b>«Besuch eintragen»</b>.</li></ol>
@@ -1483,7 +1498,7 @@ const HILFE = [
   ["halbtag", "Halbtagespraktikum", "Was ist anders?", `<ol class="schritte">
     <li>Reiter <b>Halbtagespraktikum</b>. Filter nach <b>Periode</b> (A–D) statt nach Tag.</li>
     <li>Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als <b>Paar</b> untereinander.</li>
-    <li>Klick auf den Wochenplan des Paars bucht den <b>Doppelbesuch</b> für beide.</li>
+    <li><b>Termine (beide) ▸</b> beim Paar bucht den <b>Doppelbesuch</b> für beide.</li>
     <li>Im Tool bei <b>beiden</b> den Besuch eintragen.</li></ol>
     <p class="leise">Die Regeln von Profil und Quartal (erste Tage, letzter Tag, ein Besuch pro Vormittag, zwei pro Woche) gelten hier nicht.</p>`],
   ["studierende", "Studierende", "Alle Praktika einer Person", `<ol class="schritte">
@@ -1499,9 +1514,8 @@ const HILFE = [
     <li>Regeln aus der Checkliste, Spezialfälle und Soll stehen unter <b>Aktualisieren</b>.</li></ul>`],
 ];
 function legendeKurz() {
-  return `<div class="leg-gitter" style="margin-top:12px">
-      <div class="leg-paar"><span class="rz">9:10</span> <b>Einzellektion</b></div><div class="leg-paar"><span class="rz doppel">8:20</span> <b>Doppellektion</b></div>
-      <div class="leg-paar"><span class="rz frei">10:15</span> <b>danach frei</b> <span class="leise">zum Besprechen</span></div><div class="leg-paar"><span class="rz">13:35</span> <b>danach Unterricht</b></div></div>`;
+  return `<p class="leise" style="margin-top:12px">In der grossen Ansicht steht oben diese Legende:</p><div class="leg-zeile"><span class="rz">9:10</span> Einzellektion <span class="rz doppel">8:20</span> Doppellektion
+      <span class="trenn">|</span> <span class="rz frei">10:15</span> danach frei zum Besprechen <span class="rz">13:35</span> danach Unterricht</div>`;
 }
 function hilfeWahl(k) { merke("hilfe", k); zeichnen(); }
 function ansichtHilfe() {
@@ -1926,22 +1940,21 @@ setInterval(() => {
 window.addEventListener("load", () => setTimeout(rundgangStart, 900));
 const SCHRITTE = [
   { ansicht: "start", titel: "Willkommen", text: "In zwei Minuten durch die Praxisbesuche – mit erfundenen Beispieldaten. Mit «Weiter» geht es zum nächsten Schritt.", vorher: () => geheZu("start") },
-  { ziel: "#ich", ansicht: "start", titel: "Wer bin ich?", text: "Oben rechts das eigene Kürzel wählen (hier im Beispiel: clu). Dann gehören «Ich übernehme» und «Meine Termine» dir. Den Rundgang kann man jederzeit mit «✕ Beenden» abbrechen oder unten direkt zu einem Schritt springen.", vorher: () => { S.ich = "clu"; merke("ich", "clu"); zeichnen(); } },
+  { ziel: "#ich", ansicht: "start", titel: "Wer bin ich?", text: "Oben rechts das eigene Kürzel wählen (hier im Beispiel: clu). Dann gehören deine Buchungen und «Meine Termine» dir. Den Rundgang kann man jederzeit mit «✕ Beenden» abbrechen oder unten direkt zu einem Schritt springen.", vorher: () => { S.ich = "clu"; merke("ich", "clu"); zeichnen(); } },
   { ziel: "nav button[data-ansicht=planung]", ansicht: "planung", titel: "Profil & Quartal", text: "Hier wird geplant: alle Profil-, Quartals- und Spezialpraktika des Studienjahrs.", vorher: () => geheZu("planung") },
-  { ziel: ".filterbox .fsek", ansicht: "planung", titel: "Grundauswahl", text: "Welche Praktika, ob ein Besuch nötig ist, und der Stand (offen, übernommen, besucht). Ein Klick schaltet um." },
+  { ziel: ".filterbox .fsek", ansicht: "planung", titel: "Grundauswahl", text: "Welche Praktika, ob ein Besuch nötig ist, und der Stand (offen, gebucht, besucht). Standardmässig ausgeblendet: wen du schon besucht hast. Ein Klick schaltet um." },
   { ziel: ".filterbox details", ansicht: "planung", titel: "Wann", text: "Der ganze Filter lässt sich oben auf- und zuklappen. Aufklappen: Zeitraum, Tag, Vormittag/Nachmittag, Einzel- oder Doppellektion und «danach Zeit zum Besprechen».", vorher: () => { const d = document.querySelector(".filterbox details"); if (d) d.open = true; } },
   { ziel: ".aktivleiste", ansicht: "planung", titel: "Was gerade gefiltert ist", text: "Über der Liste stehen die aktiven Filter. Mit ✕ ist einer wieder weg." },
   { ziel: "#app table.liste tbody tr .name", ansicht: "planung", titel: "Name anklicken", text: "Ein Klick auf den Namen öffnet rechts die Grundinformationen: alle Praktika, wer schon besucht hat, Bemerkungen und Achtung-Vermerke.",
     vorher: () => { const n = document.querySelector("#app table.liste tbody tr .name"); if (n) n.click(); }, nachher: () => detailZu() },
-  { ziel: ".legende-box", ansicht: "planung", titel: "Mathe-Lektionen lesen", text: "Hohes Kästchen = Doppellektion, flaches = Einzellektion. Grün = danach ist Zeit zum Besprechen. Die Erklärung lässt sich auf- und zuklappen, der Knopf rechts blendet den Stundenplan aus und ein.",
-    vorher: () => { merke("raster", "auf"); merke("legende", "auf"); zeichnen(); } },
-  { ziel: ".raster", ansicht: "planung", titel: "Wochenraster", text: "Für jede Person: an welchen Tagen und wann Mathe ist. Termine, die nach der Checkliste nicht gehen, sind schon weg – auch Tage, an denen die Person schon einen Besuch hat (alle Fächer, Stand letztes Einlesen), und Wochen mit schon 2 Besuchen. Gleiche Lektion wie ein anderer Besuch (Doppelbesuch) bleibt möglich." },
-  { ziel: "#frageFeld .woche", ansicht: "planung", titel: "Grosse Ansicht: so übernimmst du", text: "Das ist DER Weg: aufs Raster klicken (oder «Ich übernehme») – die grosse Ansicht zeigt Woche für Woche alle möglichen Termine. Termin anklicken und bestätigen: Damit ist er hier als gebucht erfasst, und das Praktikumstool öffnet sich in einem neuen Fenster direkt bei dieser Lektion. Dort «Besuch eintragen» – fertig. Mit der Maus über einem Termin stehen Klasse und Zeit danach.",
-    vorher: () => { const r = document.querySelector(".raster"); if (r) r.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
-  { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Termin wieder abgeben", text: "Hinten in der Liste steht nur noch «Termin wieder abgeben» – bei deinen eigenen Buchungen, falls es im Praktikumstool doch nicht klappt. Übernehmen geht immer über das Raster." },
+  { ziel: "#app table.liste tbody tr td:last-child .knopf", ansicht: "planung", titel: "Buchen", text: "In der Spalte «Buchen» steht pro Person «Termine ▸», darunter klein, an welchen Tagen Mathe ist und wie viele Termine möglich sind. Tag und Tageszeit wählst du am einfachsten oben im Filter.",
+    vorher: () => { merke("filter", "{}"); S.filter = {}; zeichnen(); } },
+  { ziel: "#frageFeld .leg-zeile", ansicht: "planung", titel: "Grosse Ansicht: so buchst du", text: "«Termine ▸» öffnet alle möglichen Termine Woche für Woche. Oben die Legende: flach = Einzellektion, hoch = Doppellektion, grün = danach frei zum Besprechen. Termine, die gegen die Regeln verstossen, sind schon weg. Termin anklicken und bestätigen: Damit ist er hier gebucht, und das Praktikumstool öffnet sich bei dieser Woche – dort «Besuch eintragen».",
+    vorher: () => { const b = document.querySelector("#app table.liste tbody tr td:last-child .knopf.haupt"); if (b) b.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
+  { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Termin wieder abgeben", text: "Bei deinen eigenen Buchungen steht dort «Termin wieder abgeben» – falls es im Praktikumstool doch nicht klappt. Danach öffnet sich das Tool, damit du die Buchung dort auch löschst." },
   { ziel: ".aktivleiste .knopf", ansicht: "planung", titel: "Liste für Excel kopieren", text: "Kopiert die Liste, so wie sie gefiltert ist – dann in Excel oder eine Mail einfügen." },
   { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "Hier hast du alle deine Termine im Überblick, nach Tag geordnet und filterbar nach Halbtag, Profil, Quartal. Pro Termin: «✓ Erledigt» nach dem Besuch; «Anpassen» – Termin ändern oder wieder abgeben, danach öffnet sich das Praktikumstool, damit du es dort auch anpasst; «Achtung / Bemerkung» – Pflichtbesuch später (z.B. im Quartal) oder nur eine Bemerkung; «Bericht ↑» legt deinen Bericht in den Ordner der Person unter «Protokolle»; ganz rechts «Tool ↗». Unter dem Namen klappen die «Kontakte» auf: Mathe-PxL, zuständige PxL und Mentor/in mit E-Mail. Die Hinweise rechts melden, falls doch etwas gegen eine Regel verstösst (z.B. Buchungen, die ausserhalb dieser Seite gemacht wurden).", vorher: () => geheZu("termine") },
-  { ziel: "nav button[data-ansicht=halbtag]", ansicht: "halbtag", titel: "Halbtagespraktikum", text: "Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als PAAR untereinander – «Beide übernehmen» für den Doppelbesuch. Wer allein ist, steht als EINZELN da. Die Filter hier sind eigene, unabhängig von Profil & Quartal.", vorher: () => geheZu("halbtag") },
+  { ziel: "nav button[data-ansicht=halbtag]", ansicht: "halbtag", titel: "Halbtagespraktikum", text: "Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als PAAR untereinander – «Termine (beide) ▸» bucht den Doppelbesuch. Wer allein ist, steht als EINZELN da. Die Filter hier sind eigene, unabhängig von Profil & Quartal.", vorher: () => geheZu("halbtag") },
   { ziel: "nav button[data-ansicht=studierende]", ansicht: "studierende", titel: "Studierende", text: "Eine Zeile je Person: Halbtag, Profil, Quartal je mit Datum · Stand · Kürzel (NN = unbekannt). Suche beim Tippen, Filter nach Studienjahr, Sortierung. Abgeschlossene sind im Archiv.", vorher: () => geheZu("studierende") },
   { ansicht: "start", titel: "Los geht's", text: "Echte Seite in Chrome oder Edge öffnen, einmal den Ordner «Mathematik Sek1 - TM - Praxisbesuche» aus OneDrive wählen, Kürzel wählen – fertig. Die Hilfe oben erklärt alles nochmals.", vorher: () => geheZu("start"), ende: true },
 ];
