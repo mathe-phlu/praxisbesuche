@@ -159,6 +159,14 @@ details.karte summary { cursor: pointer; }
 .leg-paar { display: flex; align-items: center; gap: 8px; }
 .leg-paar .rz { width: 46px; }
 .leg-schritte { display: flex; flex-wrap: wrap; gap: 6px 14px; padding-top: 8px; border-top: 1px dashed var(--linie); }
+.hilfe { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 760px) { .hilfe { grid-template-columns: 1fr; } }
+.hilfe-nav { display: flex; flex-direction: column; gap: 6px; }
+.hilfe-nav button { text-align: left; font: inherit; background: #fff; border: 1px solid var(--linie); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+.hilfe-nav button span { display: block; font-size: 12.5px; color: var(--leise); }
+.hilfe-nav button.an { background: var(--ph-sand); border-color: var(--ph-braun); }
+.hilfe-text { max-width: 720px; font-size: 15px; }
+.schritte li { margin: 8px 0; line-height: 1.45; }
 .legende-kopf { display: flex; justify-content: space-between; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
 .legende-kopf::-webkit-details-marker { display: none; }
 .legende-kopf b::before { content: "▸ "; } details.legende-box[open] .legende-kopf b::before { content: "▾ "; }
@@ -1284,39 +1292,61 @@ function ansichtStudierende() {
 }
 
 /* ---------- Hilfe ---------- */
+const HILFE = [
+  ["einrichten", "Einrichten", "Einmal pro Computer", `<ol class="schritte">
+    <li>Die Seite in <b>Chrome oder Edge</b> öffnen (nicht Safari, Firefox oder Teams).</li>
+    <li>In Teams: Kanal <b>Praktika</b> → Dateien → «In SharePoint öffnen» → beim Ordner <b>Praxisbesuche</b> «Verknüpfung zu OneDrive hinzufügen».</li>
+    <li>Hier auf <b>Ordner wählen …</b> → OneDrive – Hochschule Luzern → <b>Mathematik Sek1 - TM - Praxisbesuche</b> → «Bearbeiten erlauben».</li>
+    <li>Oben rechts bei <b>Ich bin</b> dein Kürzel wählen. Fertig.</li></ol>`],
+  ["suchen", "Besuche suchen", "Wen kann ich wann besuchen?", `<ol class="schritte">
+    <li>Reiter <b>Profil &amp; Quartal</b> öffnen.</li>
+    <li>Oben den <b>Filter</b> aufklappen: Praktikum, Besuch nötig, Stand. Bei Bedarf <b>Wann</b> (Tag, Vormittag, Doppellektion), <b>Wo</b> (Ort, Umkreis) und <b>Weitere</b>.</li>
+    <li>In der Spalte <b>Mathe-Lektionen</b> siehst du pro Person den Wochenplan Mo–Fr.</li>
+    <li>Aktive Filter stehen über der Liste – mit ✕ sind sie wieder weg.</li></ol>
+    ${legendeKurz()}`],
+  ["uebernehmen", "Termin übernehmen", "Buchen – hier und im Tool", `<ol class="schritte">
+    <li>Auf den <b>Wochenplan</b> der Person klicken.</li>
+    <li>Die grosse Ansicht zeigt alle möglichen Termine, Woche für Woche. Termine, die gegen die Regeln verstossen, sind schon weg.</li>
+    <li>Termin anklicken → <b>Übernehmen</b>. Jetzt ist er hier als <span class="chip s-gebucht">gebucht</span> erfasst.</li>
+    <li>Das Praktikumstool öffnet sich bei dieser Woche: dort <b>«Besuch eintragen»</b>.</li></ol>
+    <p class="leise">Klappt es im Tool nicht? → Meine Termine → «Anpassen».</p>`],
+  ["termine", "Meine Termine", "Erledigt, ändern, abgeben", `<ol class="schritte">
+    <li>Reiter <b>Meine Termine</b>: alle deine Besuche nach Tag.</li>
+    <li>Nach dem Besuch: <b>✓ Erledigt</b>.</li>
+    <li>Termin passt nicht mehr: <b>Anpassen</b> → «Termin ändern» oder «Wieder abgeben». Danach öffnet sich das Tool – dort auch anpassen.</li>
+    <li>Unter dem Namen: <b>Kontakte</b> (Mathe-PxL, zuständige PxL, Mentor/in mit E-Mail).</li>
+    <li><b>Achtung / Bemerkung</b>: z.B. «muss im Quartal besucht werden» oder nur eine Bemerkung.</li></ol>
+    <p class="leise">⚠ rechts = Regel verletzt (z.B. Buchung ausserhalb dieser Seite). Ein Doppelbesuch zur selben Zeit ist kein Problem.</p>`],
+  ["halbtag", "Halbtagespraktikum", "Was ist anders?", `<ol class="schritte">
+    <li>Reiter <b>Halbtagespraktikum</b>. Filter nach <b>Periode</b> (A–D) statt nach Tag.</li>
+    <li>Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als <b>Paar</b> untereinander.</li>
+    <li>Klick auf den Wochenplan des Paars bucht den <b>Doppelbesuch</b> für beide.</li>
+    <li>Im Tool bei <b>beiden</b> den Besuch eintragen.</li></ol>`],
+  ["studierende", "Studierende", "Alle Praktika einer Person", `<ol class="schritte">
+    <li>Reiter <b>Studierende</b>: eine Zeile pro Person, Halbtag · Profil · Quartal.</li>
+    <li>Suchen beim Tippen, filtern nach Studienjahr. Abgeschlossene sind im <b>Archiv</b>.</li>
+    <li>Klick auf den Namen: Verlauf, wer schon besucht hat, Bemerkungen, ⚠ Achtung.</li></ol>`],
+  ["anhang", "Anhang", "Aktualisieren, Regeln, Stand", `<ul class="schritte">
+    <li><b>Normalerweise ist nichts zu tun.</b> Änderungen der anderen erscheinen nach der Synchronisation (sofort: ↻ oben rechts).</li>
+    <li>Vor neuen Praktika (eine Person für alle): Reiter <b>Aktualisieren</b> → «Praktikumstool öffnen und Daten holen» → im Tool das Lesezeichen klicken.</li>
+    <li>Neue Person: im Tool ihre Seite öffnen und das Lesezeichen klicken – nur sie wird nachgetragen.</li>
+    <li>Stand: <span class="chip s-offen">offen</span> noch niemand · <span class="chip s-gebucht">gebucht</span> hier und im Tool eingetragen · <span class="chip s-besucht">besucht</span> hat stattgefunden.</li>
+    <li>Regeln aus der Checkliste, Spezialfälle und Soll stehen unter <b>Aktualisieren</b>.</li></ul>`],
+];
+function legendeKurz() {
+  return `<div class="leg-gitter" style="margin-top:12px">
+      <div class="leg-paar"><span class="rz">9:10</span> <b>Einzellektion</b></div><div class="leg-paar"><span class="rz doppel">8:20</span> <b>Doppellektion</b></div>
+      <div class="leg-paar"><span class="rz frei">10:15</span> <b>danach frei</b> <span class="leise">zum Besprechen</span></div><div class="leg-paar"><span class="rz">13:35</span> <b>danach Unterricht</b></div></div>`;
+}
+function hilfeWahl(k) { merke("hilfe", k); zeichnen(); }
 function ansichtHilfe() {
-  const k = (t, inhalt) => `<div class="karte"><h3>${t}</h3>${inhalt}</div>`;
-  return `<h2>So arbeitest du mit den Praxisbesuchen</h2>
-  <p><a class="knopf haupt" style="text-decoration:none;display:inline-block" href="rundgang.html" target="_blank">▶ Rundgang ansehen (2 Minuten, mit Beispieldaten)</a></p>
-  ${legende().replace(/<button[^>]*rasterUmschalten[^>]*>[^<]*<\/button>/, "")}
-  <div class="start">
-  ${k("1 · Einmal einrichten", `<ol><li>Seite in <b>Chrome oder Edge</b> öffnen (nicht Safari, Firefox oder Teams).</li>
-    <li>OneDrive muss laufen. Teams → Kanal Praktika → Freigegeben → «…» → «In SharePoint öffnen» → beim Ordner <b>Praxisbesuche</b> «Verknüpfung zu OneDrive hinzufügen».</li>
-    <li>«Ordner wählen …» → OneDrive – Hochschule Luzern → <b>Mathematik Sek1 - TM - Praxisbesuche</b> → «Bearbeiten erlauben».</li>
-    <li>Oben rechts bei <b>Ich bin</b> das eigene Kürzel wählen.</li></ol>`)}
-  ${k("2 · Besuche suchen", `<ul><li>Reiter <b>Profil &amp; Quartal</b> oder <b>Halbtagespraktikum</b>.</li>
-    <li>Links filtern: Praktikum, Besuch nötig, Stand – darunter aufklappbar <b>Wann</b> (Tag, Vormittag/Nachmittag, Doppellektion, Zeit zum Besprechen), <b>Wo</b> (Ort, Umkreis) und <b>Weitere</b> (z.B. «nicht schon von mir besucht»).</li>
-    <li>Über der Liste stehen die aktiven Filter – mit ✕ wieder weg.</li></ul>`)}
-  ${k("3 · Termin übernehmen", `<ul><li>Im Raster <b>Mo–Fr</b> stehen die freien Mathe-Lektionen: hohes Kästchen = Doppellektion, grün = danach Zeit zum Besprechen.</li>
-    <li><b>Der Weg</b>: Klick auf das Raster (oder «Ich übernehme») → alle möglichen Termine Woche für Woche → Termin anklicken → <b>übernehmen</b>. Damit ist er hier als gebucht erfasst.</li>
-    <li>Gleich danach öffnet sich das Praktikumstool in einem neuen Fenster direkt bei dieser Lektion: dort <b>«Besuch eintragen»</b>. Das bleibt Pflicht.</li>
-    <li>Klappt es im Tool nicht (z.B. jemand anderes war schneller): in <b>Meine Termine</b> «Anpassen» → Termin ändern oder wieder abgeben. Danach öffnet sich das Tool, damit du es dort auch anpasst.</li>
-    <li>Nach dem Besuch: im Reiter <b>Meine Termine</b> auf <b>Erledigt</b>.</li>
-    <li><b>Stand</b>: <span class="chip s-offen">offen</span> noch niemand ·
-      <span class="chip s-gebucht">gebucht</span> übernommen und im Praktikumstool eingetragen – beides gehört zusammen ·
-      <span class="chip s-besucht">besucht</span> hat stattgefunden.</li>
-    <li>In <b>Meine Termine</b> je Zeile: <b>✓ Erledigt</b> · <b>Anpassen</b> (Termin ändern oder wieder abgeben – danach öffnet sich das Praktikumstool) · <b>Achtung / Bemerkung</b> · ganz rechts <b>Tool ↗</b>. Unter dem Namen: <b>Kontakte</b> – Mathe-PxL, zuständige PxL und Mentor/in mit E-Mail und Telefon.</li>
-    <li>Hinweise wie «an diesem Tag schon ein Besuch» zählen Besuche anderer Fächer mit. Ein Doppelbesuch genau zur selben Zeit ist kein Problem.</li></ul>`)}
-  ${k("4 · Studierende und Achtung", `<ul><li>Reiter <b>Studierende</b>: alle Praktika einer Person auf einen Blick, Klick auf den Namen zeigt den Verlauf.</li>
-    <li><b>⚠ Achtung</b>: «im Profil / Quartal besuchen» mit Begründung – dann ist der Besuch dort Pflicht und erscheint mit ⚠.</li>
-    <li>Bemerkungen zur Person im Detail; Achtung lässt sich ändern oder löschen.</li></ul>`)}
-  ${k("5 · Halbtagespraktikum", `<ul><li>Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als <b>Paar</b> in einer Zeile.</li>
-    <li><b>Beide übernehmen</b> trägt den Doppelbesuch für beide ein; im Tool beide eintragen.</li></ul>`)}
-  ${k("6 · Aktualisieren", `<ul><li><b>In der Regel muss hier nichts gemacht werden.</b></li><li>Nur vor neuen Praktika (eine Person für alle): «Praktikumstool öffnen und Daten holen», im Tool das Lesezeichen klicken.</li>
-    <li>Spezialfälle (Excel) einlesen, Regeln aus der Checkliste übernehmen, Orte suchen lassen.</li>
-    <li>Neue Person dazugekommen: im Praktikumstool ihre Seite öffnen und dort das Lesezeichen klicken – nur sie wird nachgetragen.</li></ul>`)}
-  </div>
-  <p class="leise klein">Gespeichert wird im gemeinsamen Ordner. Änderungen der anderen erscheinen nach der Synchronisation (meist innert einer Minute; sofort: ↻ oben rechts).</p>`;
+  const wahl = HILFE.find((h) => h[0] === lies("hilfe")) || HILFE[0];
+  return `<h2>Hilfe</h2>
+  <div class="hilfe">
+    <nav class="hilfe-nav">${HILFE.map(([k, t, u], n) => `<button class="${k === wahl[0] ? "an" : ""}" onclick="hilfeWahl('${k}')"><b>${n + 1} · ${t}</b><span>${u}</span></button>`).join("")}
+      <a class="knopf haupt" style="text-decoration:none;text-align:center;margin-top:10px" href="rundgang.html" target="_blank">▶ Rundgang (2 Min)</a></nav>
+    <div class="karte hilfe-text"><h3>${wahl[1]}</h3>${wahl[3]}</div>
+  </div>`;
 }
 
 /* ---------- Detail einer Person ---------- */
