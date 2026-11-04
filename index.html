@@ -554,7 +554,7 @@ function standBestimmen(x, altBesuch) {
     if (e.typ === "zuruecksetzen") { stand = x.fachbesuche > 0 ? "gebucht" : wer ? "übernommen" : ""; datum = ""; }
   }
   if (!stand && wer) stand = "übernommen";
-  x.wer = wer; x.stand = stand || "offen"; x.art = art; x.datum = datum; x.termin = termin;
+  x.wer = wer; x.stand = stand || "offen"; x.besuchsart = art; x.datum = datum; x.termin = termin;
   x.doppelt = doppelt.filter((w) => w !== wer);
   x.besuchtVon = wer && (x.stand === "besucht" || x.stand === "übernommen" || x.stand === "gebucht") ? [wer] : [];
   x.notizen = x.eintraege.filter((e) => e.typ === "notiz");
@@ -572,7 +572,7 @@ function noetigBestimmen(x) {
   else if (x.gruppe === "Halbtag") { n = "ja"; warum = "Halbtagespraktikum"; }
   else if (x.gruppe === "Quartal") {
     const profile = p.praktika.filter((y) => y.gruppe === "Profil" && y !== x);
-    const regulaer = profile.some((y) => (y.stand === "besucht" || (y.stand === "gebucht" && (y.jahr || "") < x.jahr)) && y.art !== "Wertschätzung");
+    const regulaer = profile.some((y) => (y.stand === "besucht" || (y.stand === "gebucht" && (y.jahr || "") < x.jahr)) && y.besuchsart !== "Wertschätzung");
     const laeuft = profile.some((y) => y.jahr === x.jahr && y.stand !== "besucht");
     const erneut = p.alt && p.alt.erneut;
     if (erneut) { n = "ja"; warum = "soll erneut besucht werden (alte Liste)"; }
@@ -688,7 +688,9 @@ function standChip(x, kurz = false) {
   const wer = x.wer ? ` · ${esc(x.wer)}` : x.dozentTool ? ` · ${esc(x.dozentTool)}` : "";
   const t = !kurz && x.termin && x.stand !== "besucht" ? ` · ${esc(kurzDatum(x.termin.datum))} ${esc(x.termin.zeit || "")}` : "";
   const doppelt = x.doppelt && x.doppelt.length ? ` <span class="hinweis" title="Mehrere haben übernommen – bitte absprechen">doppelt: ${esc(x.doppelt.join(", "))}</span>` : "";
-  return `<span class="chip ${cls}">${esc(x.stand)}${wer}${t}</span>${doppelt}`;
+  const text = { "übernommen": "reserviert", gebucht: "im Tool gebucht" }[x.stand] || x.stand;
+  const titel = { "übernommen": "Hier reserviert – im Praktikumstool noch nicht eingetragen", gebucht: "Im Praktikumstool eingetragen", besucht: "Besuch hat stattgefunden", offen: "Noch niemand eingeteilt" }[x.stand] || "";
+  return `<span class="chip ${cls}" title="${esc(titel)}">${esc(text)}${wer}${t}</span>${doppelt}`;
 }
 function achtungZeichen(x) {
   if (!x.achtung || !x.achtung.length) return "";
@@ -704,7 +706,9 @@ function aktionen(x) {
     k.push(`<button class="knopf klein" onclick="handlung('abgeben',${ref(x.idpraktikum)})">Abgeben</button>`);
   }
   if (x.link) k.push(`<button class="knopf klein" title="Im Praktikumstool öffnen (Fenster rechts)" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>`);
-  return k.join(" ");
+  k.push(`<button class="knopf klein" title="Notiz zu diesem Praktikum" onclick="notizZu(REFS[${ref(x.idpraktikum)}])">Notiz${x.notizen && x.notizen.length ? " (" + x.notizen.length + ")" : ""}</button>`);
+  const letzte = x.notizen && x.notizen.length ? x.notizen[x.notizen.length - 1] : null;
+  return k.join(" ") + (letzte ? `<div class="klein leise" style="white-space:normal;max-width:260px;margin-top:3px">✎ ${esc(letzte.text)} <i>(${esc(letzte.wer)})</i></div>` : "");
 }
 /* Mathe-Lektionen als kleine Knöpfe: Wochentag + Zeit, Klick springt im Tool zur Lektion */
 /* Mathe-Lektionen als kleines Wochenraster Mo–Fr; Klick öffnet alle möglichen Termine */
@@ -906,7 +910,7 @@ function filterLeiste(ansicht, anzahl) {
   } else {
     grund += `<div class="fzeile"><span class="ftitel">Periode</span>${knoepfe("perioden", [["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"], ["SK", "SK Einzelfach"]])}</div>`;
   }
-  grund += `<div class="fzeile"><span class="ftitel">Stand</span>${knoepfe("stand", [["offen", "offen"], ["eingeteilt", "übernommen / gebucht"], ["besucht", "besucht"]])}</div>`;
+  grund += `<div class="fzeile"><span class="ftitel">Stand</span>${knoepfe("stand", [["offen", "offen"], ["eingeteilt", "reserviert / im Tool gebucht"], ["besucht", "besucht"]])}</div>`;
   // Wann
   const wannAktiv = [fw("von", "") && "ab " + kurzDatum(fw("von", "")), fw("bis", "") && "bis " + kurzDatum(fw("bis", "")),
     fa("tage").join(" "), fa("tageszeit").map((t) => t === "vormittag" ? "Vormittag" : "Nachmittag").join(" "),
@@ -1048,7 +1052,8 @@ function ansichtPlanung() {
 
 function ansichtTermine() {
   const sj = fw("jahr", S.einst.studienjahr);
-  const meine = R.praktika.filter((x) => S.ich && x.wer === S.ich && x.jahr === sj)
+  const tPrakt = Array.isArray(S.filter["t.praktika"]) ? S.filter["t.praktika"] : ["Halbtag", "Profil", "Quartal", "Spezial"];
+  const meine = R.praktika.filter((x) => S.ich && x.wer === S.ich && x.jahr === sj && tPrakt.includes(x.gruppe === "Abschluss" ? "Spezial" : x.gruppe))
     .sort((a, b) => ((a.termin ? a.termin.datum + a.termin.zeit : "9") + a.person.name).localeCompare((b.termin ? b.termin.datum + b.termin.zeit : "9") + b.person.name));
   if (!S.ich) return `<h2>Meine Termine</h2><div class="leer">Bitte oben rechts «Ich bin» wählen.</div>`;
   const tage = {};
@@ -1059,6 +1064,8 @@ function ansichtTermine() {
     <div class="kachel"><div class="t">Tage</div><div class="z">${Object.keys(tage).filter((t) => t !== "ohne Termin").length}</div></div>
     <div class="kachel"><div class="t">besucht</div><div class="z">${meine.filter((x) => x.stand === "besucht").length}</div></div></div>
   <div class="filter"><label>Studienjahr<select onchange="setzeFilter('jahr',this.value)">${jahre().map((j) => `<option value="${j}" ${j === sj ? "selected" : ""}>${sjText(j)}</option>`).join("")}</select></label>
+    <span class="ftitel" style="margin-left:14px">Praktikum</span>${[["Halbtag", "Halbtag"], ["Profil", "Profil"], ["Quartal", "Quartal"], ["Spezial", "Spezial"]].map(([v, t]) =>
+      `<button type="button" class="fchip ${tPrakt.includes(v) ? "an" : ""}" onclick="terminPraktikum('${v}')">${t}</button>`).join("")}
     <button class="knopf klein" onclick="listeKopieren()" title="Kopiert die Liste in die Zwischenablage – danach in Excel oder eine Mail einfügen (Cmd+V / Ctrl+V)">Liste für Excel kopieren</button></div>
   ${meine.length ? `<table class="liste"><thead><tr><th>Tag</th><th>Zeit</th><th>Name</th><th>Prakt.</th><th>Schule</th><th>Stand</th><th>Hinweise</th><th></th></tr></thead><tbody>
   ${Object.entries(tage).map(([d, xs]) => xs.map((x, i) => { const w = x.termin ? terminWarnungen(x, x.termin.datum, x.termin.zeit) : [];
@@ -1089,6 +1096,10 @@ function paareBilden(liste) {
     }
   }
   return zeilen.sort((a, b) => a[0].art - b[0].art || (a[0].schulort || "").localeCompare(b[0].schulort || "") || a[0].person.name.localeCompare(b[0].person.name));
+}
+function terminPraktikum(v) {
+  const a = new Set(Array.isArray(S.filter["t.praktika"]) ? S.filter["t.praktika"] : ["Halbtag", "Profil", "Quartal", "Spezial"]);
+  a.has(v) ? a.delete(v) : a.add(v); S.filter["t.praktika"] = [...a]; merke("filter", JSON.stringify(S.filter)); zeichnen();
 }
 function ansichtHalbtag() {
   const sj = fw("jahr", S.einst.studienjahr);
@@ -1184,7 +1195,12 @@ function ansichtHilfe() {
   ${k("3 · Termin übernehmen", `<ul><li>Im Raster <b>Mo–Fr</b> stehen die freien Mathe-Lektionen: hohes Kästchen = Doppellektion, grün = danach Zeit zum Besprechen.</li>
     <li>Klick auf das Raster → alle Termine Woche für Woche → Termin anklicken → <b>übernehmen</b>.</li>
     <li>Das Praktikumstool öffnet sich rechts direkt bei der Lektion: dort <b>«Besuch eintragen»</b>. Das bleibt Pflicht.</li>
-    <li>Nach dem Besuch: <b>Erledigt</b>.</li></ul>`)}
+    <li>Nach dem Besuch: <b>Erledigt</b>.</li>
+    <li><b>Stand</b>: <span class="chip s-offen">offen</span> noch niemand ·
+      <span class="chip s-uebernommen">reserviert</span> hier übernommen, im Praktikumstool noch nicht eingetragen ·
+      <span class="chip s-gebucht">im Tool gebucht</span> im Praktikumstool eingetragen (erscheint nach dem nächsten Aktualisieren) ·
+      <span class="chip s-besucht">besucht</span> hat stattgefunden.</li>
+    <li><b>Notiz</b>: bei jedem Praktikum in der Zeile – z.B. «Termin mit PxL abgesprochen».</li></ul>`)}
   ${k("4 · Studierende und Achtung", `<ul><li>Reiter <b>Studierende</b>: alle Praktika einer Person auf einen Blick, Klick auf den Namen zeigt den Verlauf.</li>
     <li><b>⚠ Achtung</b>: «im Profil / Quartal besuchen» mit Begründung – dann ist der Besuch dort Pflicht und erscheint mit ⚠.</li>
     <li>Bemerkungen zur Person im Detail; Achtung lässt sich ändern oder löschen.</li></ul>`)}
@@ -1212,7 +1228,7 @@ function detailZeigen(id, oeffnen = true) {
     ${p.praktika.map((x) => `<tr><td>${sjText(x.jahr)}</td><td>${esc(x.gruppe)}${x.quelle === "alt" ? ' <span class="leise klein">(alte Liste)</span>' : ""}<div class="leise klein">${zeitraum(x)}</div></td>
       <td>${esc(x.schulort)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
       <td><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}">${esc(x.noetig)}</span><div class="leise klein">${esc(x.warum)}</div></td>
-      <td>${standChip(x)}${x.art === "Wertschätzung" ? ' <span class="klein leise">Wertschätzung</span>' : ""}${x.datum ? `<div class="leise klein">${datumText(x.datum)}</div>` : ""}
+      <td>${standChip(x)}${x.besuchsart === "Wertschätzung" ? ' <span class="klein leise">Wertschätzung</span>' : ""}${x.datum ? `<div class="leise klein">${datumText(x.datum)}</div>` : ""}
         ${x.lektionen && x.lektionen.length ? `<div style="margin-top:4px">${lektionenZelle(x)}</div>` : ""}
         ${x.notizen.map(notiz).join("")}</td>
       <td style="white-space:nowrap">${aktionen(x)}<br><button class="knopf klein" onclick="notizZu(REFS[${ref(x.idpraktikum)}])">+ Notiz</button>
