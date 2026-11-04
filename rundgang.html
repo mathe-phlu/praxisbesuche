@@ -1656,7 +1656,7 @@ setInterval(() => {
 window.addEventListener("load", () => setTimeout(rundgangStart, 900));
 const SCHRITTE = [
   { titel: "Willkommen", text: "In zwei Minuten durch die Praxisbesuche – mit erfundenen Beispieldaten. Mit «Weiter» geht es zum nächsten Schritt.", vorher: () => geheZu("start") },
-  { ziel: "#ich", titel: "Wer bin ich?", text: "Oben rechts das eigene Kürzel wählen. Dann gehören «Ich übernehme» und «Meine Termine» dir.", vorher: () => { S.ich = "hmo"; zeichnen(); } },
+  { ziel: "#ich", titel: "Wer bin ich?", text: "Oben rechts das eigene Kürzel wählen. Dann gehören «Ich übernehme» und «Meine Termine» dir. Den Rundgang kann man jederzeit mit «✕ Beenden» abbrechen oder unten direkt zu einem Schritt springen.", vorher: () => { S.ich = "hmo"; zeichnen(); } },
   { ziel: "nav button[data-ansicht=planung]", titel: "Profil & Quartal", text: "Hier wird geplant: alle Profil-, Quartals- und Spezialpraktika des Studienjahrs.", vorher: () => geheZu("planung") },
   { ziel: ".filterbox .fsek", titel: "Grundauswahl", text: "Welche Praktika, ob ein Besuch nötig ist, und der Stand (offen, übernommen, besucht). Ein Klick schaltet um." },
   { ziel: ".filterbox details", titel: "Wann", text: "Aufklappen: Zeitraum, Tag, Vormittag/Nachmittag, Einzel- oder Doppellektion und «danach Zeit zum Besprechen».", vorher: () => { const d = document.querySelector(".filterbox details"); if (d) d.open = true; } },
@@ -1668,12 +1668,12 @@ const SCHRITTE = [
   { ziel: ".raster", titel: "Wochenraster", text: "Für jede Person: an welchen Tagen und wann Mathe ist. Termine, die nach der Checkliste nicht gehen, sind schon weg." },
   { ziel: "#frageFeld .woche", titel: "Grosse Ansicht: alle Termine", text: "Ein Klick aufs Raster öffnet die grosse Ansicht, Woche für Woche. Mit der Maus über einem Termin stehen Klasse und Zeit danach. Termin anklicken = übernehmen. Danach öffnet sich das Praktikumstool direkt bei dieser Lektion: dort «Besuch eintragen».",
     vorher: () => { const r = document.querySelector(".raster"); if (r) r.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
-  { ziel: "#app table.liste tbody tr td:last-child", titel: "Ich übernehme", text: "Oder direkt hier. Danach: «Erledigt», wenn der Besuch war." },
+  { ziel: "#app table.liste tbody tr td:last-child", titel: "Ich übernehme", text: "Oder direkt hier: «Ich übernehme» bucht – im Praktikumstool gleich mit eintragen. Nach dem Besuch: «Erledigt»." },
   { ziel: ".aktivleiste .knopf", titel: "Liste für Excel kopieren", text: "Kopiert die Liste, so wie sie gefiltert ist – dann in Excel oder eine Mail einfügen." },
-  { ziel: "nav button[data-ansicht=termine]", titel: "Meine Termine", text: "Alle eigenen Besuche nach Tag – mit Warnungen, falls zwei am selben Vormittag liegen.", vorher: () => geheZu("termine") },
+  { ziel: "nav button[data-ansicht=termine]", titel: "Meine Termine", text: "Alle eigenen Besuche nach Tag, filterbar nach Halbtag, Profil, Quartal. Hier bei jedem Besuch: «Notiz» und «Achtung / Bemerkung» – z.B. «muss im Quartal besucht werden».", vorher: () => geheZu("termine") },
   { ziel: "nav button[data-ansicht=halbtag]", titel: "Halbtagespraktikum", text: "Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als PAAR untereinander – «Beide übernehmen» für den Doppelbesuch. Wer allein ist, steht als EINZELN da. Die Filter hier sind eigene, unabhängig von Profil & Quartal.", vorher: () => geheZu("halbtag") },
-  { ziel: "nav button[data-ansicht=studierende]", titel: "Studierende", text: "Alle Praktika einer Person auf einen Blick. Mit «Achtung / Bemerkung» vermerkt man z.B. «muss im Profil besucht werden» samt Grund – oder einfach eine Bemerkung.", vorher: () => geheZu("studierende") },
-  { titel: "Los geht's", text: "Die echte Seite in Chrome oder Edge öffnen, einmal den Teams-Ordner «Praxisbesuche» wählen – fertig.", vorher: () => geheZu("start"), ende: true },
+  { ziel: "nav button[data-ansicht=studierende]", titel: "Studierende", text: "Eine Zeile je Person: Halbtag, Profil, Quartal je mit Datum · Stand · Kürzel (NN = unbekannt). Suche beim Tippen, Filter nach Studienjahr, Sortierung. Abgeschlossene sind im Archiv.", vorher: () => geheZu("studierende") },
+  { titel: "Los geht's", text: "Echte Seite in Chrome oder Edge öffnen, einmal den Ordner «Mathematik Sek1 - TM - Praxisbesuche» aus OneDrive wählen, Kürzel wählen – fertig. Die Hilfe oben erklärt alles nochmals.", vorher: () => geheZu("start"), ende: true },
 ];
 let schritt = 0, uhr = null;
 function rundgangStart() {
@@ -1693,7 +1693,10 @@ function zeige(i) {
     if (dlg.open && t.parentElement !== dlg) dlg.appendChild(t);
     if (!dlg.open && t.parentElement !== document.body) document.body.appendChild(t);
     const ziel = s.ziel ? document.querySelector(s.ziel) : null;
-    t.innerHTML = `<h4>${s.titel}</h4><div>${s.text}</div><div class="tk"><span class="pkt">${schritt + 1} / ${SCHRITTE.length}</span>
+    t.innerHTML = `<button class="knopf klein" style="position:absolute;right:8px;top:8px" title="Rundgang beenden" onclick="rundgangEnde()">✕ Beenden</button>
+      <h4 style="margin-right:80px">${s.titel}</h4><div>${s.text}</div>
+      <div style="margin-top:8px"><select class="eingabe klein" onchange="zeige(Number(this.value))" title="Direkt zu einem Schritt">${SCHRITTE.map((x, i) => `<option value="${i}" ${i === schritt ? "selected" : ""}>${i + 1}. ${x.titel}</option>`).join("")}</select></div>
+      <div class="tk"><span class="pkt">${schritt + 1} / ${SCHRITTE.length}</span>
       <span>${schritt ? '<button class="knopf klein" onclick="weiter(-1)">Zurück</button>' : ""}
       ${s.ende ? '<button class="knopf haupt klein" onclick="document.getElementById(\'tour\').remove();clearTimeout(uhr)">Schliessen</button>'
                : '<button class="knopf haupt klein" onclick="weiter(1)">Weiter</button>'}</span></div>`;
@@ -1707,6 +1710,15 @@ function zeige(i) {
   }, 350);
 }
 function weiter(d) { zeige(schritt + d); }
+function rundgangEnde() {
+  const s = SCHRITTE[schritt]; if (s && s.nachher) s.nachher();
+  document.querySelectorAll(".tour-licht").forEach((e) => e.classList.remove("tour-licht"));
+  const t = document.getElementById("tour"); if (t) t.remove();
+  const k = document.createElement("button"); k.className = "knopf haupt"; k.textContent = "▶ Rundgang neu starten";
+  k.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:50"; k.onclick = () => { k.remove(); rundgangStart(); };
+  document.body.appendChild(k);
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && document.getElementById("tour")) rundgangEnde(); });
 </script>
 
 </body>
