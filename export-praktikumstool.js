@@ -92,6 +92,7 @@
       const seite = new DOMParser().parseFromString(html, "text/html");
       liste[i].lektionen = matheLektionen(seite);
       liste[i].besuche = angemeldeteBesuche(seite);
+      liste[i].kontakte = kontakte(seite, liste[i].lektionen);
       await new Promise((r) => setTimeout(r, 150));
     }
   }
@@ -116,10 +117,13 @@
   const dl = document.createElement("a");
   dl.href = URL.createObjectURL(blob);
   dl.download = `praktika-${FACH.kurz}-${jahre[0]}${jahre.length > 1 ? "_bis_" + jahre[jahre.length - 1] : ""}.json`;
+  // Falls der Browser den automatischen Download blockiert: Knopf zum Speichern bleibt stehen
+  dl.textContent = `Fertig – hier klicken: Datei speichern (${praktika.length} Praktika)`;
+  dl.style.cssText = "position:fixed;top:60px;right:10px;z-index:99999;background:#7a5a2e;color:#fff;padding:12px 16px;font:bold 15px Arial;border-radius:6px;text-decoration:none";
   document.body.appendChild(dl);
   dl.click();
-  hinweis.textContent = `Fertig: ${praktika.length} Praktika gespeichert (${dl.download}).`;
-  setTimeout(() => hinweis.remove(), 8000);
+  hinweis.textContent = `Fertig: ${praktika.length} Praktika. Liegt die Datei nicht im Download-Ordner: braunen Knopf klicken.`;
+  window.__pbFertig = { anzahl: praktika.length, kontakte: praktika.filter((p) => p.kontakte).length };
 
   // Stundenplan: je Woche eine Tabelle, Spalten = Tage, Zeilen = Lektionen.
   // Ergebnis: Mathe-Blöcke je Tag – von, bis, Anzahl Lektionen (Einzel/Doppel), ob danach frei ist.
@@ -145,9 +149,12 @@
             const anker = feld.querySelector("a[id^=lekt]");
             // Fach + Praxislehrperson <br> Klasse <br> …
             const teile = feld.innerHTML.split(/<br\s*\/?>/i).map((t) => t.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+            // Lehrperson der Lektion: erste Zeile ohne den Fach-Text
+            const fachDiv = feld.querySelector("div");
+            const lehrer = teile[0].replace(fachDiv ? fachDiv.textContent.replace(/\s+/g, " ").trim() : "", "").trim();
             const gebucht = [...feld.querySelectorAll("tr.visitInfo")].map((t) => t.textContent.trim().replace(/\s+/g, " ")).filter(Boolean);
             (tage[daten[k]] ||= []).push({ von, bis, ma: /^MA:/.test(fach), id: anker ? anker.id.replace("lekt", "") : "",
-                                           klasse: teile[1] || "", gebucht });
+                                           klasse: teile[1] || "", lehrer, gebucht });
           }
         });
       }
@@ -161,7 +168,7 @@
         while (j + 1 < l.length && l[j + 1].ma && l[j + 1].von - l[j].bis <= 15 && l[j + 1].klasse === l[i].klasse) j++;
         const naechste = l.slice(j + 1).find((x) => x.von >= l[j].bis);
         bloecke.push({ datum, zeit: hhmm(l[i].von), bis: hhmm(l[j].bis), anzahl: j - i + 1, klasse: l[i].klasse,
-                       id: l[i].id, ids: l.slice(i, j + 1).map((x) => x.id),
+                       id: l[i].id, ids: l.slice(i, j + 1).map((x) => x.id), lehrer: l[i].lehrer,
                        gebucht: l.slice(i, j + 1).flatMap((x) => x.gebucht),
                        frei: naechste ? naechste.von - l[j].bis : null,          // Minuten bis zur nächsten Lektion
                        naechste: naechste ? hhmm(naechste.von) : "" });           // null = danach kein Unterricht mehr
@@ -195,6 +202,28 @@
     return [...t.rows].slice(1).map((r) => [...r.cells].map((c) => c.textContent.trim().replace(/\s+/g, " "))).filter((z) => z.length >= 5)
       .map((z) => { const m = z[0].match(/(\d\d)\.(\d\d)\.(\d{4})/);
         return { datum: m ? `${m[3]}-${m[2]}-${m[1]}` : z[0], zeit: z[1], dauer: z[2], fach: z[3], dozent: z[4].split("/")[0].trim(), klasse: z[5] || "" }; });
+  }
+
+  // Kontakte von der Detailseite: Mentor/in und Praxislehrpersonen mit E-Mail und Telefon.
+  // Die PxL, die die Mathe-Lektionen hält, wird markiert (mathe: true).
+  function kontakte(doc, lektionen) {
+    const k = { mentor: null, pxl: [] };
+    const st = [...doc.querySelectorAll("p strong")].find((s) => /Mentor/i.test(s.textContent));
+    const ma = st && st.parentElement.querySelector("a[href^=mailto]");
+    if (ma) k.mentor = { name: ma.textContent.trim(), mail: ma.getAttribute("href").replace(/^mailto:/, "").split("?")[0] };
+    const schl = (n) => n.toLowerCase().split(/\s+/).filter(Boolean).sort().join(" ");   // Reihenfolge Vor-/Nachname egal
+    const matheLehrer = new Set((lektionen || []).map((l) => schl(l.lehrer || "")).filter(Boolean));
+    for (const td of doc.querySelectorAll("td.lableSchulhausPersonen")) {
+      const rolle = td.textContent.replace(/\s+/g, " ").trim();
+      if (!/PxL/i.test(rolle)) continue;
+      const tr = td.parentElement, z = [...tr.cells];
+      const name = ((tr.querySelector("td.nameSchulhausPersonen") || {}).textContent || "").replace(/\s+/g, " ").trim();
+      const tel = z.length ? z[z.length - 1].textContent.replace(/\s+/g, " ").trim().replace(/^-$/, "") : "";
+      const naechste = tr.nextElementSibling, a = naechste && naechste.querySelector("a[href^=mailto]");
+      k.pxl.push({ rolle, name, mail: a ? a.getAttribute("href").replace(/^mailto:/, "").split("?")[0] : "", tel,
+                   mathe: matheLehrer.has(schl(name)) });
+    }
+    return k;
   }
 
   function jahreAus(text) {

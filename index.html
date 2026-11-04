@@ -37,6 +37,10 @@ h3 { font-size: 17px; margin: 22px 0 8px; }
 .klein { font-size: 13px; }
 button.knopf { font-size: 14px; padding: 6px 12px; border-radius: 6px; border: 1px solid #bbb; background: #fff; cursor: pointer; }
 button.knopf:hover { background: var(--grau); }
+.kontakte { margin-top: 3px; white-space: normal; max-width: 420px; }
+.kontakte summary { cursor: pointer; color: var(--ph-braun-dunkel); }
+.kontakte > div, .kontakte details > div { margin: 2px 0 2px 12px; }
+.kontakte details summary { margin-left: 12px; }
 .akt { display: flex; gap: 4px; align-items: center; }
 .akt-rechts { margin-left: auto; padding-left: 4px; }
 button.knopf.haupt { background: var(--ph-braun); color: #fff; border-color: var(--ph-braun); }
@@ -728,9 +732,8 @@ function aktionen(x) {
   }
   if (x.stand === "offen" || x.stand === "nicht nötig" || (x.stand === "gebucht" && !x.wer)) k.push(`<button class="knopf klein" title="Zeigt alle möglichen Termine – anklicken bucht und öffnet das Praktikumstool" onclick="uebernehmen(${ref(x.idpraktikum)})">Ich übernehme</button>`);
   if (x.wer === S.ich && x.stand !== "besucht") {
-    if (S.ansicht === "termine") k.push(`<button class="knopf klein haupt" title="Der Besuch hat stattgefunden" onclick="erledigt(${ref(x.idpraktikum)})">✓ Erledigt</button>`);
-    k.push(`<button class="knopf klein" title="Anderen Termin wählen (im Praktikumstool auch umbuchen)" onclick="uebernehmen(${ref(x.idpraktikum)}, true)">Termin ändern</button>`);
-    k.push(`<button class="knopf klein" title="Aus meiner Liste nehmen – jemand anderes kann übernehmen (im Praktikumstool die Buchung löschen)" onclick="handlung('abgeben',${ref(x.idpraktikum)})">Abgeben</button>`);
+    k.push(`<button class="knopf klein haupt" title="Der Besuch hat stattgefunden" onclick="erledigt(${ref(x.idpraktikum)})">✓ Erledigt</button>`);
+    k.push(`<button class="knopf klein" title="Termin ändern oder wieder abgeben – danach öffnet sich das Praktikumstool" onclick="anpassen(${ref(x.idpraktikum)})">Anpassen ▾</button>`);
   }
   const tool = x.link ? `<button class="knopf klein" title="Im Praktikumstool öffnen (Fenster rechts)" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>` : "";
   if (S.ansicht === "termine") {
@@ -922,7 +925,23 @@ function terminWarnungen(x, datum, zeit) {
   return w;
 }
 async function handlung(typ, i) {
-  const id = REFS[i]; if (await eintragen({ typ, praktikum: id })) meldung(typ === "uebernehmen" ? "Übernommen – bitte im Praktikumstool buchen." : "Abgegeben."); }
+  const id = REFS[i];
+  const x = R.praktika.find((p) => p.idpraktikum === id);
+  const lekt = x && x.termin ? x.termin.lektion : "";
+  if (!(await eintragen({ typ, praktikum: id }))) return;
+  if (typ === "abgeben") {
+    meldung("Abgegeben – bitte im Praktikumstool die Buchung löschen (öffnet sich rechts).");
+    if (x && x.link) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1); }
+  } else meldung("Übernommen – bitte im Praktikumstool buchen.");
+}
+/* «Anpassen» in Meine Termine: Termin ändern oder wieder abgeben – danach geht es jeweils ins Praktikumstool */
+async function anpassen(i) {
+  const x = R.praktika.find((p) => p.idpraktikum === REFS[i]); if (!x) return;
+  const was = await frage(`${x.person.name} · ${x.gruppe}${x.termin ? " · " + kurzDatum(x.termin.datum) + " " + (x.termin.zeit || "") : ""}\n\nWas möchtest du anpassen? Danach öffnet sich das Praktikumstool, damit du es dort auch anpasst.`,
+    { art: "wahl", wert: "aendern", optionen: [["aendern", "Termin ändern (anderen Termin wählen)"], ["abgeben", "Wieder abgeben (jemand anderes übernimmt)"]] });
+  if (was === "aendern") uebernehmen(i, true);
+  if (was === "abgeben") handlung("abgeben", i);
+}
 async function erledigt(i) {
   const id = REFS[i];
   const x = R.praktika.find((p) => p.idpraktikum === id);
@@ -1027,7 +1046,7 @@ function filterLeeren() {
 
 function listeKopieren() {
   const t = document.querySelector("#app table.liste"); if (!t) return;
-  const text = [...t.rows].map((r) => [...r.cells].map((c) => c.innerText.replace(/\s*\n\s*/g, " · ").replace(/Ich übernehme|Erledigt|Abgeben|Termin ändern|Termin|Tool ↗|\+ Notiz|Achtung \/ Bemerkung|✓/g, "").trim()).join("\t")).join("\n");
+  const text = [...t.rows].map((r) => [...r.cells].map((c) => c.innerText.replace(/\s*\n\s*/g, " · ").replace(/Anpassen ▾|Kontakte|Termin wieder abgeben|Ich übernehme|Erledigt|Abgeben|Termin ändern|Termin|Tool ↗|\+ Notiz|Achtung \/ Bemerkung|✓/g, "").trim()).join("\t")).join("\n");
   const ersatz = () => { const a = document.createElement("textarea"); a.value = text; document.body.appendChild(a); a.select(); document.execCommand("copy"); a.remove(); meldung("Liste kopiert – in Excel oder eine Mail einfügen."); };
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => meldung("Liste kopiert – in Excel oder eine Mail einfügen."), ersatz);
   else ersatz();
@@ -1117,12 +1136,26 @@ function ansichtTermine() {
   ${meine.length ? `<table class="liste"><thead><tr><th>Tag</th><th>Zeit</th><th>Name</th><th>Prakt.</th><th>Schule</th><th>Stand</th><th>Hinweise</th><th></th></tr></thead><tbody>
   ${Object.entries(tage).map(([d, xs]) => xs.map((x, i) => { const w = x.termin ? terminWarnungen(x, x.termin.datum, x.termin.zeit) : [];
     return `<tr><td style="white-space:nowrap">${i === 0 ? `<b>${esc(tagText(d))}</b>` : ""}</td><td>${esc(x.termin ? x.termin.zeit : "")}</td>
-    <td class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</td><td>${esc(x.gruppe)}</td>
+    <td><span class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</span>${kontakteZelle(x)}</td><td>${esc(x.gruppe)}</td>
     <td>${esc(x.schulort)}<div class="leise klein">${esc(x.schulhaus)}</div></td><td>${standChip(x, true, true)}</td>
     <td>${w.map((t) => `<div class="hinweis">⚠ ${esc(t)}</div>`).join("")}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`; }).join("")).join("")}
   </tbody></table>` : `<div class="leer">Noch keine Besuche übernommen.</div>`}`;
 }
 
+/* Kontakte aus dem Praktikumstool: Mathe-PxL zuerst, dann zuständige PxL, Mentor/in; weitere PxL eingeklappt */
+function kontakteZelle(x) {
+  const k = x.kontakte;
+  if (!k || (!k.mentor && !(k.pxl || []).length)) return "";
+  const zeile = (rolle, p) => `<div><span class="leise">${esc(rolle)}</span> ${esc(p.name)}${p.mail ? ` · <a href="mailto:${esc(p.mail)}">${esc(p.mail)}</a>` : ""}${p.tel ? ` · ${esc(p.tel)}` : ""}</div>`;
+  const pxl = k.pxl || [];
+  const mathe = pxl.filter((p) => p.mathe), zust = pxl.filter((p) => !p.mathe && /zust/i.test(p.rolle)), rest = pxl.filter((p) => !p.mathe && !/zust/i.test(p.rolle));
+  return `<details class="kontakte klein"><summary>Kontakte</summary>
+    ${mathe.map((p) => zeile(/zust/i.test(p.rolle) ? "PxL Mathe (zuständig)" : "PxL Mathe", p)).join("")}
+    ${zust.map((p) => zeile("zuständige PxL", p)).join("")}
+    ${k.mentor ? zeile("Mentor/in", k.mentor) : ""}
+    ${rest.length ? `<details><summary class="leise">weitere PxL (${rest.length})</summary>${rest.map((p) => zeile("PxL", p)).join("")}</details>` : ""}
+  </details>`;
+}
 /* Halbtag: zwei Studierende im selben Schulhaus, gleiche Periode, gleiche Mathe-Lektionen = Paar (Doppelbesuch) */
 function paareBilden(liste) {
   const gruppen = {};
@@ -1258,12 +1291,12 @@ function ansichtHilfe() {
   ${k("3 · Termin übernehmen", `<ul><li>Im Raster <b>Mo–Fr</b> stehen die freien Mathe-Lektionen: hohes Kästchen = Doppellektion, grün = danach Zeit zum Besprechen.</li>
     <li><b>Der Weg</b>: Klick auf das Raster (oder «Ich übernehme») → alle möglichen Termine Woche für Woche → Termin anklicken → <b>übernehmen</b>. Damit ist er hier als gebucht erfasst.</li>
     <li>Gleich danach öffnet sich das Praktikumstool in einem neuen Fenster direkt bei dieser Lektion: dort <b>«Besuch eintragen»</b>. Das bleibt Pflicht.</li>
-    <li>Klappt es im Tool nicht (z.B. jemand anderes war schneller): in <b>Meine Termine</b> «Termin ändern» oder «Abgeben».</li>
+    <li>Klappt es im Tool nicht (z.B. jemand anderes war schneller): in <b>Meine Termine</b> «Anpassen» → Termin ändern oder wieder abgeben. Danach öffnet sich das Tool, damit du es dort auch anpasst.</li>
     <li>Nach dem Besuch: im Reiter <b>Meine Termine</b> auf <b>Erledigt</b>.</li>
     <li><b>Stand</b>: <span class="chip s-offen">offen</span> noch niemand ·
       <span class="chip s-gebucht">gebucht</span> übernommen und im Praktikumstool eingetragen – beides gehört zusammen ·
       <span class="chip s-besucht">besucht</span> hat stattgefunden.</li>
-    <li>In <b>Meine Termine</b> je Zeile: <b>✓ Erledigt</b> · <b>Termin ändern</b> · <b>Abgeben</b> (aus der eigenen Liste nehmen, im Tool die Buchung löschen) · <b>Tool ↗</b> · <b>Achtung / Bemerkung</b> (Pflichtbesuch später oder nur eine Bemerkung).</li>
+    <li>In <b>Meine Termine</b> je Zeile: <b>✓ Erledigt</b> · <b>Anpassen</b> (Termin ändern oder wieder abgeben – danach öffnet sich das Praktikumstool) · <b>Achtung / Bemerkung</b> · ganz rechts <b>Tool ↗</b>. Unter dem Namen: <b>Kontakte</b> – Mathe-PxL, zuständige PxL und Mentor/in mit E-Mail und Telefon.</li>
     <li>Hinweise wie «an diesem Tag schon ein Besuch» zählen Besuche anderer Fächer mit. Ein Doppelbesuch genau zur selben Zeit ist kein Problem.</li></ul>`)}
   ${k("4 · Studierende und Achtung", `<ul><li>Reiter <b>Studierende</b>: alle Praktika einer Person auf einen Blick, Klick auf den Namen zeigt den Verlauf.</li>
     <li><b>⚠ Achtung</b>: «im Profil / Quartal besuchen» mit Begründung – dann ist der Besuch dort Pflicht und erscheint mit ⚠.</li>
@@ -1450,6 +1483,8 @@ async function praktikaUebernehmen(liste) {
       if (!p.idpraktikum || !p.idstudent) continue;
       const alt = nach[p.idpraktikum];
       if (alt && alt.lektionen && !p.lektionen) p.lektionen = alt.lektionen;   // Export ohne Stundenpläne
+      if (alt && alt.besuche && !p.besuche) p.besuche = alt.besuche;
+      if (alt && alt.kontakte && !p.kontakte) p.kontakte = alt.kontakte;
       if (!alt) neu++; else if (JSON.stringify(alt) !== JSON.stringify(p)) geaendert++;
       nach[p.idpraktikum] = p;
       proJahr[p.jahr + " " + p.gruppe] = (proJahr[p.jahr + " " + p.gruppe] || 0) + 1;
