@@ -1258,7 +1258,8 @@ function ansichtHilfe() {
   ${k("5 · Halbtagespraktikum", `<ul><li>Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als <b>Paar</b> in einer Zeile.</li>
     <li><b>Beide übernehmen</b> trägt den Doppelbesuch für beide ein; im Tool beide eintragen.</li></ul>`)}
   ${k("6 · Aktualisieren", `<ul><li><b>In der Regel muss hier nichts gemacht werden.</b></li><li>Nur vor neuen Praktika (eine Person für alle): «Praktikumstool öffnen und Daten holen», im Tool das Lesezeichen klicken.</li>
-    <li>Spezialfälle (Excel) einlesen, Regeln aus der Checkliste übernehmen, Orte suchen lassen.</li></ul>`)}
+    <li>Spezialfälle (Excel) einlesen, Regeln aus der Checkliste übernehmen, Orte suchen lassen.</li>
+    <li>Neue Person dazugekommen: im Praktikumstool ihre Seite öffnen und dort das Lesezeichen klicken – nur sie wird nachgetragen.</li></ul>`)}
   </div>
   <p class="leise klein">Gespeichert wird im gemeinsamen Ordner. Änderungen der anderen erscheinen nach der Synchronisation (meist innert einer Minute; sofort: ↻ oben rechts).</p>`;
 }
@@ -1350,6 +1351,8 @@ function ansichtAktualisieren() {
        <label class="klein"><input type="checkbox" id="holPlan" checked> mit Stundenplänen (Mathe-Lektionen) für ${sjText(e.studienjahr)}</label></p>
     <p><button class="knopf haupt" id="toolHolen">Praktikumstool öffnen und Daten holen</button>
        <span class="leise klein">Im Tool anmelden und dort das Lesezeichen «Praxisbesuche-Export» anklicken.</span></p>
+    <p class="klein"><b>Einzelne Person nachtragen</b> (kommt selten vor): Praktikumstool öffnen, die Seite dieser Person aufrufen
+       und dort das Lesezeichen klicken – dann kommt nur dieses Praktikum mit Stundenplan dazu.</p>
     <details><summary class="leise klein">oder eine gespeicherte Datei einlesen</summary>
       <input type="file" id="dateiTool" accept=".json" multiple> <button class="knopf" id="importTool">Einlesen</button></details>
     <div class="import-ergebnis" id="ergTool"></div>
@@ -1656,7 +1659,7 @@ setInterval(() => {
 window.addEventListener("load", () => setTimeout(rundgangStart, 900));
 const SCHRITTE = [
   { ansicht: "start", titel: "Willkommen", text: "In zwei Minuten durch die Praxisbesuche – mit erfundenen Beispieldaten. Mit «Weiter» geht es zum nächsten Schritt.", vorher: () => geheZu("start") },
-  { ziel: "#ich", ansicht: "start", titel: "Wer bin ich?", text: "Oben rechts das eigene Kürzel wählen. Dann gehören «Ich übernehme» und «Meine Termine» dir. Den Rundgang kann man jederzeit mit «✕ Beenden» abbrechen oder unten direkt zu einem Schritt springen.", vorher: () => { S.ich = "hmo"; zeichnen(); } },
+  { ziel: "#ich", ansicht: "start", titel: "Wer bin ich?", text: "Oben rechts das eigene Kürzel wählen (hier im Beispiel: clu). Dann gehören «Ich übernehme» und «Meine Termine» dir. Den Rundgang kann man jederzeit mit «✕ Beenden» abbrechen oder unten direkt zu einem Schritt springen.", vorher: () => { S.ich = "clu"; merke("ich", "clu"); zeichnen(); } },
   { ziel: "nav button[data-ansicht=planung]", ansicht: "planung", titel: "Profil & Quartal", text: "Hier wird geplant: alle Profil-, Quartals- und Spezialpraktika des Studienjahrs.", vorher: () => geheZu("planung") },
   { ziel: ".filterbox .fsek", ansicht: "planung", titel: "Grundauswahl", text: "Welche Praktika, ob ein Besuch nötig ist, und der Stand (offen, übernommen, besucht). Ein Klick schaltet um." },
   { ziel: ".filterbox details", ansicht: "planung", titel: "Wann", text: "Aufklappen: Zeitraum, Tag, Vormittag/Nachmittag, Einzel- oder Doppellektion und «danach Zeit zum Besprechen».", vorher: () => { const d = document.querySelector(".filterbox details"); if (d) d.open = true; } },
@@ -1670,7 +1673,7 @@ const SCHRITTE = [
     vorher: () => { const r = document.querySelector(".raster"); if (r) r.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
   { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Ich übernehme", text: "Oder direkt hier: «Ich übernehme» bucht – im Praktikumstool gleich mit eintragen. «Erledigt» klickt man später in «Meine Termine»." },
   { ziel: ".aktivleiste .knopf", ansicht: "planung", titel: "Liste für Excel kopieren", text: "Kopiert die Liste, so wie sie gefiltert ist – dann in Excel oder eine Mail einfügen." },
-  { ziel: "nav button[data-ansicht=termine]", ansicht: "termine", titel: "Meine Termine", text: "Alle eigenen Besuche nach Tag, filterbar nach Halbtag, Profil, Quartal. Hier bei jedem Besuch: «Notiz» und «Achtung / Bemerkung» – z.B. «muss im Quartal besucht werden».", vorher: () => geheZu("termine") },
+  { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "Hier hast du alle deine Termine im Überblick, nach Tag geordnet und filterbar nach Halbtag, Profil, Quartal. Pro Termin kannst du: den Termin wechseln («Termin»), ins Praktikumstool springen («Tool ↗»), nach dem Besuch «Erledigt» klicken und – wenn nötig – eine «Notiz» oder «Achtung / Bemerkung» hinzufügen (z.B. «muss im Quartal besucht werden»).", vorher: () => geheZu("termine") },
   { ziel: "nav button[data-ansicht=halbtag]", ansicht: "halbtag", titel: "Halbtagespraktikum", text: "Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als PAAR untereinander – «Beide übernehmen» für den Doppelbesuch. Wer allein ist, steht als EINZELN da. Die Filter hier sind eigene, unabhängig von Profil & Quartal.", vorher: () => geheZu("halbtag") },
   { ziel: "nav button[data-ansicht=studierende]", ansicht: "studierende", titel: "Studierende", text: "Eine Zeile je Person: Halbtag, Profil, Quartal je mit Datum · Stand · Kürzel (NN = unbekannt). Suche beim Tippen, Filter nach Studienjahr, Sortierung. Abgeschlossene sind im Archiv.", vorher: () => geheZu("studierende") },
   { ansicht: "start", titel: "Los geht's", text: "Echte Seite in Chrome oder Edge öffnen, einmal den Ordner «Mathematik Sek1 - TM - Praxisbesuche» aus OneDrive wählen, Kürzel wählen – fertig. Die Hilfe oben erklärt alles nochmals.", vorher: () => geheZu("start"), ende: true },

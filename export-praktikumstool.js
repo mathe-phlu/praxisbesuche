@@ -22,8 +22,12 @@
   }
   // Auftrag von der Praxisbesuche-Seite holen (sie hat das Fenster geöffnet); sonst nachfragen
   const seite = await seiteFinden();
+  // Auf der Seite einer einzelnen Person geklickt: nur dieses Praktikum (mit Stundenplan) nachtragen
+  const hier = new URLSearchParams(location.search);
+  const einzeln = hier.get("tab") === "praktikum" && hier.get("idpraktikum") ? hier.get("idpraktikum") : null;
   let jahre, mitPlan;
-  if (seite) { jahre = jahreAus(seite.auftrag.jahre); mitPlan = !!seite.auftrag.plan; }
+  if (einzeln) { jahre = [hier.get("jahr") || "26-27"]; mitPlan = true; }
+  else if (seite) { jahre = jahreAus(seite.auftrag.jahre); mitPlan = !!seite.auftrag.plan; }
   else {
     const jetzt = (document.querySelector("select[name=jahr] option[value]:not([value=''])") || {}).value || "26-27";
     const antwort = prompt("Welche Studienjahre? (z.B. 26-27 oder 22-23 bis 26-27)", jetzt);
@@ -74,6 +78,11 @@
       await new Promise((r) => setTimeout(r, 150));   // das Tool nicht hetzen
     }
   }
+  if (einzeln) {
+    const eins = praktika.filter((p) => p.idpraktikum === einzeln);
+    if (!eins.length) { hinweis.textContent = "Dieses Praktikum hat kein Mathe – es gibt nichts nachzutragen."; setTimeout(() => hinweis.remove(), 8000); return; }
+    praktika.length = 0; praktika.push(...eins);
+  }
   if (mitPlan) {
     const planJahr = jahre[jahre.length - 1];
     const liste = praktika.filter((p) => p.jahr === planJahr && p.link);
@@ -86,7 +95,7 @@
       await new Promise((r) => setTimeout(r, 150));
     }
   }
-  const daten = { quelle: "praktikumstool.phlu.ch, Fächerliste", fach: FACH.kurz, jahre,
+  const daten = { quelle: "praktikumstool.phlu.ch, Fächerliste", fach: FACH.kurz, jahre, einzeln: !!einzeln,
                   erstellt: new Date().toISOString(), arten: artNamen, praktika };
   if (seite) {
     hinweis.textContent = "Übergebe an die Praxisbesuche-Seite …";
