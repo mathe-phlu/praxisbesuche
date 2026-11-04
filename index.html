@@ -140,6 +140,11 @@ span.name:hover, div.name:hover { text-decoration: underline; }
 div.name { font-weight: 600; cursor: pointer; color: var(--akzent); }
 table.regeln td { padding: 3px 8px 3px 0; }
 details.karte summary { cursor: pointer; }
+.legende-box { background: #fff; border: 1px solid var(--linie); border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; font-size: 13.5px; }
+.legende-kopf { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 4px; }
+.legende-zeilen { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 4px 18px; margin: 6px 0; }
+.legende-zeilen .rz { width: 80px; margin-right: 6px; }
+.legende-text { color: var(--tinte); }
 .legende { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13px; margin: 0 0 8px; }
 .legende .rz { width: 76px; }
 .rleer { font-size: 11px; color: #ccc; text-align: center; }
@@ -675,11 +680,18 @@ function aktionen(x) {
 /* Mathe-Lektionen als kleines Wochenraster Mo–Fr; Klick öffnet alle möglichen Termine */
 function legende() {
   const zu = lies("raster") === "zu";
-  return `<div class="legende"><button class="knopf klein" onclick="rasterUmschalten()">${zu ? "▸ Stundenplan einblenden" : "▾ Stundenplan ausblenden"}</button> <b>Mathe-Lektionen:</b>
-    <span class="rz">9:10–9:55</span> Einzellektion
-    <span class="rz doppel">8:20–9:55</span> Doppellektion
-    <span class="rz frei">10:15–11:00</span> grün: danach Zeit zum Besprechen (mind. ${BESPRECHUNG_MIN} Min frei)
-    <span class="leise">· Klick auf das Raster: grosse Ansicht aller Termine, dort Termin anklicken = übernehmen</span></div>`;
+  return `<div class="legende-box">
+    <div class="legende-kopf"><b>So liest du die Spalte «Mathe-Lektionen»</b>
+      <button class="knopf klein" onclick="rasterUmschalten()">${zu ? "▸ Stundenplan einblenden" : "▾ Stundenplan ausblenden"}</button></div>
+    <div class="legende-text">Für jede Person ein kleiner Wochenplan Mo–Fr. Jedes Kästchen ist eine <b>Mathe-Lektion, die man besuchen kann</b>.</div>
+    <div class="legende-zeilen">
+      <div><span class="rz">9:10–9:55</span> flaches Kästchen = <b>Einzellektion</b> (eine Lektion, 45 Min)</div>
+      <div><span class="rz doppel">8:20–9:55</span> hohes Kästchen = <b>Doppellektion</b> (zwei Lektionen hintereinander)</div>
+      <div><span class="rz frei">10:15–11:00</span> grün = nach dieser Mathe-Lektion hat die Person <b>frei für die Besprechung</b> (mind. ${BESPRECHUNG_MIN} Min oder Schulschluss)</div>
+      <div><span class="rz">13:35–14:20</span> weiss = danach geht der Unterricht gleich weiter</div>
+    </div>
+    <div class="legende-text">👉 <b>Auf den Wochenplan klicken</b>: alle Termine Woche für Woche. Dort einen Termin anklicken = <b>übernehmen</b>.</div>
+  </div>`;
 }
 function rasterUmschalten() { merke("raster", lies("raster") === "zu" ? "auf" : "zu"); zeichnen();
 }
