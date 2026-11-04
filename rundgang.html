@@ -231,8 +231,8 @@ dialog label input, dialog label select { margin-top: 2px; }
   <h1>Praxisbesuche Mathematik</h1>
   <nav id="nav">
     <button data-ansicht="start">Start</button>
-    <button data-ansicht="planung">Profil &amp; Quartal</button>
     <button data-ansicht="halbtag">Halbtagespraktikum</button>
+    <button data-ansicht="planung">Profil &amp; Quartal</button>
     <button data-ansicht="termine">Meine Termine</button>
     <button data-ansicht="studierende">Studierende</button>
     <button data-ansicht="aktualisieren">Aktualisieren</button>
@@ -1102,8 +1102,7 @@ async function berichtHochladen(i) {
       await w.write(await f.arrayBuffer()); await w.close();
       await eintragen({ typ: "bericht", praktikum: x.idpraktikum, person: x.person.id, datei: `${o.name}/${ziel}`, original: f.name });
       meldung(`Bericht abgelegt: Protokolle/${o.name}/${ziel}`);
-      const ok = await frage(`Bericht abgelegt: Protokolle/${o.name}/${ziel}\n\nE-Mail-Entwurf mit dem Bericht im Anhang erstellen (an Studierende, Mathe-PxL, Mentor/in)?`, { art: "wahl", wert: "ja", optionen: [["ja", "Ja, E-Mail-Entwurf erstellen"]] });
-      if (ok === "ja") mailEntwurf(x, f, ziel);
+      mailEntwurf(x, f, ziel);   // gleich danach: E-Mail-Entwurf mit dem Bericht im Anhang
     } catch (e) { meldung("Bericht konnte nicht gespeichert werden: " + e.message); }
   };
   wahl.click();
@@ -1145,7 +1144,7 @@ function mailEntwurf(x, datei, dateiname) {
     a.download = dateiname.replace(/\.[a-z0-9]+$/i, "") + ".eml";
     document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1000);
     const fehlt = [!(k.student && k.student.mail) && "Studierende", !pxl.length && "Mathe-PxL", !cc.length && "Mentor/in"].filter(Boolean);
-    meldung(`E-Mail-Entwurf gespeichert (${a.download}) – im Download-Ordner doppelklicken, öffnet in Outlook.${fehlt.length ? " Adresse fehlt: " + fehlt.join(", ") + " – bitte von Hand ergänzen." : ""}`);
+    meldung(`Bericht abgelegt. E-Mail-Entwurf «${a.download}»: oben rechts in der Download-Leiste anklicken – öffnet in Outlook mit dem Bericht im Anhang.${fehlt.length ? " Adresse fehlt: " + fehlt.join(", ") + " – bitte von Hand ergänzen." : ""}`);
   });
 }
 async function mailZuBericht(i, j) {
@@ -1534,7 +1533,7 @@ const HILFE = [
     <li>Termin passt nicht mehr: <b>Anpassen</b> → «Termin ändern» oder «Wieder abgeben». Danach öffnet sich das Tool – dort auch anpassen.</li>
     <li>Unter dem Namen: <b>Kontakte</b> (Mathe-PxL, zuständige PxL, Mentor/in mit E-Mail).</li>
     <li><b>Achtung / Bemerkung</b>: z.B. «muss im Quartal besucht werden» oder nur eine Bemerkung.</li>
-    <li><b>Bericht ↑</b>: Bericht (PDF oder Word) hochladen. Er landet im gemeinsamen Ordner unter <b>Protokolle/Name der Person</b> (fehlt der Ordner, wird er angelegt), benannt wie gewohnt «UB Nachname PK03 kürzel JJMMTT». Bei den Studierenden erscheint dann 📄. Danach auf Wunsch ein <b>E-Mail-Entwurf</b> mit dem Bericht im Anhang an Studierende, Mathe-PxL und Mentor/in – die Datei im Download-Ordner doppelklicken, sie öffnet in Outlook. ✉ erstellt den Entwurf nochmals.</li></ol>
+    <li><b>Bericht ↑</b>: Bericht (PDF oder Word) hochladen. Er landet im gemeinsamen Ordner unter <b>Protokolle/Name der Person</b> (fehlt der Ordner, wird er angelegt), benannt wie gewohnt «UB Nachname PK03 kürzel JJMMTT». Bei den Studierenden erscheint dann 📄. Gleichzeitig entsteht ein <b>E-Mail-Entwurf</b> mit dem Bericht im Anhang an Studierende, Mathe-PxL und Mentor/in – in der Download-Leiste des Browsers anklicken, er öffnet in Outlook. Text anpassen, senden. ✉ erstellt den Entwurf nochmals.</li></ol>
     <p class="leise">⚠ rechts = Regel verletzt (z.B. Buchung ausserhalb dieser Seite). Ein Doppelbesuch zur selben Zeit ist kein Problem.</p>`],
   ["halbtag", "Halbtagespraktikum", "Was ist anders?", `<ol class="schritte">
     <li>Reiter <b>Halbtagespraktikum</b>. Filter nach <b>Periode</b> (A–D) statt nach Tag.</li>
@@ -1982,6 +1981,7 @@ window.addEventListener("load", () => setTimeout(rundgangStart, 900));
 const SCHRITTE = [
   { ansicht: "start", titel: "Willkommen", text: "In zwei Minuten durch die Praxisbesuche – mit erfundenen Beispieldaten. Mit «Weiter» geht es zum nächsten Schritt.", vorher: () => geheZu("start") },
   { ziel: "#ich", ansicht: "start", titel: "Wer bin ich?", text: "Oben rechts das eigene Kürzel wählen (hier im Beispiel: clu). Dann gehören deine Buchungen und «Meine Termine» dir. Den Rundgang kann man jederzeit mit «✕ Beenden» abbrechen oder unten direkt zu einem Schritt springen.", vorher: () => { S.ich = "clu"; merke("ich", "clu"); zeichnen(); } },
+  { ziel: "nav button[data-ansicht=halbtag]", ansicht: "halbtag", titel: "Halbtagespraktikum", text: "Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als PAAR untereinander – «Termine (beide) ▸» bucht den Doppelbesuch. Wer allein ist, steht als EINZELN da. Die Filter hier sind eigene, unabhängig von Profil & Quartal.", vorher: () => geheZu("halbtag") },
   { ziel: "nav button[data-ansicht=planung]", ansicht: "planung", titel: "Profil & Quartal", text: "Hier wird geplant: alle Profil-, Quartals- und Spezialpraktika des Studienjahrs.", vorher: () => geheZu("planung") },
   { ziel: ".filterbox .fsek", ansicht: "planung", titel: "Grundauswahl", text: "Welche Praktika, ob ein Besuch nötig ist, und der Stand (offen, gebucht, besucht). Standardmässig ausgeblendet: wen du schon besucht hast. Ein Klick schaltet um." },
   { ziel: ".filterbox details", ansicht: "planung", titel: "Wann", text: "Der ganze Filter lässt sich oben auf- und zuklappen. Aufklappen: Zeitraum, Tag, Vormittag/Nachmittag, Einzel- oder Doppellektion und «danach Zeit zum Besprechen».", vorher: () => { const d = document.querySelector(".filterbox details"); if (d) d.open = true; } },
@@ -1994,8 +1994,7 @@ const SCHRITTE = [
     vorher: () => { const b = document.querySelector("#app table.liste tbody tr td:last-child .knopf.haupt"); if (b) b.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
   { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Termin wieder abgeben", text: "Bei deinen eigenen Buchungen steht dort «Termin wieder abgeben» – falls es im Praktikumstool doch nicht klappt. Danach öffnet sich das Tool, damit du die Buchung dort auch löschst." },
   { ziel: ".aktivleiste .knopf", ansicht: "planung", titel: "Liste für Excel kopieren", text: "Kopiert die Liste, so wie sie gefiltert ist – dann in Excel oder eine Mail einfügen." },
-  { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "Hier hast du alle deine Termine im Überblick, nach Tag geordnet und filterbar nach Halbtag, Profil, Quartal. Pro Termin: «✓ Erledigt» nach dem Besuch; «Anpassen» – Termin ändern oder wieder abgeben, danach öffnet sich das Praktikumstool, damit du es dort auch anpasst; «Achtung / Bemerkung» – Pflichtbesuch später (z.B. im Quartal) oder nur eine Bemerkung; «Bericht ↑» legt deinen Bericht in den Ordner der Person unter «Protokolle» und erstellt auf Wunsch einen E-Mail-Entwurf mit dem Bericht im Anhang (an Studierende, Mathe-PxL, Mentor/in) – Doppelklick öffnet ihn in Outlook; 📄 öffnet den Bericht, ✉ erstellt den Entwurf nochmals; ganz rechts «Tool ↗». Unter dem Namen klappen die «Kontakte» auf: Mathe-PxL, zuständige PxL und Mentor/in mit E-Mail. Die Hinweise rechts melden, falls doch etwas gegen eine Regel verstösst (z.B. Buchungen, die ausserhalb dieser Seite gemacht wurden).", vorher: () => geheZu("termine") },
-  { ziel: "nav button[data-ansicht=halbtag]", ansicht: "halbtag", titel: "Halbtagespraktikum", text: "Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als PAAR untereinander – «Termine (beide) ▸» bucht den Doppelbesuch. Wer allein ist, steht als EINZELN da. Die Filter hier sind eigene, unabhängig von Profil & Quartal.", vorher: () => geheZu("halbtag") },
+  { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "Hier hast du alle deine Termine im Überblick, nach Tag geordnet und filterbar nach Halbtag, Profil, Quartal. Pro Termin: «✓ Erledigt» nach dem Besuch; «Anpassen» – Termin ändern oder wieder abgeben, danach öffnet sich das Praktikumstool, damit du es dort auch anpasst; «Achtung / Bemerkung» – Pflichtbesuch später (z.B. im Quartal) oder nur eine Bemerkung; «Bericht ↑» legt deinen Bericht in den Ordner der Person unter «Protokolle» und erstellt gleichzeitig einen E-Mail-Entwurf mit dem Bericht im Anhang (an Studierende, Mathe-PxL, Mentor/in) – in der Download-Leiste anklicken, er öffnet in Outlook; 📄 öffnet den Bericht, ✉ erstellt den Entwurf nochmals; ganz rechts «Tool ↗». Unter dem Namen klappen die «Kontakte» auf: Mathe-PxL, zuständige PxL und Mentor/in mit E-Mail. Die Hinweise rechts melden, falls doch etwas gegen eine Regel verstösst (z.B. Buchungen, die ausserhalb dieser Seite gemacht wurden).", vorher: () => geheZu("termine") },
   { ziel: "#protokolle", ansicht: "termine", titel: "Protokolle im Verlauf", text: "Klick auf einen Namen: Im Verlauf stehen unter «Protokolle» alle Berichte der Person aus dem gemeinsamen Ordner – auch die alten. Vor einem Besuch z.B. kurz den Halbtagsbericht anschauen.",
     vorher: () => { const n = document.querySelector("#app table.liste tbody tr .name"); if (n) n.click(); }, nachher: () => detailZu() },
   { ziel: "nav button[data-ansicht=studierende]", ansicht: "studierende", titel: "Studierende", text: "Eine Zeile je Person: Halbtag, Profil, Quartal je mit Datum · Stand · Kürzel (NN = unbekannt). Suche beim Tippen, Filter nach Studienjahr, Sortierung. Abgeschlossene sind im Archiv.", vorher: () => geheZu("studierende") },

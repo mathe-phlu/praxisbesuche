@@ -212,8 +212,8 @@ dialog label input, dialog label select { margin-top: 2px; }
   <h1>Praxisbesuche Mathematik</h1>
   <nav id="nav">
     <button data-ansicht="start">Start</button>
-    <button data-ansicht="planung">Profil &amp; Quartal</button>
     <button data-ansicht="halbtag">Halbtagespraktikum</button>
+    <button data-ansicht="planung">Profil &amp; Quartal</button>
     <button data-ansicht="termine">Meine Termine</button>
     <button data-ansicht="studierende">Studierende</button>
     <button data-ansicht="aktualisieren">Aktualisieren</button>
@@ -1083,8 +1083,7 @@ async function berichtHochladen(i) {
       await w.write(await f.arrayBuffer()); await w.close();
       await eintragen({ typ: "bericht", praktikum: x.idpraktikum, person: x.person.id, datei: `${o.name}/${ziel}`, original: f.name });
       meldung(`Bericht abgelegt: Protokolle/${o.name}/${ziel}`);
-      const ok = await frage(`Bericht abgelegt: Protokolle/${o.name}/${ziel}\n\nE-Mail-Entwurf mit dem Bericht im Anhang erstellen (an Studierende, Mathe-PxL, Mentor/in)?`, { art: "wahl", wert: "ja", optionen: [["ja", "Ja, E-Mail-Entwurf erstellen"]] });
-      if (ok === "ja") mailEntwurf(x, f, ziel);
+      mailEntwurf(x, f, ziel);   // gleich danach: E-Mail-Entwurf mit dem Bericht im Anhang
     } catch (e) { meldung("Bericht konnte nicht gespeichert werden: " + e.message); }
   };
   wahl.click();
@@ -1126,7 +1125,7 @@ function mailEntwurf(x, datei, dateiname) {
     a.download = dateiname.replace(/\.[a-z0-9]+$/i, "") + ".eml";
     document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1000);
     const fehlt = [!(k.student && k.student.mail) && "Studierende", !pxl.length && "Mathe-PxL", !cc.length && "Mentor/in"].filter(Boolean);
-    meldung(`E-Mail-Entwurf gespeichert (${a.download}) – im Download-Ordner doppelklicken, öffnet in Outlook.${fehlt.length ? " Adresse fehlt: " + fehlt.join(", ") + " – bitte von Hand ergänzen." : ""}`);
+    meldung(`Bericht abgelegt. E-Mail-Entwurf «${a.download}»: oben rechts in der Download-Leiste anklicken – öffnet in Outlook mit dem Bericht im Anhang.${fehlt.length ? " Adresse fehlt: " + fehlt.join(", ") + " – bitte von Hand ergänzen." : ""}`);
   });
 }
 async function mailZuBericht(i, j) {
@@ -1515,7 +1514,7 @@ const HILFE = [
     <li>Termin passt nicht mehr: <b>Anpassen</b> → «Termin ändern» oder «Wieder abgeben». Danach öffnet sich das Tool – dort auch anpassen.</li>
     <li>Unter dem Namen: <b>Kontakte</b> (Mathe-PxL, zuständige PxL, Mentor/in mit E-Mail).</li>
     <li><b>Achtung / Bemerkung</b>: z.B. «muss im Quartal besucht werden» oder nur eine Bemerkung.</li>
-    <li><b>Bericht ↑</b>: Bericht (PDF oder Word) hochladen. Er landet im gemeinsamen Ordner unter <b>Protokolle/Name der Person</b> (fehlt der Ordner, wird er angelegt), benannt wie gewohnt «UB Nachname PK03 kürzel JJMMTT». Bei den Studierenden erscheint dann 📄. Danach auf Wunsch ein <b>E-Mail-Entwurf</b> mit dem Bericht im Anhang an Studierende, Mathe-PxL und Mentor/in – die Datei im Download-Ordner doppelklicken, sie öffnet in Outlook. ✉ erstellt den Entwurf nochmals.</li></ol>
+    <li><b>Bericht ↑</b>: Bericht (PDF oder Word) hochladen. Er landet im gemeinsamen Ordner unter <b>Protokolle/Name der Person</b> (fehlt der Ordner, wird er angelegt), benannt wie gewohnt «UB Nachname PK03 kürzel JJMMTT». Bei den Studierenden erscheint dann 📄. Gleichzeitig entsteht ein <b>E-Mail-Entwurf</b> mit dem Bericht im Anhang an Studierende, Mathe-PxL und Mentor/in – in der Download-Leiste des Browsers anklicken, er öffnet in Outlook. Text anpassen, senden. ✉ erstellt den Entwurf nochmals.</li></ol>
     <p class="leise">⚠ rechts = Regel verletzt (z.B. Buchung ausserhalb dieser Seite). Ein Doppelbesuch zur selben Zeit ist kein Problem.</p>`],
   ["halbtag", "Halbtagespraktikum", "Was ist anders?", `<ol class="schritte">
     <li>Reiter <b>Halbtagespraktikum</b>. Filter nach <b>Periode</b> (A–D) statt nach Tag.</li>
