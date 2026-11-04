@@ -131,7 +131,9 @@
     const minuten = (t) => { const [h, m] = String(t).split(":").map(Number); return h * 60 + m; };
     const hhmm = (n) => `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
     const tage = {};   // datum -> alle Lektionen des Tages (jedes Fach)
-    for (const woche of doc.querySelectorAll("table.tabelleStundenplanWoche")) {
+    // Wochen sind der Reihe nach mit Sprungmarken w01, w02, … versehen (Überschrift über der Woche)
+    [...doc.querySelectorAll("table.tabelleStundenplanWoche")].forEach((woche, wi) => {
+      const wAnker = "w" + String(wi + 1).padStart(2, "0");
       const zeilen = [...woche.rows].filter((r) => r.parentElement.parentElement === woche);
       const daten = [...zeilen[0].querySelectorAll("td.datumInner")].map((td) => {
         const m = td.textContent.match(/(\d\d)\.(\d\d)\.(\d{4})/);
@@ -154,11 +156,11 @@
             const lehrer = teile[0].replace(fachDiv ? fachDiv.textContent.replace(/\s+/g, " ").trim() : "", "").trim();
             const gebucht = [...feld.querySelectorAll("tr.visitInfo")].map((t) => t.textContent.trim().replace(/\s+/g, " ")).filter(Boolean);
             (tage[daten[k]] ||= []).push({ von, bis, ma: /^MA:/.test(fach), id: anker ? anker.id.replace("lekt", "") : "",
-                                           klasse: teile[1] || "", lehrer, gebucht });
+                                           klasse: teile[1] || "", lehrer, woche: wAnker, gebucht });
           }
         });
       }
-    }
+    });
     const bloecke = [];
     for (const [datum, l] of Object.entries(tage)) {
       l.sort((a, b) => a.von - b.von);
@@ -168,7 +170,7 @@
         while (j + 1 < l.length && l[j + 1].ma && l[j + 1].von - l[j].bis <= 15 && l[j + 1].klasse === l[i].klasse) j++;
         const naechste = l.slice(j + 1).find((x) => x.von >= l[j].bis);
         bloecke.push({ datum, zeit: hhmm(l[i].von), bis: hhmm(l[j].bis), anzahl: j - i + 1, klasse: l[i].klasse,
-                       id: l[i].id, ids: l.slice(i, j + 1).map((x) => x.id), lehrer: l[i].lehrer,
+                       id: l[i].id, ids: l.slice(i, j + 1).map((x) => x.id), lehrer: l[i].lehrer, woche: l[i].woche,
                        gebucht: l.slice(i, j + 1).flatMap((x) => x.gebucht),
                        frei: naechste ? naechste.von - l[j].bis : null,          // Minuten bis zur nächsten Lektion
                        naechste: naechste ? hhmm(naechste.von) : "" });           // null = danach kein Unterricht mehr

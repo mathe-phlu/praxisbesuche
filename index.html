@@ -155,6 +155,10 @@ div.name { font-weight: 600; cursor: pointer; color: var(--akzent); }
 table.regeln td { padding: 3px 8px 3px 0; }
 details.karte summary { cursor: pointer; }
 .legende-box { background: #fff; border: 1px solid var(--linie); border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; font-size: 13.5px; }
+.leg-gitter { display: grid; grid-template-columns: repeat(2, minmax(0, max-content)); gap: 6px 28px; margin: 8px 0; align-items: center; }
+.leg-paar { display: flex; align-items: center; gap: 8px; }
+.leg-paar .rz { width: 46px; }
+.leg-schritte { display: flex; flex-wrap: wrap; gap: 6px 14px; padding-top: 8px; border-top: 1px dashed var(--linie); }
 .legende-kopf { display: flex; justify-content: space-between; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
 .legende-kopf::-webkit-details-marker { display: none; }
 .legende-kopf b::before { content: "▸ "; } details.legende-box[open] .legende-kopf b::before { content: "▾ "; }
@@ -333,7 +337,12 @@ function blockText(l) {
   const danach = l.frei === null ? "danach kein Unterricht" : l.frei === undefined ? "" : l.frei >= BESPRECHUNG_MIN ? `danach ${l.frei} Min frei` : `danach ${l.frei} Min Pause`;
   return `${kurzDatum(l.datum)} ${l.zeit}–${l.bis || ""} · ${art}${l.klasse ? " · Kl. " + l.klasse : ""}${danach ? " · " + danach : ""}`;
 }
-function toolLink(x, lektion) { return x.link ? TOOL + x.link + (lektion ? "#lekt" + lektion : "") : ""; }
+/* Sprung ins Tool: zur Woche der Lektion (dann steht die Datumszeile oben), sonst zur Lektion selbst */
+function toolLink(x, lektion) {
+  if (!x.link) return "";
+  const l = lektion ? (x.lektionen || []).find((b) => b.id === lektion || (b.ids || []).includes(lektion)) : null;
+  return TOOL + x.link + (l && l.woche ? "#" + l.woche : lektion ? "#lekt" + lektion : "");
+}
 function datumText(d) { if (!d) return ""; const x = new Date(d); return isNaN(x) ? String(d) : x.toLocaleDateString("de-CH"); }
 
 /* ---------- Ordner (File System Access, nur Chrome/Edge) ---------- */
@@ -752,14 +761,14 @@ function legende() {
   return `<details class="legende-box" ${lies("legende") === "auf" ? "open" : ""} ontoggle="merke('legende', this.open ? 'auf' : 'zu')">
     <summary class="legende-kopf"><b>So liest du die Spalte «Mathe-Lektionen»</b>
       <button class="knopf klein" onclick="event.preventDefault();event.stopPropagation();rasterUmschalten()">${zu ? "▸ Stundenplan einblenden" : "▾ Stundenplan ausblenden"}</button></summary>
-    <div class="legende-text">Für jede Person ein kleiner Wochenplan Mo–Fr. Jedes Kästchen ist eine <b>Mathe-Lektion, die man besuchen kann</b>.</div>
-    <div class="legende-zeilen">
-      <div><span class="rz">9:10–9:55</span> flaches Kästchen = <b>Einzellektion</b> (eine Lektion, 45 Min)</div>
-      <div><span class="rz doppel">8:20–9:55</span> hohes Kästchen = <b>Doppellektion</b> (zwei Lektionen hintereinander)</div>
-      <div><span class="rz frei">10:15–11:00</span> grün = nach dieser Mathe-Lektion hat die Person <b>frei für die Besprechung</b> (mind. ${BESPRECHUNG_MIN} Min oder Schulschluss)</div>
-      <div><span class="rz">13:35–14:20</span> weiss = danach geht der Unterricht gleich weiter</div>
+    <div class="leg-gitter">
+      <div class="leg-paar"><span class="rz">9:10</span> <b>Einzellektion</b> <span class="leise">(45 Min)</span></div>
+      <div class="leg-paar"><span class="rz doppel">8:20</span> <b>Doppellektion</b> <span class="leise">(2 Lektionen)</span></div>
+      <div class="leg-paar"><span class="rz frei">10:15</span> <b>danach frei</b> <span class="leise">zum Besprechen</span></div>
+      <div class="leg-paar"><span class="rz">13:35</span> <b>danach Unterricht</b> <span class="leise">kein Besprechen</span></div>
     </div>
-    <div class="legende-text">→ <b>Auf den Wochenplan klicken</b>: alle Termine Woche für Woche. Dort einen Termin anklicken = <b>übernehmen</b> – das Praktikumstool öffnet sich gleich bei dieser Lektion.</div>
+    <div class="leg-schritte"><b>So buchst du:</b>
+      <span>① Wochenplan anklicken</span><span>② Termin wählen</span><span>③ «Übernehmen» – das Praktikumstool öffnet sich bei dieser Woche: dort «Besuch eintragen»</span></div>
   </details>`;
 }
 function rasterUmschalten() { merke("raster", lies("raster") === "zu" ? "auf" : "zu"); zeichnen();
