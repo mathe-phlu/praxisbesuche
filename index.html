@@ -1,0 +1,1494 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Praxisbesuche Mathematik</title>
+<meta name="robots" content="noindex">
+<!-- Schrift «Patrick Hand» nur für Überschriften; ohne Internet gilt die Systemschrift -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap">
+<!-- Nur zum Einlesen von Excel-Dateien (Spezialfälle, alte Liste); die Daten bleiben im Browser. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --tinte: #3a3a3a; --ph-braun: #8a6a3a; --ph-braun-dunkel: #6e532c; --ph-sand: #f5eddf; --grau: #f4f4f4; --linie: #e3e3e3; --leise: #6b6b6b; --hell: #ffffff;
+  --offen: #fce9d9; --uebernommen: #e3eef8; --gebucht: #d9e6f5; --besucht: #e6f2e6; --nichtnoetig: #f4f4f4;
+  --achtung: #a33a2e; --achtung-hell: #fbe9e6; --akzent: #2f5f8a;
+  --hand: "Patrick Hand", "Segoe Print", "Bradley Hand", cursive;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.45 -apple-system, "Segoe UI", Arial, sans-serif; color: var(--tinte); background: #fafafa; }
+header { background: var(--ph-braun); color: #fff; padding: 10px 20px; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; position: sticky; top: 0; z-index: 5; }
+header h1, h2, h3 { font-family: var(--hand); letter-spacing: .2px; font-weight: 400; }
+header h1 { font-size: 24px !important; }
+h2 { font-size: 28px !important; } h3 { font-size: 21px !important; }
+header h1 { font-size: 19px; margin: 0 12px 0 0; font-weight: 600; }
+nav { display: flex; gap: 4px; flex-wrap: wrap; }
+nav button { background: transparent; color: #f3ead9; border: 0; padding: 7px 12px; border-radius: 6px; font-size: 15px; cursor: pointer; }
+nav button.aktiv, nav button:hover { background: var(--ph-braun-dunkel); color: #fff; }
+header .rechts { margin-left: auto; display: flex; gap: 12px; align-items: center; font-size: 14px; color: #f3ead9; }
+header select { font-size: 14px; padding: 4px; }
+main { padding: 18px 20px 60px; max-width: 1500px; }
+h2 { font-size: 22px; margin: 4px 0 14px; font-weight: 600; }
+h3 { font-size: 17px; margin: 22px 0 8px; }
+.leise { color: var(--leise); }
+.klein { font-size: 13px; }
+button.knopf { font-size: 14px; padding: 6px 12px; border-radius: 6px; border: 1px solid #bbb; background: #fff; cursor: pointer; }
+button.knopf:hover { background: var(--grau); }
+button.knopf.haupt { background: var(--ph-braun); color: #fff; border-color: var(--ph-braun); }
+button.knopf.haupt:hover { background: var(--ph-braun-dunkel); }
+h2, h3 { color: var(--ph-braun-dunkel); }
+.kachel.gruppe { background: var(--ph-sand); }
+button.knopf.klein { font-size: 13px; padding: 3px 8px; }
+.kacheln { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 16px; }
+.kachel { background: #fff; border: 1px solid var(--linie); border-radius: 8px; padding: 8px 14px; min-width: 110px; }
+.kachel .t { font-size: 12px; color: var(--leise); }
+.kachel .z { font-size: 24px; font-weight: 700; }
+.kachel.gruppe { background: var(--grau); border: 0; display: flex; gap: 10px; padding: 8px; }
+.kachel.gruppe > .kachel { min-width: 90px; }
+.rot { color: var(--achtung); } .gruen { color: #3c7a3c; }
+.mitfilter { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .mitfilter { grid-template-columns: 1fr; } }
+.inhalt { min-width: 0; overflow-x: auto; }
+.filterbox { background: #fff; border: 1px solid var(--linie); border-radius: 8px; position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow: auto; }
+.fkopf { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--linie); background: var(--ph-sand); border-radius: 8px 8px 0 0; }
+.fsek { padding: 6px 12px 10px; border-bottom: 1px solid var(--linie); }
+.fblock { padding: 7px 0; border-top: 1px dashed #e2d9c8; }
+.fsek > .fblock:first-of-type, .fsek > summary + .fblock { border-top: 0; }
+.fblock .ftitel { display: block; font-size: 12.5px; margin: 0 0 4px; }
+.haken-liste .haken { display: flex; margin: 3px 0; }
+details.fsek summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+details.fsek summary::-webkit-details-marker { display: none; }
+details.fsek summary h4::before { content: "▸ "; }
+details.fsek[open] summary h4::before { content: "▾ "; }
+details.fsek summary h4 { display: inline; }
+.fsek h4 { margin: 4px 0 2px; font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--ph-braun-dunkel); }
+.fsek .fzeile { display: block; margin: 6px 0; }
+.fsek .ftitel { display: block; font-size: 12.5px; margin: 0 0 3px; }
+.fsek .fchip { margin: 0 3px 4px 0; }
+.fsek input[type=date] { width: 128px; }
+.fsek input[type=search], .fsek input[list] { width: 100%; }
+.aktivleiste { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: #fff; border: 1px solid var(--linie); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
+.aktivchip { font: inherit; font-size: 13px; background: var(--ph-sand); border: 1px solid #d8c8a8; border-radius: 12px; padding: 1px 9px; cursor: pointer; }
+.aktivchip:hover { border-color: var(--ph-braun); }
+.filterbox-alt { background: #fff; border: 1px solid var(--linie); border-radius: 8px; margin-bottom: 12px; }
+.fgrund { display: block; }
+.fzeile { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0; }
+.ftitel { font-size: 12px; color: var(--leise); margin-right: 2px; }
+.fchip { font: inherit; font-size: 13.5px; padding: 3px 10px; border-radius: 14px; border: 1px solid #ccc; background: #fff; color: var(--tinte); cursor: pointer; }
+.fchip:hover { border-color: var(--ph-braun); }
+.fchip.an { background: var(--ph-braun); border-color: var(--ph-braun); color: #fff; }
+.fgruppe { border-bottom: 1px solid var(--linie); padding: 0 12px; }
+.fgruppe summary { cursor: pointer; padding: 8px 0; list-style-position: inside; }
+.fgruppe[open] { padding-bottom: 8px; }
+.fgruppe input[type=search], .fgruppe input[type=date], .fgruppe select, .fgruppe input[list] { font-size: 14px; padding: 4px 6px; border: 1px solid #ccc; border-radius: 5px; }
+.faktiv { color: var(--ph-braun-dunkel); font-size: 13px; margin-left: 6px; }
+.ffuss { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 14px; }
+.fgrund select { font-size: 14px; padding: 3px 6px; border: 1px solid #ccc; border-radius: 5px; }
+.filter { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; background: #fff; border: 1px solid var(--linie); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+.filter label { display: flex; flex-direction: column; font-size: 12px; color: var(--leise); gap: 2px; }
+.filter label.haken { flex-direction: row; align-items: center; gap: 6px; font-size: 14px; color: var(--tinte); }
+.filter input[type=search], .filter select { font-size: 14px; padding: 5px 6px; border: 1px solid #ccc; border-radius: 5px; min-width: 110px; }
+table.liste { border-collapse: collapse; width: 100%; background: #fff; border: 1px solid var(--linie); }
+table.liste th { position: sticky; top: 56px; background: var(--ph-braun); color: #fff; font-weight: 600; text-align: left; padding: 8px 10px; font-size: 14px; white-space: nowrap; }
+table.liste td { padding: 7px 10px; border-bottom: 1px solid var(--linie); vertical-align: top; }
+table.liste tr:hover td { background: #fbfbfb; }
+table.liste td.name { font-weight: 600; cursor: pointer; color: var(--akzent); white-space: nowrap; }
+table.liste td.name:hover { text-decoration: underline; }
+.chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 13px; white-space: nowrap; }
+.s-offen { background: var(--offen); } .s-uebernommen { background: var(--uebernommen); } .s-gebucht { background: var(--gebucht); }
+.s-besucht { background: var(--besucht); } .s-nicht { background: var(--nichtnoetig); color: #888; }
+.n-ja { font-weight: 700; color: var(--achtung); } .n-optional { color: var(--leise); } .n-nein { color: #aaa; } .n-spaeter { color: #aaa; }
+.achtung { color: var(--achtung); font-weight: 700; cursor: help; }
+.zeile-achtung td:first-child { box-shadow: inset 4px 0 0 var(--achtung); }
+.hinweis { background: var(--achtung-hell); color: var(--achtung); padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+.karte { background: #fff; border: 1px solid var(--linie); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+.karte h3 { margin-top: 0; }
+.start { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.start .karte { cursor: pointer; }
+.start .karte:hover { border-color: #999; }
+.start .karte .z { font-size: 30px; font-weight: 700; }
+.schublade { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 96vw); background: #fff; box-shadow: -4px 0 20px rgba(0,0,0,.18); z-index: 10; overflow: auto; padding: 18px 22px 40px; transform: translateX(105%); transition: transform .2s; }
+.schublade.offen { transform: none; }
+.schublade .zu { position: absolute; right: 16px; top: 12px; }
+dialog { border: 1px solid var(--linie); border-radius: 10px; padding: 18px 20px; min-width: min(420px, 90vw); }
+dialog::backdrop { background: rgba(0,0,0,.25); }
+dialog input, dialog select { font-size: 15px; padding: 6px; width: 100%; border: 1px solid #ccc; border-radius: 5px; }
+textarea { width: 100%; font: inherit; min-height: 60px; padding: 6px; border: 1px solid #ccc; border-radius: 5px; }
+.notiz { border-left: 3px solid #ccc; padding: 2px 10px; margin: 6px 0; }
+.notiz .wer { font-size: 12px; color: var(--leise); }
+.meldung { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--tinte); color: #fff; padding: 10px 18px; border-radius: 8px; z-index: 20; display: none; }
+.import-ergebnis { font-size: 14px; margin-top: 8px; }
+.import-ergebnis li { margin: 2px 0; }
+input.eingabe { font-size: 14px; padding: 4px 6px; border: 1px solid #ccc; border-radius: 5px; }
+.raster { display: grid; grid-template-columns: repeat(5, 68px); gap: 3px; cursor: pointer; }
+.raster:hover { outline: 1px solid var(--ph-braun); outline-offset: 2px; }
+.rt, .wt { display: flex; flex-direction: column; gap: 2px; }
+.rk { font-size: 11px; color: var(--leise); text-align: center; border-bottom: 1px solid var(--linie); }
+.rz { display: inline-block; box-sizing: border-box; font-size: 11px; letter-spacing: -.2px; background: #fff; border: 1px solid #cfcfcf; border-radius: 3px; padding: 1px 2px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: clip; font-variant-numeric: tabular-nums; line-height: 1.35; }
+.raster .rz { display: block; width: 100%; }
+.rz.doppel { padding: 7px 2px; border-color: #9a9a9a; font-weight: 600; }
+.rz.frei { background: #dcefd8; border-color: #8cc084; color: #1f4d1a; }
+.paar { color: var(--ph-braun-dunkel); font-weight: 600; margin-top: 2px; }
+table.regeln td { padding: 3px 8px 3px 0; }
+details.karte summary { cursor: pointer; }
+.legende { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13px; margin: 0 0 8px; }
+.legende .rz { width: 76px; }
+.rleer { font-size: 11px; color: #ccc; text-align: center; }
+.wochen { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow: auto; }
+.woche { display: grid; grid-template-columns: 110px repeat(5, minmax(120px, 1fr)); gap: 4px; align-items: start; }
+.wt .rz { display: block; width: 100%; text-align: left; }
+.wk { font-size: 13px; font-weight: 600; padding-top: 2px; }
+button.knopfz { font: inherit; font-size: 12.5px; cursor: pointer; text-align: left; padding: 2px 5px; }
+button.knopfz:hover { border-color: var(--ph-braun); }
+dialog { max-width: min(980px, 96vw); }
+button.lekt { font: inherit; font-size: 12.5px; border: 1px solid var(--linie); background: var(--grau); border-radius: 5px; padding: 1px 6px; margin: 1px 0; cursor: pointer; white-space: nowrap; }
+button.lekt.doppel { background: var(--ph-sand); }
+button.lekt .bespr { font-size: 11px; color: #3c7a3c; font-weight: 600; }
+button.lekt:hover { border-color: #999; background: #fff; }
+dialog label input, dialog label select { margin-top: 2px; }
+.leer { padding: 30px; text-align: center; color: var(--leise); background: #fff; border: 1px dashed #ccc; border-radius: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Praxisbesuche Mathematik</h1>
+  <nav id="nav">
+    <button data-ansicht="start">Start</button>
+    <button data-ansicht="planung">Profil &amp; Quartal</button>
+    <button data-ansicht="halbtag">Halbtagespraktikum</button>
+    <button data-ansicht="termine">Meine Termine</button>
+    <button data-ansicht="studierende">Studierende</button>
+    <button data-ansicht="aktualisieren">Aktualisieren</button>
+    <button data-ansicht="hilfe">Hilfe</button>
+  </nav>
+  <div class="rechts">
+    <span id="ordnerstatus"></span>
+    <label>Ich bin <select id="ich"></select></label>
+    <button class="knopf klein" id="neuLaden" title="Einträge der anderen neu einlesen">↻</button>
+  </div>
+</header>
+<main id="app"></main>
+<aside class="schublade" id="schublade"></aside>
+<div class="meldung" id="meldung"></div>
+<dialog id="frage"><form method="dialog">
+  <p id="frageText" style="margin-top:0;font-weight:600"></p>
+  <div id="frageFeld"></div>
+  <p style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:0">
+    <button class="knopf" value="abbrechen">Abbrechen</button><button class="knopf haupt" value="ok" id="frageOk">OK</button></p>
+</form></dialog>
+
+<script>
+"use strict";
+/* =====================================================================
+   Praxisbesuche Mathematik
+   Daten liegen in einem gemeinsamen Ordner (Teams/OneDrive oder SwitchDrive):
+     stamm/praktika.json        aus dem Praktikumstool (Lesezeichen-Export), nur «Aktualisieren» schreibt
+     stamm/alt.json             Verlauf aus der alten Excel-Liste
+     stamm/spezial.json         Spezialfälle je Studienjahr
+     stamm/einstellungen.json   Studienjahr, Quote, Dozierende
+     eintraege/<kürzel>/*.json  jede Handlung eine eigene Datei, nie geändert
+   ===================================================================== */
+
+const KUERZEL_STANDARD = ["alh", "clu", "hmo", "kum", "lam", "nas", "nsa", "srg", "wec", "wem", "wma"];
+const TIPPFEHLER = { km: "kum" };
+const GRUPPEN = ["Halbtag", "Profil", "Quartal", "Spezial", "Abschluss"];
+const TOOL = "https://praktikumstool.phlu.ch";
+
+/* Studienjahr nach Datum: ab August gilt das neue (z.B. Nov. 2026 -> «26-27») */
+function studienjahrHeute() {
+  const d = new Date(), y = d.getFullYear() % 100, a = d.getMonth() >= 7 ? y : y - 1;
+  return `${String(a).padStart(2, "0")}-${String(a + 1).padStart(2, "0")}`;
+}
+const S = {
+  ordner: null,
+  ich: lies("ich") || "",
+  praktika: {},          // idpraktikum -> Praktikum
+  orte: {},              // Schulort -> {lat, lon, label}
+  personen: {},          // idstudent -> {name, studiengang, faecher}
+  alt: [],               // Personen aus der alten Excel
+  spezial: [],           // Spezialfälle
+  einst: { studienjahr: studienjahrHeute(), studienjahrFest: "", quote: 0.5, dozierende: [], arbeitssitzungProfil: "2027-01-12", arbeitssitzungQuartal: "2027-01-14" },
+  eintraege: [],
+  ansicht: lies("ansicht") || "start",
+  offeneGruppen: new Set(JSON.parse(lies("offen") || "[]")),
+  filter: (() => { const f = JSON.parse(lies("filter") || "{}");
+    for (const k of ["praktikum", "suche", "tag"]) delete f[k];
+    for (const k of ["noetig", "stand", "tageszeit", "lektart"]) if (f[k] !== undefined && !Array.isArray(f[k])) delete f[k];
+    return f; })(),
+};
+
+/* ---------- kleine Helfer ---------- */
+const REFS = [];
+function ref(v) { REFS.push(v); return REFS.length - 1; }
+function lies(k) { try { return localStorage.getItem("pb." + k); } catch (e) { return null; } }
+function merke(k, v) { try { localStorage.setItem("pb." + k, v); } catch (e) {} }
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const sjText = (j) => (j ? j.replace("-", "/") : "–");
+function nameSchluessel(...teile) {
+  return teile.join(" ").toLowerCase().normalize("NFC").split(/[\s,]+/).filter(Boolean).sort().join(" ");
+}
+/* Eingabe in der Seite statt Browser-Eingabefenster: frage(text, {wert, art: "text"|"lang"|"wahl", optionen}) -> Text oder null */
+function frage(text, o = {}) {
+  return new Promise((fertig) => {
+    const d = $("#frage"); $("#frageText").textContent = text; $("#frageText").style.whiteSpace = "pre-line";
+    const f = $("#frageFeld");
+    f.innerHTML = o.art === "wahl" ? `<select id="frageEingabe">${o.optionen.map(([v, t]) => `<option value="${esc(v)}" ${v === o.wert ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`
+      : o.art === "lang" ? `<textarea id="frageEingabe">${esc(o.wert || "")}</textarea>`
+      : `<input id="frageEingabe" value="${esc(o.wert || "")}">`;
+    d.onclose = () => fertig(d.returnValue === "ok" ? $("#frageEingabe").value : null);
+    d.returnValue = ""; d.showModal(); $("#frageEingabe").focus();
+  });
+}
+function meldung(t) { const m = $("#meldung"); m.textContent = t; m.style.display = "block"; clearTimeout(meldung.t); meldung.t = setTimeout(() => (m.style.display = "none"), 3500); }
+function jahrPlus(j, n) { const a = Number(j.slice(0, 2)) + n; return `${String(a).padStart(2, "0")}-${String(a + 1).padStart(2, "0")}`; }
+function datumAus(t) {   // «11.01.2027» oder «2027-01-11» -> «2027-01-11»
+  if (!t) return "";
+  const m = String(t).match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  return m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : String(t).slice(0, 10);
+}
+const WTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+function wochentag(iso) { return WTAGE[new Date(iso + "T12:00").getDay()]; }
+function kurzDatum(iso) { return iso ? `${wochentag(iso)} ${iso.slice(8, 10)}.${iso.slice(5, 7)}.` : ""; }
+function vormittag(zeit) { return (zeit || "00:00") < "12:00"; }
+/* Suche: Komma = oder, Leerzeichen = und, «-wort» = ohne */
+function passtSuche(text, such) {
+  if (!such) return true;
+  const t = text.toLowerCase();
+  const ohne = such.split(/[\s,]+/).filter((w) => w.startsWith("-") && w.length > 1).map((w) => w.slice(1));
+  if (ohne.some((w) => t.includes(w))) return false;
+  const oder = such.split(",").map((a) => a.split(/\s+/).filter((w) => w && !w.startsWith("-"))).filter((a) => a.length);
+  return !oder.length || oder.some((und) => und.every((w) => t.includes(w)));
+}
+/* Mathe-Lektionen eines Praktikums, gefiltert nach Zeitraum, Wochentag, Tageszeit */
+/* Regeln aus der Checkliste der Praktikumsabteilung; unter «Aktualisieren → Regeln» je Studienjahr anpassbar */
+const REGELN_STD = { profilErsteTage: 3, quartalErsteTage: 7, letzterTag: true, maxProWoche: 2, besprechungMin: 30 };
+function regel(k) { const r = S.einst.regeln || {}; return r[k] ?? REGELN_STD[k]; }
+const BESPRECHUNG_MIN_STD = 30;
+Object.defineProperty(window, "BESPRECHUNG_MIN", { get: () => Number(regel("besprechungMin")) || BESPRECHUNG_MIN_STD });
+function besprechung(l) { return l.frei === null || (l.frei !== undefined && l.frei >= BESPRECHUNG_MIN); }
+function lektionenIm(x, { nurFrei = true, alleTage = false } = {}) {
+  const von = fw("von", ""), bis = fw("bis", ""), tage = fa("tage"), tz = fa("tageszeit");
+  const planung = S.ansicht === "planung";
+  const art = planung ? fa("lektart") : [], bespr = planung && fw("bespr", true);
+  return (x.lektionen || []).filter((l) => {
+    if (art.length && !art.includes((l.anzahl || 1) > 1 ? "doppel" : "einzel")) return false;
+    if (bespr && !besprechung(l)) return false;
+    if (von && l.datum < von) return false;
+    if (bis && l.datum > bis) return false;
+    if (terminGesperrt(x, l.datum, l.zeit)) return false;
+    if (alleTage || !planung) return !nurFrei || !(l.gebucht && l.gebucht.length);
+    if (tage.length && !tage.includes(wochentag(l.datum))) return false;
+    if (tz.length && !tz.includes(vormittag(l.zeit) ? "vormittag" : "nachmittag")) return false;
+    if (nurFrei && l.gebucht && l.gebucht.length) return false;
+    return true;
+  }).sort((a, b) => (a.datum + a.zeit).localeCompare(b.datum + b.zeit));
+}
+/* Luftlinie in km zwischen zwei Schulorten (Koordinaten aus stamm/orte.json) */
+function km(a, b) {
+  const o1 = S.orte[a], o2 = S.orte[b];
+  if (!o1 || !o2) return null;
+  const r = Math.PI / 180, dLat = (o2.lat - o1.lat) * r, dLon = (o2.lon - o1.lon) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(o1.lat * r) * Math.cos(o2.lat * r) * Math.sin(dLon / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+}
+function umkreisText(x) {
+  const um = fw("umOrt", ""); if (!um || !x.schulort) return "";
+  const d = km(um, x.schulort);
+  return d == null ? "" : ` <span class="leise klein">· ${d < 1 ? "<1" : Math.round(d)} km</span>`;
+}
+function blockText(l) {
+  const art = (l.anzahl || 1) > 1 ? `${l.anzahl}er-Lektion` : "Einzellektion";
+  const danach = l.frei === null ? "danach kein Unterricht" : l.frei === undefined ? "" : l.frei >= BESPRECHUNG_MIN ? `danach ${l.frei} Min frei` : `danach ${l.frei} Min Pause`;
+  return `${kurzDatum(l.datum)} ${l.zeit}–${l.bis || ""} · ${art}${l.klasse ? " · Kl. " + l.klasse : ""}${danach ? " · " + danach : ""}`;
+}
+function toolLink(x, lektion) { return x.link ? TOOL + x.link + (lektion ? "#lekt" + lektion : "") : ""; }
+function datumText(d) { if (!d) return ""; const x = new Date(d); return isNaN(x) ? String(d) : x.toLocaleDateString("de-CH"); }
+
+/* ---------- Ordner (File System Access, nur Chrome/Edge) ---------- */
+const IDB = {
+  db() { return new Promise((ok, nein) => { const r = indexedDB.open("praxisbesuche", 1); r.onupgradeneeded = () => r.result.createObjectStore("k"); r.onsuccess = () => ok(r.result); r.onerror = () => nein(r.error); }); },
+  async get(k) { const db = await this.db(); return new Promise((ok) => { const r = db.transaction("k").objectStore("k").get(k); r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); }); },
+  async set(k, v) { const db = await this.db(); return new Promise((ok) => { const t = db.transaction("k", "readwrite"); t.objectStore("k").put(v, k); t.oncomplete = ok; }); },
+};
+/* Gewählt wird der Ordner «Praxisbesuche»; die Daten liegen in dessen Unterordner «Daten». */
+async function datenOrdner(h) {
+  S.wurzel = h;
+  S.ordner = h.name === "Daten" ? h : await h.getDirectoryHandle("Daten", { create: true });
+}
+async function ordnerWaehlen() {
+  if (!window.showDirectoryPicker) { meldung("Diese Seite braucht Chrome oder Edge (Ordnerzugriff)."); return; }
+  const h = await showDirectoryPicker({ id: "praxisbesuche", mode: "readwrite" });
+  await IDB.set("ordner", h);
+  await datenOrdner(h);
+  await allesLaden();
+}
+async function ordnerZugriff() {
+  if (window.__testOrdner) { S.ordner = window.__testOrdner; return true; }
+  const h = await IDB.get("ordner").catch(() => null);
+  if (!h) return false;
+  if ((await h.queryPermission({ mode: "readwrite" })) === "granted") { await datenOrdner(h); return true; }
+  S.ordnerWartet = h;
+  return false;
+}
+async function zugriffErlauben() {
+  const h = S.ordnerWartet;
+  if (h && (await h.requestPermission({ mode: "readwrite" })) === "granted") { await datenOrdner(h); await allesLaden(); }
+}
+async function verzeichnis(pfad, anlegen = false) {
+  let d = S.ordner;
+  for (const teil of pfad.split("/").filter(Boolean)) d = await d.getDirectoryHandle(teil, { create: anlegen });
+  return d;
+}
+async function leseJSON(pfad, standard) {
+  try {
+    const teile = pfad.split("/"); const datei = teile.pop();
+    const d = await verzeichnis(teile.join("/"));
+    const f = await (await d.getFileHandle(datei)).getFile();
+    return JSON.parse(await f.text());
+  } catch (e) { return standard; }
+}
+async function schreibeJSON(pfad, obj) {
+  const teile = pfad.split("/"); const datei = teile.pop();
+  const d = await verzeichnis(teile.join("/"), true);
+  const w = await (await d.getFileHandle(datei, { create: true })).createWritable();
+  await w.write(JSON.stringify(obj, null, 1));
+  await w.close();
+}
+
+/* ---------- Laden ---------- */
+async function allesLaden() {
+  if (!S.ordner) return zeichnen();
+  S.orte = await leseJSON("stamm/orte.json", {});
+  const [pr, alt, sp, einst] = await Promise.all([
+    leseJSON("stamm/praktika.json", { praktika: [] }), leseJSON("stamm/alt.json", { personen: [] }),
+    leseJSON("stamm/spezial.json", { faelle: [] }), leseJSON("stamm/einstellungen.json", null)]);
+  S.praktika = {}; S.personen = {};
+  for (const p of pr.praktika || []) {
+    S.praktika[p.idpraktikum] = p;
+    const alte = S.personen[p.idstudent];
+    if (!alte || p.jahr >= alte.jahr) S.personen[p.idstudent] = { id: p.idstudent, name: p.name, studiengang: p.studiengang, faecher: p.faecher, jahr: p.jahr };
+  }
+  S.alt = alt.personen || [];
+  S.artNamen = pr.arten || {};
+  S.spezial = sp.faelle || [];
+  if (einst) S.einst = Object.assign(S.einst, einst);
+  // automatisch nach Datum, ausser unter «Einstellungen» fest gewählt
+  S.einst.studienjahr = S.einst.studienjahrFest || studienjahrHeute();
+  if (!S.einst.dozierende.length) S.einst.dozierende = KUERZEL_STANDARD.map((k) => ({ kuerzel: k, name: "", soll: "" }));
+  await eintraegeLaden();
+}
+async function eintraegeLaden() {
+  const liste = [], gesehen = new Set();
+  try {
+    const wurzel = await verzeichnis("eintraege");
+    for await (const [name, d] of wurzel.entries()) {
+      if (d.kind !== "directory") continue;
+      for await (const [dn, f] of d.entries()) {
+        if (f.kind !== "file" || !dn.endsWith(".json")) continue;
+        try {
+          const e = JSON.parse(await (await f.getFile()).text());
+          if (!e.id || gesehen.has(e.id)) continue;      // Konfliktkopien enthalten dieselbe id
+          gesehen.add(e.id); liste.push(e);
+        } catch (err) { /* halb synchronisierte Datei: beim nächsten Mal */ }
+      }
+    }
+  } catch (e) { /* noch keine Einträge */ }
+  liste.sort((a, b) => a.zeit.localeCompare(b.zeit));
+  S.eintraege = liste;
+  berechnen();
+  zeichnen();
+}
+async function eintragen(e) {
+  if (!S.ich) { meldung("Bitte oben rechts «Ich bin» wählen."); return false; }
+  const zeit = new Date().toISOString();
+  const id = zeit.replace(/[:.]/g, "") + "-" + Math.random().toString(36).slice(2, 8);
+  const eintrag = Object.assign({ id, zeit, wer: S.ich }, e);
+  await schreibeJSON(`eintraege/${S.ich}/${id}.json`, eintrag);
+  S.eintraege.push(eintrag);
+  berechnen(); zeichnen();
+  return true;
+}
+
+/* ---------- Rechnen: Stand, Besuch nötig, Verlauf ---------- */
+let R = { praktika: [], personen: {} };
+function berechnen() {
+  const altNach = {};
+  for (const a of S.alt) altNach[a.schluessel] = a;
+  const spezialNach = {};
+  for (const f of S.spezial) if (f.idstudent) (spezialNach[f.idstudent] ||= []).push(f);
+
+  // Personen
+  const personen = {};
+  for (const p of Object.values(S.personen)) {
+    const alt = altNach[nameSchluessel(p.name)] || null;
+    personen[p.id] = { ...p, alt, spezial: spezialNach[p.id] || [], praktika: [], notizen: [] };
+  }
+  // Personen nur aus der alten Liste (frühere Jahrgänge)
+  const zugeordnet = new Set(Object.values(personen).map((p) => p.alt && p.alt.schluessel).filter(Boolean));
+  for (const a of S.alt) if (!zugeordnet.has(a.schluessel)) {
+    const id = "alt:" + a.schluessel;
+    personen[id] = { id, name: `${a.name} ${a.vorname}`, studiengang: a.studiengang, faecher: [], alt: a, spezial: [], praktika: [], notizen: [], nurAlt: true };
+  }
+
+  // Einträge je Praktikum
+  const proPrakt = {};
+  for (const e of S.eintraege) {
+    if (e.praktikum) (proPrakt[e.praktikum] ||= []).push(e);
+    if (e.typ === "bemerkung" && e.person && personen[e.person]) personen[e.person].notizen.push(e);
+    if (e.typ === "achtung" && e.person && personen[e.person]) (personen[e.person].achtungen ||= []).push(e);
+    if (e.typ === "achtung_weg" && e.person && personen[e.person]) personen[e.person].achtungen = (personen[e.person].achtungen || []).filter((a) => a.id !== e.bezug);
+  }
+
+  // Praktika aus dem Praktikumstool
+  const liste = [];
+  for (const pr of Object.values(S.praktika)) {
+    const person = personen[pr.idstudent];
+    const x = { ...pr, person, eintraege: proPrakt[pr.idpraktikum] || [], quelle: "tool" };
+    standBestimmen(x);
+    liste.push(x); person.praktika.push(x);
+  }
+  // Praktika nur aus der alten Liste (Jahre, die nicht importiert sind)
+  for (const person of Object.values(personen)) {
+    const a = person.alt; if (!a) continue;
+    for (const [feld, gruppe] of [["pk01", "Halbtag"], ["pk02", "Profil"], ["pk03", "Quartal"], ["diplom", "Abschluss"]]) {
+      const b = a[feld]; if (!b || (!b.sj && !b.wer && !b.status)) continue;
+      const doppelt = person.praktika.some((p) => p.gruppe === gruppe && b.sj && p.jahr === b.sj);
+      if (doppelt) continue;
+      const id = `alt:${a.schluessel}:${feld}`;
+      const x = { idpraktikum: id, gruppe, jahr: b.sj, person, eintraege: proPrakt[id] || [], quelle: "alt", altText: b.text,
+                  art: 0, schulort: "", schulhaus: "", von: "", bis: "", faecher: [], fachbesuche: 0 };
+      standBestimmen(x, b);
+      person.praktika.push(x);
+    }
+  }
+  for (const person of Object.values(personen)) {
+    const jahrNeu = person.praktika.reduce((m, x) => (x.jahr || "") > m ? x.jahr : m, "");
+    const fertig = person.praktika.some((x) => ["Quartal", "Abschluss"].includes(x.gruppe) && x.jahr && x.jahr < S.einst.studienjahr);
+    person.archiv = !!jahrNeu && jahrNeu < S.einst.studienjahr && (fertig || jahrNeu < jahrPlus(S.einst.studienjahr, -1));
+    if (!jahrNeu) person.archiv = true;   // nur alte Liste ohne Jahr
+  }
+  for (const person of Object.values(personen)) {
+    person.praktika.sort((a, b) => (a.jahr || "").localeCompare(b.jahr || "") || GRUPPEN.indexOf(a.gruppe) - GRUPPEN.indexOf(b.gruppe));
+    person.besucher = new Set(person.praktika.flatMap((p) => p.besuchtVon));
+  }
+  for (const x of liste) noetigBestimmen(x);
+  for (const person of Object.values(personen)) for (const x of person.praktika) if (x.quelle === "alt") noetigBestimmen(x);
+  R = { praktika: liste, personen };
+}
+
+function standBestimmen(x, altBesuch) {
+  // aus der alten Liste (gleiches Jahr)
+  const a = x.person && x.person.alt;
+  const feld = { Halbtag: "pk01", Profil: "pk02", Quartal: "pk03", Abschluss: "diplom" }[x.gruppe];
+  const alt = altBesuch || (a && a[feld] && a[feld].sj === x.jahr ? a[feld] : null);
+  let wer = alt && alt.wer ? alt.wer : "", stand = alt && alt.status ? alt.status : "", art = alt && alt.art ? alt.art : "", datum = alt && alt.datum ? alt.datum : "";
+  if (stand === "besucht" && !wer) stand = "";
+  if (x.quelle === "tool" && x.fachbesuche > 0 && stand !== "besucht") stand = x.jahr < S.einst.studienjahr ? "besucht" : "gebucht";
+  // eigene Einträge, der Reihe nach
+  let doppelt = [], termin = null;
+  for (const e of x.eintraege) {
+    if (e.typ === "uebernehmen") { if (wer && wer !== e.wer && stand !== "besucht") doppelt.push(e.wer); else { wer = e.wer; termin = e.termin || termin; if (stand !== "besucht" && stand !== "gebucht") stand = "übernommen"; } }
+    if (e.typ === "termin" && e.wer === wer) termin = e.termin || null;
+    if (e.typ === "abgeben" && e.wer === wer) { wer = ""; termin = null; if (stand === "übernommen") stand = ""; }
+    if (e.typ === "erledigt") { stand = "besucht"; datum = e.datum || e.zeit; if (!wer) wer = e.wer; if (e.art) art = e.art; }
+    if (e.typ === "zuruecksetzen") { stand = x.fachbesuche > 0 ? "gebucht" : wer ? "übernommen" : ""; datum = ""; }
+  }
+  if (!stand && wer) stand = "übernommen";
+  x.wer = wer; x.stand = stand || "offen"; x.art = art; x.datum = datum; x.termin = termin;
+  x.doppelt = doppelt.filter((w) => w !== wer);
+  x.besuchtVon = wer && (x.stand === "besucht" || x.stand === "übernommen" || x.stand === "gebucht") ? [wer] : [];
+  x.notizen = x.eintraege.filter((e) => e.typ === "notiz");
+}
+
+function noetigBestimmen(x) {
+  const p = x.person, spez = (p.spezial || []).filter((f) => f.jahr === x.jahr);
+  x.achtung = spez.filter((f) => f.stufe === "zwingend" || f.stufe === "prüfen");
+  // eigene Vermerke «Achtung: im Profil/Quartal besuchen» gelten für dieses Praktikum ab dem aktuellen Studienjahr
+  const eigene = (p.achtungen || []).filter((a) => a.fuer === x.gruppe && (x.jahr || "") >= S.einst.studienjahr && x.stand !== "besucht");
+  for (const a of eigene) x.achtung.push({ kategorie: "Achtung (" + a.wer + ")", hinweis: `im ${a.fuer} besuchen${a.text ? ": " + a.text : ""}`, stufe: "zwingend" });
+  const uebersteuert = [...x.eintraege].reverse().find((e) => e.typ === "noetig");
+  let n, warum;
+  if (x.gruppe === "Profil") { n = "optional"; warum = "Profil: freiwillig, zählt für die Quote"; }
+  else if (x.gruppe === "Halbtag") { n = "ja"; warum = "Halbtagespraktikum"; }
+  else if (x.gruppe === "Quartal") {
+    const profile = p.praktika.filter((y) => y.gruppe === "Profil" && y !== x);
+    const regulaer = profile.some((y) => (y.stand === "besucht" || (y.stand === "gebucht" && (y.jahr || "") < x.jahr)) && y.art !== "Wertschätzung");
+    const laeuft = profile.some((y) => y.jahr === x.jahr && y.stand !== "besucht");
+    const erneut = p.alt && p.alt.erneut;
+    if (erneut) { n = "ja"; warum = "soll erneut besucht werden (alte Liste)"; }
+    else if (regulaer) { n = "nein"; warum = "im Profil schon besucht"; }
+    else if (laeuft) { n = "später"; warum = "Profil läuft noch"; }
+    else { n = "ja"; warum = profile.length ? "im Profil nicht regulär besucht" : "kein Profilbesuch bekannt"; }
+  } else { n = "ja"; warum = x.gruppe; }
+  if (x.achtung.some((f) => f.stufe === "zwingend")) { n = "ja"; warum = x.achtung.map((f) => f.hinweis).join(" · "); }
+  if (uebersteuert) { n = uebersteuert.wert; warum = `von Hand (${uebersteuert.wer}): ${uebersteuert.text || ""}`; }
+  x.noetig = n; x.warum = warum;
+  if (x.stand === "offen" && n === "nein") x.stand = "nicht nötig";
+}
+
+/* ---------- Zeichnen ---------- */
+function zeichnen() {
+  REFS.length = 0;
+  for (const b of document.querySelectorAll("#nav button")) b.classList.toggle("aktiv", b.dataset.ansicht === S.ansicht);
+  const ich = $("#ich");
+  const doz = S.einst.dozierende.map((d) => d.kuerzel);
+  ich.innerHTML = `<option value="">–</option>` + doz.map((k) => `<option ${k === S.ich ? "selected" : ""}>${esc(k)}</option>`).join("");
+  if (!window.showDirectoryPicker && !window.__testOrdner) $("#ordnerstatus").innerHTML = '<b style="color:#fff;background:#a33a2e;padding:2px 8px;border-radius:4px">Falscher Browser – speichert nicht</b>';
+  else $("#ordnerstatus").innerHTML = S.ordner ? `Ordner: ${esc((S.wurzel || S.ordner).name)}` : "";
+  const app = $("#app");
+  if (S.ansicht === "hilfe") { app.innerHTML = ansichtHilfe(); return; }
+  if (!S.ordner) { app.innerHTML = ansichtOhneOrdner(); return; }
+  const f = { start: ansichtStart, planung: ansichtPlanung, halbtag: ansichtHalbtag, termine: ansichtTermine, studierende: ansichtStudierende, aktualisieren: ansichtAktualisieren, hilfe: ansichtHilfe }[S.ansicht] || ansichtStart;
+  app.innerHTML = f();
+  if (S.ansicht === "aktualisieren") aktualisierenVerbinden();
+  if (S.detail) detailZeigen(S.detail, false);
+}
+
+function browserFehler() {
+  return `<div class="karte" style="max-width:700px;border:2px solid var(--achtung)">
+    <h2 class="rot">Bitte in Chrome oder Edge öffnen</h2>
+    <p><b>In diesem Browser kann die Seite nichts speichern.</b> Einträge würden verloren gehen und die anderen sähen sie nie.
+       Die Seite braucht den direkten Zugriff auf den gemeinsamen Ordner – das können nur <b>Google Chrome</b> und <b>Microsoft Edge</b>
+       (nicht Safari, nicht Firefox, nicht die Teams-Ansicht).</p>
+    <p>So geht's: diese Adresse kopieren und in Chrome oder Edge einfügen:</p>
+    <p><input class="eingabe" style="width:100%" readonly value="${esc(location.href)}" onclick="this.select()"></p>
+    <p class="leise klein">Zum Anschauen ohne Speichern gibt es den <a href="rundgang.html">Rundgang mit Beispieldaten</a>.</p></div>`;
+}
+function ansichtOhneOrdner() {
+  if (!window.showDirectoryPicker && !window.__testOrdner) return browserFehler();
+  const wartet = S.ordnerWartet;
+  return `<div class="karte" style="max-width:640px">
+    <h2>Gemeinsamen Ordner verbinden</h2>
+    <p>Bitte den gemeinsamen Ordner <b>«Praxisbesuche»</b> wählen (SharePoint/Teams, mit OneDrive synchronisiert) –
+       den Ordner, in dem diese Seite liegt. Die Seite liest und schreibt nur in dessen Unterordner «Daten».</p>
+    ${wartet ? `<p><button class="knopf haupt" onclick="zugriffErlauben()">Zugriff auf «${esc(wartet.name)}» erlauben</button></p>` : ""}
+    <p><button class="knopf ${wartet ? "" : "haupt"}" onclick="ordnerWaehlen()">Ordner wählen …</button></p>
+    <p class="leise klein">Funktioniert in Chrome und Edge. Beim ersten Mal den Ordner wählen und «Bearbeiten erlauben» bestätigen.</p>
+  </div>`;
+}
+
+function jahre() { return [...new Set(Object.values(S.praktika).map((p) => p.jahr))].sort().reverse(); }
+function fw(k, std) { return S.filter[k] ?? std; }
+function setzeFilter(k, v) { S.filter[k] = v; merke("filter", JSON.stringify(S.filter)); zeichnen(); }
+
+function ansichtStart() {
+  const sj = S.einst.studienjahr, pr = R.praktika.filter((p) => p.jahr === sj);
+  const q = pr.filter((p) => p.gruppe === "Quartal" && p.noetig === "ja");
+  const prof = pr.filter((p) => p.gruppe === "Profil");
+  const ht = pr.filter((p) => p.gruppe === "Halbtag");
+  const meine = pr.filter((p) => S.ich && p.wer === S.ich);
+  const offenQ = q.filter((p) => p.stand === "offen").length;
+  const ziel = Math.ceil(S.einst.quote * prof.length), eingeteilt = prof.filter((p) => p.stand !== "offen" && p.stand !== "nicht nötig").length;
+  const zahl = Object.keys(S.praktika).length;
+  return `<h2>Studienjahr ${sjText(sj)}</h2>
+  ${zahl ? "" : `<div class="karte"><b>Noch keine Daten.</b> Unter «Aktualisieren» die Datei aus dem Praktikumstool einlesen.</div>`}
+  <div class="start">
+    <div class="karte" onclick="geheZu('planung')"><h3>Profil &amp; Quartal planen</h3>
+      <div class="z">${offenQ}</div><div class="leise">Quartalsbesuche nötig und noch offen (von ${q.length})</div>
+      <div style="margin-top:8px">Profil: ${eingeteilt} von Ziel ${ziel} eingeteilt</div></div>
+    <div class="karte" onclick="geheZu('halbtag')"><h3>Halbtagespraktikum</h3>
+      <div class="z">${ht.filter((p) => p.stand === "offen").length}</div><div class="leise">offen von ${ht.length}</div></div>
+    <div class="karte" onclick="geheZu('studierende')"><h3>Studierende</h3>
+      <div class="z">${Object.values(R.personen).filter((p) => !p.archiv).length}</div><div class="leise">aktuell · ${Object.values(R.personen).filter((p) => p.archiv).length} im Archiv (alle Praktika abgeschlossen)</div></div>
+    <div class="karte" onclick="geheZu('termine')"><h3>Meine Termine ${S.ich ? "(" + esc(S.ich) + ")" : ""}</h3>
+      <div class="z">${meine.length}</div><div class="leise">in ${sjText(sj)} übernommen, gebucht oder besucht</div></div>
+    ${sollKarte(sj)}
+    <div class="karte" onclick="geheZu('aktualisieren')"><h3>Aktualisieren</h3>
+      <div class="leise">Vor dem Praktikum: Praktikumstool-Export, Spezialfälle und Einstellungen einlesen.</div></div>
+  </div>`;
+}
+function sollKarte(sj) {
+  const doz = S.einst.dozierende.filter((d) => d.sollHalbtag || d.sollPQ || d.soll);
+  if (!doz.length) return "";
+  const ist = (k, gr) => R.praktika.filter((x) => x.jahr === sj && x.wer === k && gr.includes(x.gruppe)).length;
+  return `<div class="karte" style="cursor:default"><h3>Besuche je Dozent/in</h3><table class="klein" style="width:100%">
+    <tr class="leise"><td></td><td>Halbtag</td><td>Profil + Quartal</td></tr>
+    ${doz.map((d) => { const h = ist(d.kuerzel, ["Halbtag"]), pq = ist(d.kuerzel, ["Profil", "Quartal", "Spezial"]);
+      const z = (i, s) => s ? `<span class="${i >= Number(s) ? "gruen" : "rot"}">${i} / ${s}</span>` : i;
+      return `<tr><td><b>${esc(d.kuerzel)}</b> ${esc(d.name || "")}</td><td>${z(h, d.sollHalbtag)}</td><td>${z(pq, d.sollPQ || d.soll)}</td></tr>`; }).join("")}
+  </table></div>`;
+}
+function geheZu(a, filter) { S.ansicht = a; merke("ansicht", a); if (filter) Object.assign(S.filter, filter); zeichnen(); window.scrollTo(0, 0); }
+
+function standChip(x, kurz = false) {
+  const cls = { offen: "s-offen", "übernommen": "s-uebernommen", gebucht: "s-gebucht", besucht: "s-besucht", "nicht nötig": "s-nicht" }[x.stand] || "s-nicht";
+  const wer = x.wer ? ` · ${esc(x.wer)}` : "";
+  const t = !kurz && x.termin && x.stand !== "besucht" ? ` · ${esc(kurzDatum(x.termin.datum))} ${esc(x.termin.zeit || "")}` : "";
+  const doppelt = x.doppelt && x.doppelt.length ? ` <span class="hinweis" title="Mehrere haben übernommen – bitte absprechen">doppelt: ${esc(x.doppelt.join(", "))}</span>` : "";
+  return `<span class="chip ${cls}">${esc(x.stand)}${wer}${t}</span>${doppelt}`;
+}
+function achtungZeichen(x) {
+  if (!x.achtung || !x.achtung.length) return "";
+  const t = x.achtung.map((f) => `${f.kategorie}: ${f.hinweis}${f.bemerkung ? " (" + f.bemerkung + ")" : ""}`).join("\n");
+  return `<span class="achtung" title="${esc(t)}">⚠</span>`;
+}
+function aktionen(x) {
+  const k = [];
+  if (x.stand === "offen" || x.stand === "nicht nötig" || (x.stand === "gebucht" && !x.wer)) k.push(`<button class="knopf klein" onclick="uebernehmen(${ref(x.idpraktikum)})">Ich übernehme</button>`);
+  if (x.wer === S.ich && x.stand !== "besucht") {
+    k.push(`<button class="knopf klein" onclick="uebernehmen(${ref(x.idpraktikum)}, true)">Termin</button>`);
+    k.push(`<button class="knopf klein" onclick="erledigt(${ref(x.idpraktikum)})">Erledigt</button>`);
+    k.push(`<button class="knopf klein" onclick="handlung('abgeben',${ref(x.idpraktikum)})">Abgeben</button>`);
+  }
+  if (x.link) k.push(`<button class="knopf klein" title="Im Praktikumstool öffnen (Fenster rechts)" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>`);
+  return k.join(" ");
+}
+/* Mathe-Lektionen als kleine Knöpfe: Wochentag + Zeit, Klick springt im Tool zur Lektion */
+/* Mathe-Lektionen als kleines Wochenraster Mo–Fr; Klick öffnet alle möglichen Termine */
+function legende() {
+  return `<div class="legende"><b>Mathe-Lektionen:</b>
+    <span class="rz">9:10–9:55</span> Einzellektion
+    <span class="rz doppel">8:20–9:55</span> Doppellektion
+    <span class="rz frei">10:15–11:00</span> grün: danach Zeit zum Besprechen (mind. ${BESPRECHUNG_MIN} Min frei)
+    <span class="leise">· Klick auf das Raster: alle Termine Woche für Woche</span></div>`;
+}
+function lektionenZelle(x, partner) {
+  if (!x.lektionen) return `<span class="leise klein">kein Stundenplan</span>`;
+  const l = lektionenIm(x);
+  if (!l.length) return `<span class="leise klein">keine passende Lektion</span>`;
+  const proTag = { Mo: {}, Di: {}, Mi: {}, Do: {}, Fr: {} };
+  for (const a of l) { const t = proTag[wochentag(a.datum)]; if (!t) continue; const k = a.zeit + "–" + (a.bis || ""); (t[k] ||= []).push(a); }
+  const spalten = Object.entries(proTag).map(([tag, zeiten]) => {
+    const z = Object.entries(zeiten).sort((a, b) => a[0].localeCompare(b[0])).map(([k, ls]) => {
+      const a = ls[0], doppel = (a.anzahl || 1) > 1, frei = besprechung(a);
+      return `<div class="rz ${doppel ? "doppel" : ""} ${frei ? "frei" : ""}" title="${esc(blockText(a))}${ls.length > 1 ? "\n" + ls.length + " Termine: " + ls.map((b) => kurzDatum(b.datum)).join(", ") : ""}">${esc(k.replace(/^0/, "").replace(/–0/, "–"))}</div>`;
+    }).join("");
+    return `<div class="rt"><div class="rk">${tag}</div>${z || '<div class="rleer">·</div>'}</div>`;
+  }).join("");
+  return `<div class="raster" title="Klick: alle Termine anzeigen" onclick="termineZeigen(${ref(x.idpraktikum)}${partner ? ", " + ref(partner.idpraktikum) : ""})">${spalten}</div>`;
+}
+/* Fenster mit allen möglichen Mathe-Terminen, Woche für Woche */
+function termineZeigen(i, ip) {
+  const x = R.praktika.find((p) => p.idpraktikum === REFS[i]);
+  const partner = ip !== undefined ? R.praktika.find((p) => p.idpraktikum === REFS[ip]) : null;
+  const l = lektionenIm(x, { alleTage: true });
+  const gesperrt = (x.lektionen || []).filter((a) => terminGesperrt(x, a.datum, a.zeit)).length;
+  const montag = (iso) => { const d = new Date(iso + "T12:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
+  const wochen = {};
+  for (const a of l) ((wochen[montag(a.datum)] ||= { Mo: [], Di: [], Mi: [], Do: [], Fr: [] })[wochentag(a.datum)] || []).push(a);
+  const d = $("#frage");
+  $("#frageText").textContent = `${x.person.name}${partner ? " + " + partner.person.name + " (Doppelbesuch)" : ""} · ${x.gruppe} · ${x.schulort || ""} ${x.schulhaus ? "(" + x.schulhaus + ")" : ""}`;
+  $("#frageFeld").innerHTML = `<p class="klein leise" style="margin-top:0">Freie Mathe-Lektionen, die nach der Checkliste möglich sind${gesperrt ? ` (${gesperrt} ausgeblendet: erste Tage, letzter Tag, Arbeitssitzung)` : ""}.
+      Hohes Kästchen = Doppellektion, grün = danach Zeit zum Besprechen. Termin anklicken zum Übernehmen.</p>
+    <div class="wochen">${Object.entries(wochen).sort().map(([mo, tage]) => `<div class="woche"><div class="wk">Woche ab ${esc(kurzDatum(mo))}</div>
+      ${Object.entries(tage).map(([tag, ls]) => `<div class="wt"><div class="rk">${tag}${ls.length ? " " + esc(ls[0].datum.slice(8, 10) + "." + ls[0].datum.slice(5, 7) + ".") : ""}</div>
+        ${ls.map((a) => `<button type="button" class="rz knopfz ${(a.anzahl || 1) > 1 ? "doppel" : ""} ${besprechung(a) ? "frei" : ""}" title="${esc(blockText(a))}"
+          onclick="terminGewaehlt(${ref(x.idpraktikum)}, ${ref(a)}${partner ? ", " + ref(partner.idpraktikum) : ""})">${esc(a.zeit)}–${esc(a.bis || "")}<span class="klein leise"> ${(a.anzahl || 1) > 1 ? "Doppel" : "Einzel"}${a.frei === null ? " · danach Schluss" : a.frei !== undefined ? (a.frei >= BESPRECHUNG_MIN ? " · danach " + a.frei + "′ frei" : " · " + a.frei + "′ Pause") : ""}</span></button>`).join("") || '<div class="rleer">–</div>'}</div>`).join("")}</div>`).join("") || '<p>Keine freien Mathe-Lektionen.</p>'}</div>`;
+  $("#frageOk").style.display = "none";
+  d.returnValue = ""; d.showModal();
+  d.onclose = () => { $("#frageOk").style.display = ""; };
+}
+async function terminGewaehlt(ip, il, ipartner) {
+  const x = R.praktika.find((p) => p.idpraktikum === REFS[ip]), a = REFS[il];
+  const partner = ipartner !== undefined ? R.praktika.find((p) => p.idpraktikum === REFS[ipartner]) : null;
+  await new Promise((weiter) => { const d = $("#frage"); d.addEventListener("close", () => setTimeout(weiter, 0), { once: true }); d.close(); });
+  if (!S.ich) { meldung("Bitte oben rechts «Ich bin» wählen."); return; }
+  const alle = [x, ...(partner ? [partner] : [])];
+  const fremd = alle.filter((y) => y.wer && y.wer !== S.ich && y.stand !== "offen");
+  if (fremd.length) { meldung(`Schon übernommen: ${fremd.map((y) => y.person.name + " (" + y.wer + ")").join(", ")}.`); return; }
+  const meinesSchon = x.wer === S.ich;
+  const w = terminWarnungen(x, a.datum, a.zeit);
+  const wer = alle.map((y) => y.person.name).join(" + ");
+  const ok = await frage(`${wer}: ${blockText(a)}${w.length ? "\n⚠ " + w.join("\n⚠ ") : ""}\n\n${meinesSchon ? "Termin ändern?" : "Übernehmen und im Praktikumstool eintragen?"}`, { art: "wahl", wert: "ja", optionen: [["ja", meinesSchon ? "Ja, Termin ändern" : "Ja, übernehmen"]] });
+  if (ok === null) return;
+  for (const y of alle) {
+    // beim Partner dieselbe Lektion (gleicher Tag, gleiche Zeit) suchen
+    const l = y === x ? a : (y.lektionen || []).find((b) => b.datum === a.datum && b.zeit === a.zeit) || a;
+    const termin = { datum: l.datum, zeit: l.zeit, bis: l.bis, lektion: l.id };
+    if (!(await eintragen(y.wer === S.ich ? { typ: "termin", praktikum: y.idpraktikum, termin } : { typ: "uebernehmen", praktikum: y.idpraktikum, termin }))) return;
+  }
+  meldung(meinesSchon ? "Termin geändert." : `Übernommen${partner ? " (beide)" : ""} – jetzt im Praktikumstool eintragen.`);
+  if (x.link) { REFS.push(toolLink(x, a.id)); toolOeffnen(REFS.length - 1); }
+}
+function toolOeffnen(i) {
+  const link = REFS[i];
+  if (!link) return;
+  const b = Math.round(screen.availWidth / 2);
+  window.open(link.startsWith("http") ? link : TOOL + link, "praktikumstool", `popup,width=${b},height=${screen.availHeight},left=${b},top=0`);
+}
+/* Übernehmen mit Termin: Lektion wählen oder Datum/Zeit eingeben, Checkliste prüfen */
+async function uebernehmen(i, nurTermin = false) {
+  const id = REFS[i];
+  const x = R.praktika.find((p) => p.idpraktikum === id);
+  if (!S.ich) { meldung("Bitte oben rechts «Ich bin» wählen."); return; }
+  const frei = lektionenIm(x, { nurFrei: true });
+  const d = $("#frage");
+  $("#frageText").textContent = `${x.person.name} · ${x.gruppe} ${sjText(x.jahr)} · ${x.schulort || ""}`;
+  $("#frageFeld").innerHTML = `
+    ${frei.length ? `<label class="klein leise">Mathe-Lektion (frei, im gewählten Zeitraum)</label>
+      <select id="tLektion"><option value="">– selbst eingeben –</option>${frei.map((l) => `<option value="${esc(l.id)}" data-d="${l.datum}" data-z="${esc(l.zeit)}">${esc(blockText(l))}</option>`).join("")}</select>` : `<p class="klein leise">Keine Stundenplan-Daten – Datum und Zeit selbst eingeben (oder leer lassen).</p>`}
+    <div style="display:flex;gap:8px;margin-top:8px"><label class="klein leise" style="flex:1">Datum<input type="date" id="tDatum" value="${x.termin ? x.termin.datum : ""}"></label>
+      <label class="klein leise" style="flex:1">Zeit<input type="time" id="tZeit" value="${x.termin ? esc(x.termin.zeit || "") : ""}"></label></div>
+    <label class="haken klein" style="display:flex;gap:6px;margin-top:8px"><input type="checkbox" id="tTool" checked style="width:auto"> danach im Praktikumstool zur Lektion springen</label>
+    <div id="tWarnung" style="margin-top:8px"></div>`;
+  const pruefen = () => {
+    const w = terminWarnungen(x, $("#tDatum").value, $("#tZeit").value);
+    $("#tWarnung").innerHTML = w.map((t) => `<div class="hinweis" style="margin:3px 0">⚠ ${esc(t)}</div>`).join("");
+  };
+  const sel = $("#tLektion");
+  if (sel) sel.onchange = () => { const o = sel.selectedOptions[0]; if (o.value) { $("#tDatum").value = o.dataset.d; $("#tZeit").value = o.dataset.z; } pruefen(); };
+  $("#tDatum").onchange = pruefen; $("#tZeit").onchange = pruefen; pruefen();
+  d.returnValue = ""; d.showModal();
+  await new Promise((ok) => (d.onclose = ok));
+  if (d.returnValue !== "ok") return;
+  const datum = $("#tDatum").value, zeit = $("#tZeit").value;
+  const lekt = sel && sel.value ? sel.value : (frei.find((l) => l.datum === datum && l.zeit === zeit) || {}).id || "";
+  const termin = datum ? { datum, zeit, lektion: lekt } : null;
+  const ok = await eintragen(nurTermin ? { typ: "termin", praktikum: id, termin } : { typ: "uebernehmen", praktikum: id, termin });
+  if (!ok) return;
+  meldung(nurTermin ? "Termin geändert." : "Übernommen – bitte im Praktikumstool eintragen.");
+  if ($("#tTool") && $("#tTool").checked && x.link) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1); }
+}
+/* Termine, die nach der Checkliste nie gehen – sie werden gar nicht angeboten */
+function terminGesperrt(x, datum, zeit) {
+  const von = datumAus(x.von), bis = datumAus(x.bis);
+  if (von && datum < von) return "vor Beginn des Praktikums";
+  if (bis && datum > bis) return "nach Ende des Praktikums";
+  if (bis && datum === bis && regel("letzterTag")) return "letzter Praktikumstag";
+  const ersteTage = Number(regel("profilErsteTage")) || 0;
+  if (von && x.gruppe === "Profil" && ersteTage) {
+    let tage = 0; for (let d = new Date(von + "T12:00"); d.toISOString().slice(0, 10) < datum; d.setDate(d.getDate() + 1)) if (d.getDay() % 6) tage++;
+    if (tage < ersteTage) return `erste ${ersteTage} Praktikumstage`;
+  }
+  const ersteKal = Number(regel("quartalErsteTage")) || 0;
+  if (von && x.gruppe === "Quartal" && ersteKal) { const e = new Date(von + "T12:00"); e.setDate(e.getDate() + ersteKal); if (datum < e.toISOString().slice(0, 10)) return "erste Praktikumswoche"; }
+  const arb = x.gruppe === "Profil" ? S.einst.arbeitssitzungProfil : x.gruppe === "Quartal" ? S.einst.arbeitssitzungQuartal : "";
+  if (arb && datum === arb && vormittag(zeit)) return "Vormittag der Arbeitssitzung";
+  return "";
+}
+/* Checkliste 2026/27 (Praktikumsabteilung) */
+function terminWarnungen(x, datum, zeit) {
+  const w = [];
+  if (!datum) return w;
+  const von = datumAus(x.von), bis = datumAus(x.bis);
+  if (von && datum < von) w.push("vor Beginn des Praktikums");
+  if (bis && datum > bis) w.push("nach Ende des Praktikums");
+  if (bis && datum === bis) w.push("nicht am letzten Praktikumstag");
+  if (von && x.gruppe === "Profil") {
+    let tage = 0; for (let d = new Date(von + "T12:00"); d.toISOString().slice(0, 10) < datum; d.setDate(d.getDate() + 1)) if (d.getDay() % 6) tage++;
+    if (tage < 3) w.push("nicht an den ersten 3 Praktikumstagen");
+  }
+  if (von && x.gruppe === "Quartal") { const e = new Date(von + "T12:00"); e.setDate(e.getDate() + 7); if (datum < e.toISOString().slice(0, 10)) w.push("nicht in der ersten Praktikumswoche"); }
+  const arb = x.gruppe === "Profil" ? S.einst.arbeitssitzungProfil : x.gruppe === "Quartal" ? S.einst.arbeitssitzungQuartal : "";
+  if (arb && datum === arb && vormittag(zeit)) w.push("Vormittag der Arbeitssitzung");
+  // eigene Besuche: in der Regel ein Besuch pro Halbtag
+  const meine = R.praktika.filter((y) => y !== x && y.wer === S.ich && y.termin && y.termin.datum === datum && vormittag(y.termin.zeit) === vormittag(zeit));
+  if (meine.length) w.push(`am selben ${vormittag(zeit) ? "Vormittag" : "Nachmittag"} schon: ${meine.map((y) => y.person.name).join(", ")}`);
+  // die Person: nicht 2 Besuche am selben Tag, höchstens 2 pro Woche
+  const besuche = [...(x.lektionen || []).filter((l) => l.gebucht && l.gebucht.length).map((l) => l.datum),
+                   ...R.praktika.filter((y) => y !== x && y.person === x.person && y.termin).map((y) => y.termin.datum)];
+  if (besuche.includes(datum)) w.push("an diesem Tag hat die Person schon einen Besuch");
+  const kw = (iso) => { const d = new Date(iso + "T12:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
+  const maxW = Number(regel("maxProWoche")) || 2;
+  if (besuche.filter((b) => kw(b) === kw(datum)).length >= maxW) w.push(`in dieser Woche schon ${maxW} Besuche bei der Person`);
+  return w;
+}
+async function handlung(typ, i) {
+  const id = REFS[i]; if (await eintragen({ typ, praktikum: id })) meldung(typ === "uebernehmen" ? "Übernommen – bitte im Praktikumstool buchen." : "Abgegeben."); }
+async function erledigt(i) {
+  const id = REFS[i];
+  const x = R.praktika.find((p) => p.idpraktikum === id);
+  const vorschlag = x && x.termin ? x.termin.datum.split("-").reverse().join(".") : new Date().toLocaleDateString("de-CH");
+  const d = await frage("Datum des Besuchs (TT.MM.JJJJ)", { wert: vorschlag });
+  if (d === null) return;
+  await eintragen({ typ: "erledigt", praktikum: id, datum: datumAus(d) || d });
+  meldung("Als besucht eingetragen.");
+}
+/* ---------- Filter: Grundauswahl · Wann · Wo · Weitere ---------- */
+const STD = {
+  praktika: ["Profil", "Quartal", "Spezial"], noetig: ["ja", "optional"], stand: ["offen", "eingeteilt", "besucht"],
+  tage: [], tageszeit: [], lektart: [], perioden: [],
+};
+function fa(k) { const v = S.filter[k]; return Array.isArray(v) ? v : STD[k]; }
+function umschalten(k, wert) { const a = new Set(fa(k)); a.has(wert) ? a.delete(wert) : a.add(wert); setzeFilter(k, [...a]); }
+function knoepfe(k, optionen) {
+  const an = fa(k);
+  return optionen.map(([v, t]) => `<button type="button" class="fchip ${an.includes(v) ? "an" : ""}" onclick="umschalten('${k}','${v}')">${esc(t)}</button>`).join("");
+}
+function filterLeiste(ansicht, anzahl) {
+  const sj = fw("jahr", S.einst.studienjahr);
+  const orte = Object.keys(S.orte).sort((a, b) => a.localeCompare(b));
+  const opt = (werte, wahl) => werte.map(([v, t]) => `<option value="${esc(v)}" ${v === wahl ? "selected" : ""}>${esc(t)}</option>`).join("");
+  const planung = ansicht === "planung";
+  // Grundauswahl
+  let grund = `<div class="fzeile"><span class="ftitel">Studienjahr</span><select onchange="setzeFilter('jahr',this.value)">${opt(jahre().map((j) => [j, sjText(j)]), sj)}</select></div>`;
+  if (planung) {
+    const alle = fa("praktika").length === 3;
+    grund += `<div class="fzeile"><span class="ftitel">Praktikum</span><button type="button" class="fchip ${alle ? "an" : ""}" onclick="setzeFilter('praktika',${esc(JSON.stringify(STD.praktika))})">alle</button>${knoepfe("praktika", [["Profil", "Profil"], ["Quartal", "Quartal"], ["Spezial", "Spezial"]])}</div>`;
+    grund += `<div class="fzeile"><span class="ftitel">Besuch nötig</span>${knoepfe("noetig", [["ja", "ja"], ["optional", "optional"], ["nein", "nein"]])}</div>`;
+  } else {
+    grund += `<div class="fzeile"><span class="ftitel">Periode</span>${knoepfe("perioden", [["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"], ["SK", "SK Einzelfach"]])}</div>`;
+  }
+  grund += `<div class="fzeile"><span class="ftitel">Stand</span>${knoepfe("stand", [["offen", "offen"], ["eingeteilt", "übernommen / gebucht"], ["besucht", "besucht"]])}</div>`;
+  // Wann
+  const wannAktiv = [fw("von", "") && "ab " + kurzDatum(fw("von", "")), fw("bis", "") && "bis " + kurzDatum(fw("bis", "")),
+    fa("tage").join(" "), fa("tageszeit").map((t) => t === "vormittag" ? "Vormittag" : "Nachmittag").join(" "),
+    fa("lektart").map((t) => t === "einzel" ? "Einzel" : "Doppel").join(" "), fw("bespr", true) && "Besprechung"].filter(Boolean);
+  let wann = `<div class="fblock"><span class="ftitel">Zeitraum</span><input type="date" value="${esc(fw("von", ""))}" onchange="setzeFilter('von',this.value)"> bis <input type="date" value="${esc(fw("bis", ""))}" onchange="setzeFilter('bis',this.value)"></div>`;
+  if (planung) {
+    wann += `<div class="fblock"><span class="ftitel">Tag</span>${knoepfe("tage", [["Mo", "Mo"], ["Di", "Di"], ["Mi", "Mi"], ["Do", "Do"], ["Fr", "Fr"]])}</div>`;
+    wann += `<div class="fblock"><span class="ftitel">Tageszeit</span>${knoepfe("tageszeit", [["vormittag", "Vormittag"], ["nachmittag", "Nachmittag"]])}</div>`;
+    wann += `<div class="fblock"><span class="ftitel">Art der Mathe-Lektion</span>${knoepfe("lektart", [["einzel", "Einzellektion"], ["doppel", "Doppellektion"]])}</div>`;
+    wann += `<div class="fblock"><label class="haken" title="Nach dem Mathe-Block mind. ${BESPRECHUNG_MIN} Min frei oder Schulschluss"><input type="checkbox" ${fw("bespr", true) ? "checked" : ""} onchange="setzeFilter('bespr',this.checked)"> danach Zeit zum Besprechen</label></div>
+      <div class="leise klein" style="padding-top:4px">Tag, Tageszeit und Lektion beziehen sich auf die freien Mathe-Lektionen im Stundenplan.</div>`;
+  }
+  // Wo
+  const woAktiv = [fw("ort", "") && "«" + fw("ort", "") + "»", fw("umOrt", "") && fw("umKm", "") && `${fw("umKm", "")} km um ${fw("umOrt", "")}`].filter(Boolean);
+  const wo = `<div class="fblock"><span class="ftitel">Ort oder Schulhaus</span><input type="search" value="${esc(fw("ort", ""))}" onchange="setzeFilter('ort',this.value)" placeholder="z.B. Sursee, Hochdorf -Neu" title="Komma = oder · Leerzeichen = und · -Wort = ohne"></div>
+    <div class="fblock"><span class="ftitel">Umkreis</span><input list="ortListe" value="${esc(fw("umOrt", ""))}" onchange="setzeFilter('umOrt',this.value)" placeholder="Ort" style="width:140px"><datalist id="ortListe">${orte.map((o) => `<option value="${esc(o)}">`).join("")}</datalist>
+      <select onchange="setzeFilter('umKm',this.value)">${opt([["", "– km"], ["5", "5 km"], ["10", "10 km"], ["15", "15 km"], ["20", "20 km"], ["30", "30 km"], ["50", "50 km"]], fw("umKm", ""))}</select>
+      ${orte.length ? "" : '<span class="leise klein">Orte zuerst unter «Aktualisieren» suchen lassen.</span>'}</div>`;
+  // Weitere
+  const weitereAktiv = [fw("name", "") && "Name «" + fw("name", "") + "»", fw("nichtVonMir", false) && "nicht von mir besucht", fw("nurMeine", false) && "nur meine", fw("nurAchtung", false) && "nur ⚠"].filter(Boolean);
+  const weitere = `<div class="fblock"><span class="ftitel">Name</span><input type="search" value="${esc(fw("name", ""))}" onchange="setzeFilter('name',this.value)" placeholder="Name, Studiengang, Fach"></div>
+    <div class="fblock haken-liste">
+      <label class="haken"><input type="checkbox" ${fw("nichtVonMir", false) ? "checked" : ""} onchange="setzeFilter('nichtVonMir',this.checked)"> nicht schon von mir besucht</label>
+      <label class="haken"><input type="checkbox" ${fw("nurMeine", false) ? "checked" : ""} onchange="setzeFilter('nurMeine',this.checked)"> nur meine</label>
+      <label class="haken"><input type="checkbox" ${fw("nurAchtung", false) ? "checked" : ""} onchange="setzeFilter('nurAchtung',this.checked)"> nur ⚠ Spezialfälle</label></div>`;
+  const gruppe = (titel, inhalt) => `<section class="fsek"><h4>${titel}</h4>${inhalt}</section>`;
+  const klapp = (titel, aktiv, inhalt) => { const offen = S.offeneGruppen ? S.offeneGruppen.has(titel) : false;
+    return `<details class="fsek" ${offen ? "open" : ""} ontoggle="gruppeMerken('${titel}',this.open)"><summary><h4>${titel}</h4>${aktiv.length ? `<span class="faktiv">${esc(aktiv.join(" · "))}</span>` : ""}</summary>${inhalt}</details>`; };
+  return `<aside class="filterbox">
+    <div class="fkopf"><b>Filter</b><button class="knopf klein" onclick="filterLeeren()">zurücksetzen</button></div>
+    ${gruppe("Auswahl", grund)}${klapp("Wann", wannAktiv, wann)}${klapp("Wo", woAktiv, wo)}${klapp("Weitere", weitereAktiv, weitere)}
+  </aside>`;
+}
+/* Über der Liste: Anzahl, aktive Filter zum Wegklicken, Liste kopieren */
+function aktivLeiste(ansicht, anzahl) {
+  const c = [];
+  const weg = (k, t) => c.push(`<button type="button" class="aktivchip" onclick="filterWeg('${k}')" title="Filter entfernen">${esc(t)} ✕</button>`);
+  const gleich = (k) => JSON.stringify([...fa(k)].sort()) === JSON.stringify([...STD[k]].sort());
+  if (ansicht === "planung" && !gleich("praktika")) weg("praktika", "Praktikum: " + (fa("praktika").join(", ") || "keins"));
+  if (ansicht === "planung" && !gleich("noetig")) weg("noetig", "Besuch nötig: " + (fa("noetig").join(", ") || "–"));
+  if (!gleich("stand")) weg("stand", "Stand: " + fa("stand").map((t) => t === "eingeteilt" ? "übernommen/gebucht" : t).join(", "));
+  if (ansicht === "halbtag" && fa("perioden").length) weg("perioden", "Periode " + fa("perioden").join(", "));
+  if (fw("von", "")) weg("von", "ab " + kurzDatum(fw("von", "")));
+  if (fw("bis", "")) weg("bis", "bis " + kurzDatum(fw("bis", "")));
+  if (ansicht === "planung") {
+    if (fa("tage").length) weg("tage", fa("tage").join(", "));
+    if (fa("tageszeit").length) weg("tageszeit", fa("tageszeit").map((t) => t === "vormittag" ? "Vormittag" : "Nachmittag").join(", "));
+    if (fa("lektart").length) weg("lektart", fa("lektart").map((t) => t === "einzel" ? "Einzellektion" : "Doppellektion").join(", "));
+    if (fw("bespr", true)) c.push(`<button type="button" class="aktivchip" onclick="setzeFilter('bespr',false)" title="Filter ausschalten">danach Zeit zum Besprechen ✕</button>`);
+  }
+  if (fw("ort", "")) weg("ort", "Ort: " + fw("ort", ""));
+  if (fw("umOrt", "") && fw("umKm", "")) weg("umKm", `${fw("umKm", "")} km um ${fw("umOrt", "")}`);
+  if (fw("name", "")) weg("name", "Name: " + fw("name", ""));
+  if (fw("nichtVonMir", false)) weg("nichtVonMir", "nicht von mir besucht");
+  if (fw("nurMeine", false)) weg("nurMeine", "nur meine");
+  if (fw("nurAchtung", false)) weg("nurAchtung", "nur ⚠");
+  return `<div class="aktivleiste"><b>${anzahl}</b> ${anzahl === 1 ? "Eintrag" : "Einträge"}${c.length ? " · " + c.join(" ") : ' <span class="leise klein">· keine Einschränkung</span>'}
+    <span style="margin-left:auto"></span><button class="knopf klein" onclick="listeKopieren()" title="Die Liste, wie sie gerade gefiltert ist, für Excel oder eine Mail">Liste kopieren</button></div>`;
+}
+function filterWeg(k) { delete S.filter[k]; merke("filter", JSON.stringify(S.filter)); zeichnen();
+}
+function gruppeMerken(titel, offen) { S.offeneGruppen ||= new Set(JSON.parse(lies("offen") || "[]")); setTimeout(() => merke("offen", JSON.stringify([...S.offeneGruppen])), 0); offen ? S.offeneGruppen.add(titel) : S.offeneGruppen.delete(titel); }
+function filterLeeren() {
+  for (const k of ["praktika", "noetig", "stand", "von", "bis", "tage", "tageszeit", "lektart", "bespr", "perioden", "ort", "umOrt", "umKm", "name", "nichtVonMir", "nurMeine", "nurAchtung"]) delete S.filter[k];
+  merke("filter", JSON.stringify(S.filter)); zeichnen();
+}
+
+function listeKopieren() {
+  const t = document.querySelector("#app table.liste"); if (!t) return;
+  const text = [...t.rows].map((r) => [...r.cells].map((c) => c.innerText.replace(/\s*\n\s*/g, " · ").replace(/Ich übernehme|Erledigt|Abgeben|Termin|Tool ↗|\+ Notiz/g, "").trim()).join("\t")).join("\n");
+  const ersatz = () => { const a = document.createElement("textarea"); a.value = text; document.body.appendChild(a); a.select(); document.execCommand("copy"); a.remove(); meldung("Liste kopiert – in Excel oder eine Mail einfügen."); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => meldung("Liste kopiert – in Excel oder eine Mail einfügen."), ersatz);
+  else ersatz();
+}
+function filtern(liste, ansicht) {
+  const sj = fw("jahr", S.einst.studienjahr);
+  const von = fw("von", ""), bis = fw("bis", "");
+  const lektFilter = fa("tage").length || fa("tageszeit").length || fa("lektart").length || fw("bespr", true) || von || bis;
+  const noetig = fa("noetig"), stand = fa("stand"), perioden = fa("perioden");
+  const standGruppe = (x) => x.stand === "besucht" ? "besucht" : ["übernommen", "gebucht"].includes(x.stand) ? "eingeteilt" : "offen";
+  return liste.filter((x) => {
+    if (x.jahr !== sj) return false;
+    if (ansicht === "planung") {
+      const n = x.noetig === "später" ? "nein" : x.noetig;
+      if (!noetig.includes(n)) return false;
+    }
+    if (ansicht === "halbtag" && perioden.length) { const pe = periode(x); if (!perioden.some((p) => p === "SK" ? /SK/.test(pe) : pe === "Periode " + p)) return false; }
+    if (!stand.includes(standGruppe(x))) return false;
+    // Zeitraum: Praktikum muss hineinfallen; mit Stundenplan zusätzlich eine passende freie Mathe-Lektion
+    if (von && datumAus(x.bis) && datumAus(x.bis) < von) return false;
+    if (bis && datumAus(x.von) && datumAus(x.von) > bis) return false;
+    if (ansicht === "planung" && lektFilter && x.lektionen && x.stand === "offen" && !lektionenIm(x).length) return false;
+    if (fw("ort", "") && !passtSuche([x.schulort, x.schulhaus].join(" "), fw("ort", "").toLowerCase().trim())) return false;
+    if (fw("umOrt", "") && fw("umKm", "")) { const d = km(fw("umOrt", ""), x.schulort); if (d == null || d > Number(fw("umKm", ""))) return false; }
+    if (fw("name", "") && !passtSuche([x.person.name, x.person.studiengang, (x.faecher || []).join(" ")].join(" "), fw("name", "").toLowerCase().trim())) return false;
+    if (fw("nichtVonMir", false) && S.ich && x.person.praktika.some((y) => y !== x && y.besuchtVon.includes(S.ich))) return false;
+    if (fw("nurMeine", false) && (!S.ich || x.wer !== S.ich)) return false;
+    if (fw("nurAchtung", false) && !(x.achtung && x.achtung.length)) return false;
+    return true;
+  });
+}
+
+function frueherBesucht(x) {
+  const fr = x.person.praktika.filter((y) => y !== x && y.besuchtVon.length).map((y) => `${y.gruppe} ${sjText(y.jahr)}: ${y.besuchtVon.join(", ")}`);
+  return fr.length ? `<span class="klein">${esc(fr.join(" · "))}</span>` : `<span class="leise klein">–</span>`;
+}
+function zeitraum(x) { return x.von ? `${esc(x.von.slice(0, 5))}–${esc(x.bis.slice(0, 5))}` : ""; }
+
+function ansichtPlanung() {
+  const sj = fw("jahr", S.einst.studienjahr);
+  const alleJahr = R.praktika.filter((p) => p.jahr === sj);
+  const prof = alleJahr.filter((p) => p.gruppe === "Profil");
+  const quart = alleJahr.filter((p) => p.gruppe === "Quartal" && p.noetig === "ja");
+  const eing = (l) => l.filter((p) => ["übernommen", "gebucht", "besucht"].includes(p.stand)).length;
+  const ziel = Math.ceil(S.einst.quote * prof.length);
+  const welche = fa("praktika");
+  let liste = R.praktika.filter((p) => welche.includes(p.gruppe === "Abschluss" ? "Spezial" : p.gruppe));
+  liste = filtern(liste, "planung").sort((a, b) => GRUPPEN.indexOf(a.gruppe) - GRUPPEN.indexOf(b.gruppe) || (b.achtung.length - a.achtung.length) || a.person.name.localeCompare(b.person.name));
+  const k = (t, z, cls = "") => `<div class="kachel"><div class="t">${t}</div><div class="z ${cls}">${z}</div></div>`;
+  return `<h2>Profil- und Quartalspraktikum ${sjText(sj)}</h2>
+  <div class="kacheln">
+    <div class="kachel gruppe">${k("Profil · Quote", Math.round(S.einst.quote * 100) + " %")}${k("Ziel", ziel)}${k("eingeteilt", eing(prof))}${k("fehlen", Math.max(0, ziel - eing(prof)), ziel - eing(prof) > 0 ? "rot" : "gruen")}</div>
+    <div class="kachel gruppe">${k("Quartal · nötig", quart.length)}${k("eingeteilt", eing(quart))}${k("fehlen", quart.length - eing(quart), quart.length - eing(quart) > 0 ? "rot" : "gruen")}</div>
+    <div class="kachel gruppe">${k("Prognose Quartal " + sjText(jahrPlus(sj, 1)), Math.max(0, prof.length - eing(prof)))}</div>
+  </div>
+  <div class="mitfilter">${filterLeiste("planung", liste.length)}<div class="inhalt">
+  ${aktivLeiste("planung", liste.length)}
+  ${legende()}
+  ${liste.length ? `<table class="liste"><thead><tr><th></th><th>Name</th><th>Prakt.</th><th>Zeitraum</th><th>Schule</th><th>Besuch nötig?</th><th>Stand</th><th>Mathe-Lektionen</th><th>Früher besucht von</th><th></th></tr></thead><tbody>
+  ${liste.map((x) => `<tr class="${x.achtung.length ? "zeile-achtung" : ""}">
+    <td>${achtungZeichen(x)}</td>
+    <td class="name" title="Fächer: ${esc((x.faecher || []).join(", "))}" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}<div class="leise klein">${esc(x.person.studiengang || "")} · ${esc((x.faecher || []).join(", "))}</div></td>
+    <td>${esc(x.gruppe)}</td><td class="klein">${zeitraum(x)}</td>
+    <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
+    <td><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}" title="${esc(x.warum)}">${esc(x.noetig)}</span>${x.achtung.length ? `<div class="klein rot">${esc(x.achtung.map((f) => f.hinweis).join(" · "))}</div>` : ""}</td>
+    <td>${standChip(x)}</td><td>${lektionenZelle(x)}</td><td>${frueherBesucht(x)}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`).join("")}
+  </tbody></table>` : `<div class="leer">Keine Praktika für diese Auswahl.</div>`}</div></div>`;
+}
+
+function ansichtTermine() {
+  const sj = fw("jahr", S.einst.studienjahr);
+  const meine = R.praktika.filter((x) => S.ich && x.wer === S.ich && x.jahr === sj)
+    .sort((a, b) => ((a.termin ? a.termin.datum + a.termin.zeit : "9") + a.person.name).localeCompare((b.termin ? b.termin.datum + b.termin.zeit : "9") + b.person.name));
+  if (!S.ich) return `<h2>Meine Termine</h2><div class="leer">Bitte oben rechts «Ich bin» wählen.</div>`;
+  const tage = {};
+  for (const x of meine) (tage[x.termin ? x.termin.datum : "ohne Termin"] ||= []).push(x);
+  const tagText = (d) => d === "ohne Termin" ? d : `${kurzDatum(d)}${d.slice(0, 4)}`;
+  return `<h2>Meine Termine ${sjText(sj)} · ${esc(S.ich)}</h2>
+  <div class="kacheln"><div class="kachel"><div class="t">Besuche</div><div class="z">${meine.length}</div></div>
+    <div class="kachel"><div class="t">Tage</div><div class="z">${Object.keys(tage).filter((t) => t !== "ohne Termin").length}</div></div>
+    <div class="kachel"><div class="t">besucht</div><div class="z">${meine.filter((x) => x.stand === "besucht").length}</div></div></div>
+  <div class="filter"><label>Studienjahr<select onchange="setzeFilter('jahr',this.value)">${jahre().map((j) => `<option value="${j}" ${j === sj ? "selected" : ""}>${sjText(j)}</option>`).join("")}</select></label>
+    <button class="knopf klein" onclick="listeKopieren()">Liste kopieren</button></div>
+  ${meine.length ? `<table class="liste"><thead><tr><th>Tag</th><th>Zeit</th><th>Name</th><th>Prakt.</th><th>Schule</th><th>Stand</th><th>Hinweise</th><th></th></tr></thead><tbody>
+  ${Object.entries(tage).map(([d, xs]) => xs.map((x, i) => { const w = x.termin ? terminWarnungen(x, x.termin.datum, x.termin.zeit) : [];
+    return `<tr><td style="white-space:nowrap">${i === 0 ? `<b>${esc(tagText(d))}</b>` : ""}</td><td>${esc(x.termin ? x.termin.zeit : "")}</td>
+    <td class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</td><td>${esc(x.gruppe)}</td>
+    <td>${esc(x.schulort)}<div class="leise klein">${esc(x.schulhaus)}</div></td><td>${standChip(x)}</td>
+    <td>${w.map((t) => `<div class="hinweis">⚠ ${esc(t)}</div>`).join("")}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`; }).join("")).join("")}
+  </tbody></table>` : `<div class="leer">Noch keine Besuche übernommen.</div>`}`;
+}
+
+/* Halbtag: zwei Studierende im selben Schulhaus, gleiche Periode, gleiche Mathe-Lektionen = Paar (Doppelbesuch) */
+function paareBilden(liste) {
+  const gruppen = {};
+  for (const x of liste) (gruppen[[x.jahr, x.art, x.schulort, x.schulhaus, x.von, x.bis].join("|")] ||= []).push(x);
+  const zeilen = [];
+  const lekt = (x) => new Set((x.lektionen || []).map((l) => l.datum + " " + l.zeit));
+  for (const g of Object.values(gruppen)) {
+    const rest = [...g];
+    while (rest.length) {
+      const a = rest.shift();
+      let best = -1, wert = 0;
+      rest.forEach((b, i) => {
+        const la = lekt(a), lb = lekt(b);
+        const gemeinsam = la.size && lb.size ? [...la].filter((t) => lb.has(t)).length / Math.min(la.size, lb.size) : 0.6;
+        if (gemeinsam > wert) { wert = gemeinsam; best = i; }
+      });
+      zeilen.push(best >= 0 && wert >= 0.5 ? [a, rest.splice(best, 1)[0]] : [a]);
+    }
+  }
+  return zeilen.sort((a, b) => a[0].art - b[0].art || (a[0].schulort || "").localeCompare(b[0].schulort || "") || a[0].person.name.localeCompare(b[0].person.name));
+}
+function ansichtHalbtag() {
+  const sj = fw("jahr", S.einst.studienjahr);
+  const alle = R.praktika.filter((p) => p.gruppe === "Halbtag" && p.jahr === sj);
+  const liste = filtern(R.praktika.filter((p) => p.gruppe === "Halbtag"), "halbtag");
+  const zeilen = paareBilden(liste);
+  const k = (t, z) => `<div class="kachel"><div class="t">${t}</div><div class="z">${z}</div></div>`;
+  const name = (x) => `<div class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${achtungZeichen(x)} ${esc(x.person.name)} <span class="leise klein">${esc(x.person.studiengang || "")}</span></div>`;
+  return `<h2>Halbtagespraktikum ${sjText(sj)}</h2>
+  <div class="kacheln">${k("Personen", alle.length)}${k("Paare / einzeln", `${zeilen.filter((z) => z.length === 2).length} / ${zeilen.filter((z) => z.length === 1).length}`)}${k("eingeteilt", alle.filter((p) => ["übernommen", "gebucht"].includes(p.stand)).length)}${k("besucht", alle.filter((p) => p.stand === "besucht").length)}${k("offen", alle.filter((p) => p.stand === "offen").length)}</div>
+  <div class="mitfilter">${filterLeiste("halbtag", liste.length)}<div class="inhalt">
+  ${aktivLeiste("halbtag", liste.length)}
+  ${legende()}
+  ${zeilen.length ? `<table class="liste"><thead><tr><th>Studierende</th><th>Periode</th><th>Zeitraum</th><th>Schule</th><th>Stand</th><th>Mathe-Lektionen</th><th>Früher besucht von</th><th></th></tr></thead><tbody>
+  ${zeilen.map((z) => { const x = z[0];
+    return `<tr class="${z.some((y) => y.achtung.length) ? "zeile-achtung" : ""}">
+    <td>${z.map(name).join("")}${z.length === 2 ? '<div class="klein paar">Paar · Doppelbesuch</div>' : ""}</td>
+    <td class="klein">${esc(periode(x))}</td><td class="klein">${zeitraum(x)}</td>
+    <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
+    <td>${z.map((y) => `<div>${standChip(y)}</div>`).join("")}</td>
+    <td>${lektionenZelle(x, z[1])}</td>
+    <td>${z.map(frueherBesucht).join("<br>")}</td>
+    <td style="white-space:nowrap">${z.length === 2 ? paarAktionen(z) : aktionen(x)}</td></tr>`; }).join("")}
+  </tbody></table>` : `<div class="leer">Keine Halbtagespraktika für diese Auswahl.</div>`}</div></div>`;
+}
+function paarAktionen([a, b]) {
+  const k = [];
+  if ([a, b].some((x) => x.stand === "offen")) k.push(`<button class="knopf klein" onclick="termineZeigen(${ref(a.idpraktikum)}, ${ref(b.idpraktikum)})">Beide übernehmen</button>`);
+  for (const x of [a, b]) if (x.wer === S.ich && x.stand !== "besucht") k.push(`<button class="knopf klein" onclick="erledigt(${ref(x.idpraktikum)})">Erledigt ${esc(x.person.name.split(" ")[0])}</button>`);
+  for (const x of [a, b]) if (x.link) k.push(`<button class="knopf klein" title="${esc(x.person.name)} im Praktikumstool" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ${esc(x.person.name.split(" ")[0])} ↗</button>`);
+  return k.join("<br>");
+}
+function periode(x) {
+  const n = (S.artNamen || {})[x.art] || "";
+  const m = n.match(/Periode ([A-D])/); if (m) return "Periode " + m[1];
+  if (/Einzelfach/.test(n)) return "SK Einzelfach " + (n.match(/(\d)\. Fach/) || [, ""])[1];
+  return n;
+}
+
+function ansichtStudierende() {
+  const such = fw("ssuche", "").toLowerCase().trim(), sg = fw("sg", "alle"), archiv = fw("archiv", false);
+  const sj = S.einst.studienjahr;
+  const imArchiv = Object.values(R.personen).filter((p) => p.archiv).length;
+  let liste = Object.values(R.personen).filter((p) => archiv ? p.archiv : !p.archiv);
+  if (sg !== "alle") liste = liste.filter((p) => (p.studiengang || "").replace(/[\s.\d]/g, "").startsWith(sg));
+  if (such) liste = liste.filter((p) => passtSuche([p.name, p.studiengang, ...(p.praktika.map((x) => x.schulort + " " + x.schulhaus))].join(" "), such));
+  if (fw("nurAchtung", false)) liste = liste.filter((p) => (p.achtungen || []).length || p.praktika.some((x) => x.achtung && x.achtung.length));
+  if (fw("nurBemerkung", false)) liste = liste.filter((p) => p.notizen.length || (p.alt && p.alt.bemerkung));
+  liste.sort((a, b) => a.name.localeCompare(b.name));
+  const zelle = (p, g) => {
+    const xs = p.praktika.filter((x) => x.gruppe === g);
+    if (!xs.length) return `<span class="leise">–</span>`;
+    return xs.map((x) => `<div>${sjText(x.jahr)} ${standChip(x, true)}${g === "Quartal" ? ` <span class="n-${x.noetig === "später" ? "spaeter" : x.noetig} klein">${esc(x.noetig)}</span>` : ""}</div>`).join("");
+  };
+  const sgs = [...new Set(Object.values(R.personen).map((p) => (p.studiengang || "").replace(/[\s.\d]/g, "")).filter(Boolean))].sort();
+  return `<h2>Studierende${archiv ? " – Archiv" : ""}</h2>
+  <div class="filter">
+    <label title="Komma = oder · Leerzeichen = und · -Wort = ohne">Suche (Name, Ort, Schulhaus)<input type="search" value="${esc(fw("ssuche", ""))}" onchange="setzeFilter('ssuche',this.value)" placeholder="z.B. Sursee, Hochdorf -Neu"></label>
+    <button class="knopf klein" onclick="listeKopieren()">Liste kopieren</button>
+    <label>Studiengang<select onchange="setzeFilter('sg',this.value)"><option value="alle">alle</option>${sgs.map((s) => `<option ${s === sg ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></label>
+    <label class="haken" title="Archiv: alle Praktika abgeschlossen oder seit zwei Jahren kein Praktikum"><input type="checkbox" ${archiv ? "checked" : ""} onchange="setzeFilter('archiv',this.checked)"> Archiv zeigen (${imArchiv} abgeschlossen)</label>
+    <label class="haken"><input type="checkbox" ${fw("nurAchtung", false) ? "checked" : ""} onchange="setzeFilter('nurAchtung',this.checked)"> nur mit ⚠ Achtung</label>
+    <label class="haken"><input type="checkbox" ${fw("nurBemerkung", false) ? "checked" : ""} onchange="setzeFilter('nurBemerkung',this.checked)"> nur mit Bemerkung</label>
+    <span class="leise klein">${liste.length} Personen</span>
+  </div>
+  <table class="liste"><thead><tr><th></th><th>Name</th><th>Studiengang</th><th>Fächer</th><th>Halbtag</th><th>Profil</th><th>Quartal</th><th>Achtung / Bemerkung</th><th></th></tr></thead><tbody>
+  ${liste.map((p) => { const a = (p.achtungen || []).length || p.praktika.some((x) => x.achtung && x.achtung.length);
+    const bem = [...(p.achtungen || []).map((x) => `<div class="rot">⚠ im ${esc(x.fuer)} besuchen${x.text ? ": " + esc(x.text) : ""}
+        <button class="knopf klein" title="ändern" onclick="achtungSetzen(REFS[${ref(p.id)}], REFS[${ref(x.id)}])">ändern</button>
+        <button class="knopf klein" title="löschen" onclick="achtungWeg(REFS[${ref(p.id)}], REFS[${ref(x.id)}])">✕</button></div>`),
+                 ...p.notizen.slice(-1).map((x) => `<div>${esc(x.text.slice(0, 80))}</div>`), ...(!p.notizen.length && p.alt && p.alt.bemerkung ? [`<div class="leise">${esc(p.alt.bemerkung.slice(0, 80))}</div>`] : [])].join("");
+    return `<tr class="${a ? "zeile-achtung" : ""}"><td>${a ? `<span class="achtung">⚠</span>` : ""}</td><td class="name" onclick="detailZeigen(REFS[${ref(p.id)}])">${esc(p.name)}</td>
+    <td>${esc(p.studiengang || "")}</td><td class="klein">${esc((p.faecher || []).join(", "))}</td>
+    <td>${zelle(p, "Halbtag")}</td><td>${zelle(p, "Profil")}</td><td>${zelle(p, "Quartal")}</td><td class="klein">${bem}</td>
+    <td style="white-space:nowrap"><button class="knopf klein" onclick="achtungSetzen(REFS[${ref(p.id)}])">⚠ Achtung</button></td></tr>`; }).join("")}
+  </tbody></table>`;
+}
+
+/* ---------- Hilfe ---------- */
+function ansichtHilfe() {
+  const k = (t, inhalt) => `<div class="karte"><h3>${t}</h3>${inhalt}</div>`;
+  return `<h2>So arbeitest du mit den Praxisbesuchen</h2>
+  <p><a class="knopf haupt" style="text-decoration:none;display:inline-block" href="rundgang.html" target="_blank">▶ Rundgang ansehen (2 Minuten, mit Beispieldaten)</a></p>
+  <div class="start">
+  ${k("1 · Einmal einrichten", `<ol><li>Seite in <b>Chrome oder Edge</b> öffnen (nicht Safari, Firefox oder Teams).</li>
+    <li>Den Teams-Ordner <b>Praxisbesuche</b> mit OneDrive synchronisieren («Synchronisieren» in Teams → Dateien).</li>
+    <li>«Ordner wählen …» → den Ordner <b>Praxisbesuche</b> wählen → «Bearbeiten erlauben».</li>
+    <li>Oben rechts bei <b>Ich bin</b> das eigene Kürzel wählen.</li></ol>`)}
+  ${k("2 · Besuche suchen", `<ul><li>Reiter <b>Profil &amp; Quartal</b> oder <b>Halbtagespraktikum</b>.</li>
+    <li>Links filtern: Praktikum, Besuch nötig, Stand – darunter aufklappbar <b>Wann</b> (Tag, Vormittag/Nachmittag, Doppellektion, Zeit zum Besprechen), <b>Wo</b> (Ort, Umkreis) und <b>Weitere</b> (z.B. «nicht schon von mir besucht»).</li>
+    <li>Über der Liste stehen die aktiven Filter – mit ✕ wieder weg.</li></ul>`)}
+  ${k("3 · Termin übernehmen", `<ul><li>Im Raster <b>Mo–Fr</b> stehen die freien Mathe-Lektionen: hohes Kästchen = Doppellektion, grün = danach Zeit zum Besprechen.</li>
+    <li>Klick auf das Raster → alle Termine Woche für Woche → Termin anklicken → <b>übernehmen</b>.</li>
+    <li>Das Praktikumstool öffnet sich rechts direkt bei der Lektion: dort <b>«Besuch eintragen»</b>. Das bleibt Pflicht.</li>
+    <li>Nach dem Besuch: <b>Erledigt</b>.</li></ul>`)}
+  ${k("4 · Studierende und Achtung", `<ul><li>Reiter <b>Studierende</b>: alle Praktika einer Person auf einen Blick, Klick auf den Namen zeigt den Verlauf.</li>
+    <li><b>⚠ Achtung</b>: «im Profil / Quartal besuchen» mit Begründung – dann ist der Besuch dort Pflicht und erscheint mit ⚠.</li>
+    <li>Bemerkungen zur Person im Detail; Achtung lässt sich ändern oder löschen.</li></ul>`)}
+  ${k("5 · Halbtagespraktikum", `<ul><li>Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als <b>Paar</b> in einer Zeile.</li>
+    <li><b>Beide übernehmen</b> trägt den Doppelbesuch für beide ein; im Tool beide eintragen.</li></ul>`)}
+  ${k("6 · Aktualisieren (Rike, Maurus)", `<ul><li>Vor jedem Praktikum: «Praktikumstool öffnen und Daten holen», im Tool das Lesezeichen klicken.</li>
+    <li>Spezialfälle (Excel) einlesen, Regeln aus der Checkliste übernehmen, Orte suchen lassen.</li></ul>`)}
+  </div>
+  <p class="leise klein">Gespeichert wird im gemeinsamen Ordner. Änderungen der anderen erscheinen nach der Synchronisation (meist innert einer Minute; sofort: ↻ oben rechts).</p>`;
+}
+
+/* ---------- Detail einer Person ---------- */
+function detailZeigen(id, oeffnen = true) {
+  const p = R.personen[id]; if (!p) return;
+  S.detail = id;
+  const s = $("#schublade");
+  const a = p.alt;
+  const notiz = (e) => `<div class="notiz">${esc(e.text)}<div class="wer">${esc(e.wer)}, ${datumText(e.zeit)}</div></div>`;
+  s.innerHTML = `<button class="knopf zu" onclick="detailZu()">Schliessen ✕</button>
+    <h2>${esc(p.name)}</h2>
+    <div class="leise">${esc(p.studiengang || "")}${p.faecher && p.faecher.length ? " · Fächer: " + esc(p.faecher.join(", ")) : ""}${p.nurAlt ? " · nur aus der alten Liste" : ""}</div>
+    ${p.spezial.length ? `<div class="karte" style="margin-top:12px;border-color:var(--achtung)"><b class="rot">⚠ Spezialfall</b>${p.spezial.map((f) => `<div>${sjText(f.jahr)} · ${esc(f.kategorie)}: <b>${esc(f.hinweis)}</b>${f.bemerkung ? " – " + esc(f.bemerkung) : ""}</div>`).join("")}</div>` : ""}
+    <h3>Verlauf</h3>
+    <table class="liste"><thead><tr><th>Jahr</th><th>Praktikum</th><th>Schule</th><th>nötig?</th><th>Stand</th><th></th></tr></thead><tbody>
+    ${p.praktika.map((x) => `<tr><td>${sjText(x.jahr)}</td><td>${esc(x.gruppe)}${x.quelle === "alt" ? ' <span class="leise klein">(alte Liste)</span>' : ""}<div class="leise klein">${zeitraum(x)}</div></td>
+      <td>${esc(x.schulort)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
+      <td><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}">${esc(x.noetig)}</span><div class="leise klein">${esc(x.warum)}</div></td>
+      <td>${standChip(x)}${x.art === "Wertschätzung" ? ' <span class="klein leise">Wertschätzung</span>' : ""}${x.datum ? `<div class="leise klein">${datumText(x.datum)}</div>` : ""}
+        ${x.lektionen && x.lektionen.length ? `<div style="margin-top:4px">${lektionenZelle(x)}</div>` : ""}
+        ${x.notizen.map(notiz).join("")}</td>
+      <td style="white-space:nowrap">${aktionen(x)}<br><button class="knopf klein" onclick="notizZu(REFS[${ref(x.idpraktikum)}])">+ Notiz</button>
+        <button class="knopf klein" title="Besuch nötig von Hand festlegen" onclick="noetigSetzen(REFS[${ref(x.idpraktikum)}])">nötig?</button></td></tr>`).join("")}
+    </tbody></table>
+    <h3>Achtung</h3>
+    ${(p.achtungen || []).map((a) => `<div class="notiz" style="border-color:var(--achtung)"><b class="rot">⚠ im ${esc(a.fuer)} besuchen</b>${a.text ? " – " + esc(a.text) : ""}
+      <div class="wer">${esc(a.wer)}, ${datumText(a.zeit)} ·
+        <button class="knopf klein" onclick="achtungSetzen(REFS[${ref(p.id)}], REFS[${ref(a.id)}])">ändern</button>
+        <button class="knopf klein" onclick="achtungWeg(REFS[${ref(p.id)}], REFS[${ref(a.id)}])">löschen</button></div></div>`).join("") || '<p class="leise klein">Kein Vermerk.</p>'}
+    <p><button class="knopf" onclick="achtungSetzen(REFS[${ref(p.id)}])">⚠ Achtung setzen …</button></p>
+    <h3>Bemerkungen zur Person</h3>
+    ${a && a.bemerkung ? `<div class="notiz">${esc(a.bemerkung)}<div class="wer">alte Liste</div></div>` : ""}
+    ${p.notizen.map(notiz).join("")}
+    <textarea id="neueBemerkung" placeholder="Neue Bemerkung …"></textarea>
+    <p><button class="knopf haupt" onclick="bemerkungSpeichern(REFS[${ref(p.id)}])">Bemerkung speichern</button></p>
+    ${a && (a.notizen || a.original) ? `<details><summary class="leise">Aus der alten Liste</summary><p class="klein">${esc(a.notizen || "")}</p><p class="klein leise">${esc(a.original || "")}</p></details>` : ""}`;
+  if (oeffnen) s.classList.add("offen");
+}
+function detailZu() { $("#schublade").classList.remove("offen"); S.detail = null; }
+async function achtungSetzen(id, alteId) {
+  const d = $("#frage");
+  const alt = alteId ? (R.personen[id].achtungen || []).find((a) => a.id === alteId) : null;
+  $("#frageText").textContent = `${alt ? "Achtung ändern" : "Achtung"} für ${R.personen[id].name}`;
+  $("#frageFeld").innerHTML = `<label class="klein leise">Wo muss die Person besucht werden?</label>
+    <select id="aFuer"><option value="Profil">im Profilpraktikum</option><option value="Quartal">im Quartalspraktikum</option><option value="Halbtag">im Halbtagespraktikum</option></select>
+    <label class="klein leise" style="display:block;margin-top:8px">Begründung</label><textarea id="aText" placeholder="z.B. im Halbtagespraktikum fachlich unsicher">${alt ? esc(alt.text || "") : ""}</textarea>`;
+  if (alt) $("#aFuer").value = alt.fuer;
+  d.returnValue = ""; d.showModal();
+  await new Promise((ok) => (d.onclose = ok));
+  if (d.returnValue !== "ok") return;
+  const fuer = $("#aFuer").value, text = $("#aText").value.trim();
+  if (alt && !(await eintragen({ typ: "achtung_weg", person: id, bezug: alt.id }))) return;
+  if (await eintragen({ typ: "achtung", person: id, fuer, text })) meldung(alt ? "Achtung geändert." : "Achtung gesetzt – erscheint in der Planung mit ⚠.");
+}
+async function achtungWeg(person, bezug) {
+  const ok = await frage("Diesen Achtung-Vermerk löschen?", { art: "wahl", wert: "ja", optionen: [["ja", "Ja, löschen"]] });
+  if (ok === null) return;
+  if (await eintragen({ typ: "achtung_weg", person, bezug })) meldung("Achtung gelöscht.");
+}
+async function bemerkungSpeichern(id) {
+  const t = $("#neueBemerkung").value.trim(); if (!t) return;
+  if (await eintragen({ typ: "bemerkung", person: id, text: t })) meldung("Bemerkung gespeichert.");
+}
+async function notizZu(id) {
+  const t = await frage("Notiz zu diesem Praktikum", { art: "lang" }); if (!t) return;
+  await eintragen({ typ: "notiz", praktikum: id, text: t });
+}
+async function noetigSetzen(id) {
+  const wert = await frage("Besuch nötig? (von Hand festlegen)", { art: "wahl", wert: "ja", optionen: [["ja", "ja"], ["nein", "nein"], ["optional", "optional"], ["", "wieder nach Regel"]] });
+  if (wert === null) return;
+  const grund = wert ? (await frage("Grund (kurz)")) || "" : "";
+  await eintragen({ typ: "noetig", praktikum: id, wert: wert || null, text: grund });
+}
+
+/* ---------- Aktualisieren: Import und Einstellungen ---------- */
+function ansichtAktualisieren() {
+  const e = S.einst;
+  const n = Object.keys(S.praktika).length;
+  const proJahr = {};
+  for (const p of Object.values(S.praktika)) proJahr[p.jahr + " " + p.gruppe] = (proJahr[p.jahr + " " + p.gruppe] || 0) + 1;
+  return `<h2>Aktualisieren</h2>
+  <p class="leise">Einmal vor den Praktika, durch Rike oder Maurus. Alles wird hier im Browser gelesen – nichts geht an einen anderen Dienst.</p>
+  <div class="karte"><h3>1 · Praktika aus dem Praktikumstool</h3>
+    <p>Studienjahre <input class="eingabe" id="holJahre" value="${esc(`${jahrPlus(e.studienjahr, -4)} bis ${e.studienjahr}`)}" size="16">
+       <label class="klein"><input type="checkbox" id="holPlan" checked> mit Stundenplänen (Mathe-Lektionen) für ${sjText(e.studienjahr)}</label></p>
+    <p><button class="knopf haupt" id="toolHolen">Praktikumstool öffnen und Daten holen</button>
+       <span class="leise klein">Im Tool anmelden und dort das Lesezeichen «Praxisbesuche-Export» anklicken.</span></p>
+    <details><summary class="leise klein">oder eine gespeicherte Datei einlesen</summary>
+      <input type="file" id="dateiTool" accept=".json" multiple> <button class="knopf" id="importTool">Einlesen</button></details>
+    <div class="import-ergebnis" id="ergTool"></div>
+    <p class="leise klein">Jetzt im Ordner: ${n} Praktika${n ? " · " + Object.entries(proJahr).sort().reverse().map(([k, v]) => `${sjText(k.split(" ")[0])} ${k.split(" ")[1]}: ${v}`).join(" · ") : ""}</p></div>
+  <div class="karte"><h3>2 · Spezialfälle</h3>
+    <p>Excel-Liste «Spezialfälle Besuchsplanung» der Praktikumsabteilung. Studienjahr:
+      <select id="spezJahr">${[...new Set([e.studienjahr, ...jahre()])].map((j) => `<option ${j === e.studienjahr ? "selected" : ""} value="${j}">${sjText(j)}</option>`).join("")}</select></p>
+    <input type="file" id="dateiSpez" accept=".xlsx,.xls"> <button class="knopf haupt" id="importSpez">Einlesen</button>
+    <div class="import-ergebnis" id="ergSpez"></div>
+    <p class="leise klein">Jetzt im Ordner: ${S.spezial.length} Spezialfälle (${S.spezial.filter((f) => !f.idstudent).length} ohne Zuordnung).</p></div>
+  <div class="karte"><h3>3 · Regeln (Checkliste der Praktikumsabteilung)</h3>
+    <p class="leise klein">Einmal pro Studienjahr aus der Checkliste übernehmen. Termine, die dagegen verstossen, bietet die Seite nicht an.</p>
+    <table class="regeln">
+      <tr><td>Arbeitssitzung Profil (Vormittag, keine Besuche)</td><td><input class="eingabe" type="date" id="eArbP" value="${esc(e.arbeitssitzungProfil || "")}"></td></tr>
+      <tr><td>Arbeitssitzung Quartal (Vormittag, keine Besuche)</td><td><input class="eingabe" type="date" id="eArbQ" value="${esc(e.arbeitssitzungQuartal || "")}"></td></tr>
+      <tr><td>Profil: keine Besuche an den ersten … Praktikumstagen</td><td><input class="eingabe" type="number" min="0" max="10" id="rProfil" value="${esc(regel("profilErsteTage"))}" style="width:60px"></td></tr>
+      <tr><td>Quartal: keine Besuche in den ersten … Kalendertagen (7 = erste Woche)</td><td><input class="eingabe" type="number" min="0" max="21" id="rQuartal" value="${esc(regel("quartalErsteTage"))}" style="width:60px"></td></tr>
+      <tr><td>Nicht am letzten Praktikumstag</td><td><input type="checkbox" id="rLetzter" ${regel("letzterTag") ? "checked" : ""}></td></tr>
+      <tr><td>Höchstens … Besuche pro Woche bei einer Person</td><td><input class="eingabe" type="number" min="1" max="5" id="rWoche" value="${esc(regel("maxProWoche"))}" style="width:60px"></td></tr>
+      <tr><td>«Zeit zum Besprechen»: so viele Minuten frei nach dem Mathe-Block</td><td><input class="eingabe" type="number" min="10" max="120" step="5" id="rBespr" value="${esc(regel("besprechungMin"))}" style="width:60px"></td></tr>
+    </table>
+    <p style="margin-top:10px"><b>Checkliste als PDF im Ordner ablegen</b> (damit alle die aktuelle Fassung haben):
+      <input type="file" id="dateiCheck" accept=".pdf"> <button class="knopf" id="checkAblegen">Ablegen</button></p>
+    <div id="dokumente" class="klein"></div></div>
+  <div class="karte"><h3>4 · Orte für den Umkreis</h3>
+    <p>Sucht die Koordinaten der Schulorte bei swisstopo (geo.admin.ch). Übermittelt werden nur Ortsnamen, keine Personen.
+       Bei mehreren gleichnamigen Orten nimmt die Seite den nächsten zu Luzern.</p>
+    <button class="knopf haupt" id="orteSuchen">Fehlende Orte suchen</button>
+    <span class="leise klein">${Object.keys(S.orte).length} Orte bekannt, ${schulorte().filter((o) => !S.orte[o]).length} fehlen.</span>
+    <div class="import-ergebnis" id="ergOrte"></div>
+    <details style="margin-top:8px"><summary class="leise">Orte ansehen und korrigieren</summary>
+      <table class="liste" style="max-width:700px;margin-top:6px"><thead><tr><th>Schulort</th><th>gefunden</th><th></th></tr></thead><tbody>
+      ${schulorte().map((o) => `<tr><td>${esc(o)}</td><td class="klein">${S.orte[o] ? esc(S.orte[o].label) : '<span class="rot">nicht gefunden</span>'}</td>
+        <td><button class="knopf klein" onclick="ortKorrigieren(REFS[${ref(o)}])">korrigieren</button></td></tr>`).join("")}
+      </tbody></table></details></div>
+  <div class="karte"><h3>5 · Einstellungen</h3>
+    <p>Aktuelles Studienjahr <select id="eJahr"><option value="" ${!e.studienjahrFest ? "selected" : ""}>automatisch nach Datum (${sjText(studienjahrHeute())})</option>${[...new Set([studienjahrHeute(), ...jahre()])].sort().reverse().map((j) => `<option value="${j}" ${j === e.studienjahrFest ? "selected" : ""}>fest: ${sjText(j)}</option>`).join("")}</select>
+       &nbsp; Quote Profil <input class="eingabe" id="eQuote" type="number" min="0" max="100" step="5" value="${Math.round(e.quote * 100)}" style="width:70px"> %</p>
+    <p class="leise klein">Soll = Vorgabe an Besuchen im Studienjahr. Änderungen werden sofort gespeichert.</p>
+    <table class="liste" style="max-width:760px"><thead><tr><th>Kürzel</th><th>Name</th><th>Soll Halbtag</th><th>Soll Profil + Quartal</th></tr></thead><tbody id="eDoz">
+      ${[...e.dozierende, { kuerzel: "", name: "" }].map((d) => `<tr><td><input class="eingabe" value="${esc(d.kuerzel)}" size="6"></td><td><input class="eingabe" value="${esc(d.name)}" size="28"></td>
+        <td><input class="eingabe" type="number" min="0" value="${esc(d.sollHalbtag ?? "")}" style="width:70px"></td><td><input class="eingabe" type="number" min="0" value="${esc(d.sollPQ ?? d.soll ?? "")}" style="width:70px"></td></tr>`).join("")}
+    </tbody></table>
+    <p><button class="knopf haupt" id="einstSpeichern">Einstellungen speichern</button> <span class="leise klein" id="einstStand"></span></p></div>
+  <details class="karte"><summary><b>Einmalig: alte Excel-Liste</b> <span class="leise klein">(${S.alt.length} Personen eingelesen)</span></summary>
+    <p>«Buchhaltung Praxisbesuche.xlsx» – liefert den Verlauf: wer wen früher besucht hat, Bemerkungen. Ist bereits eingelesen; nur bei Bedarf erneut.</p>
+    <input type="file" id="dateiAlt" accept=".xlsx"> <button class="knopf" id="importAlt">Einlesen</button>
+    <div class="import-ergebnis" id="ergAlt"></div></details>`;
+}
+function aktualisierenVerbinden() {
+  $("#importTool").onclick = importTool;
+  $("#toolHolen").onclick = toolHolen;
+  $("#importSpez").onclick = importSpezial;
+  $("#importAlt").onclick = importAlt;
+  $("#einstSpeichern").onclick = () => einstellungenSpeichern(true);
+  // sofort speichern, sobald etwas geändert wird
+  for (const el of document.querySelectorAll("#eJahr, #eQuote, #eArbP, #eArbQ, #rProfil, #rQuartal, #rLetzter, #rWoche, #rBespr, #eDoz input"))
+    el.addEventListener("change", () => einstellungenSpeichern(false));
+  $("#checkAblegen").onclick = checklisteAblegen;
+  dokumenteZeigen();
+  $("#orteSuchen").onclick = orteSuchen;
+}
+async function importTool() {
+  const dateien = [...$("#dateiTool").files];
+  if (!dateien.length) return meldung("Bitte zuerst eine Datei wählen.");
+  const liste = [];
+  for (const f of dateien) {
+    const d = JSON.parse(await f.text());
+    if (!d.praktika) { meldung(`${f.name}: keine Praktikumstool-Datei.`); continue; }
+    liste.push(d);
+  }
+  await praktikaUebernehmen(liste);
+}
+/* Praktika (aus Datei oder direkt vom Lesezeichen) in stamm/praktika.json übernehmen */
+async function praktikaUebernehmen(liste) {
+  const bestand = await leseJSON("stamm/praktika.json", { praktika: [], arten: {} });
+  const nach = {}; for (const p of bestand.praktika) nach[p.idpraktikum] = p;
+  let neu = 0, geaendert = 0; const proJahr = {};
+  for (const d of liste) {
+    Object.assign(bestand.arten ||= {}, d.arten || {});
+    for (const p of d.praktika) {
+      if (!p.idpraktikum || !p.idstudent) continue;
+      const alt = nach[p.idpraktikum];
+      if (alt && alt.lektionen && !p.lektionen) p.lektionen = alt.lektionen;   // Export ohne Stundenpläne
+      if (!alt) neu++; else if (JSON.stringify(alt) !== JSON.stringify(p)) geaendert++;
+      nach[p.idpraktikum] = p;
+      proJahr[p.jahr + " " + p.gruppe] = (proJahr[p.jahr + " " + p.gruppe] || 0) + 1;
+    }
+  }
+  bestand.praktika = Object.values(nach);
+  bestand.stand = new Date().toISOString();
+  await schreibeJSON("stamm/praktika.json", bestand);
+  const text = `<ul><li>${neu} neu, ${geaendert} aktualisiert</li>${Object.entries(proJahr).sort().map(([k, v]) => `<li>${esc(sjText(k.split(" ")[0]))} ${esc(k.split(" ")[1])}: ${v}</li>`).join("")}</ul>`;
+  await allesLaden();
+  if ($("#ergTool")) $("#ergTool").innerHTML = text;
+  meldung(`Praktika eingelesen: ${neu} neu, ${geaendert} aktualisiert.`);
+  return { neu, geaendert };
+}
+
+/* Praktikumstool öffnen: das Lesezeichen dort fragt nach dem Auftrag und schickt die Daten hierher zurück */
+async function toolHolen() {
+  S.auftrag = { jahre: $("#holJahre").value.trim() || S.einst.studienjahr, plan: $("#holPlan").checked };
+  const b = Math.round(screen.availWidth / 2);
+  S.toolFenster = window.open(TOOL + "/app/", "praktikumstool", `popup,width=${b},height=${screen.availHeight},left=${b},top=0`);
+  $("#ergTool").innerHTML = `<b>Praktikumstool ist offen.</b> Falls nötig anmelden, dann dort das Lesezeichen «Praxisbesuche-Export» anklicken. Die Daten kommen von selbst hierher.`;
+}
+window.addEventListener("message", async (e) => {
+  if (e.origin !== TOOL || !e.data || !e.data.typ) return;
+  if (e.data.typ === "praxisbesuche-hallo") {
+    const a = S.auftrag || { jahre: `${jahrPlus(S.einst.studienjahr, -4)} bis ${S.einst.studienjahr}`, plan: true };
+    e.source.postMessage({ typ: "praxisbesuche-auftrag", jahre: a.jahre, plan: a.plan }, e.origin);
+    if ($("#ergTool")) $("#ergTool").innerHTML = `Lesezeichen läuft im Praktikumstool (${esc(a.jahre)}${a.plan ? ", mit Stundenplänen" : ""}) …`;
+  }
+  if (e.data.typ === "praxisbesuche-daten" && e.data.daten && e.data.daten.praktika) {
+    if (!S.ordner) { meldung("Zuerst den gemeinsamen Ordner verbinden."); return; }
+    const r = await praktikaUebernehmen([e.data.daten]);
+    e.source.postMessage({ typ: "praxisbesuche-erhalten", ...r }, e.origin);
+  }
+});
+function xlsxZeilen(buf, blattName) {
+  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const ws = wb.Sheets[blattName] || wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+}
+function personNachName(name, vorname) {
+  const k = nameSchluessel(name, vorname);
+  return Object.values(S.personen).find((p) => nameSchluessel(p.name) === k) || null;
+}
+async function importSpezial() {
+  const f = $("#dateiSpez").files[0]; if (!f) return meldung("Bitte zuerst die Excel-Datei wählen.");
+  if (!window.XLSX) return meldung("Excel-Leser nicht geladen (Internet nötig).");
+  const jahr = $("#spezJahr").value;
+  const zeilen = xlsxZeilen(await f.arrayBuffer());
+  let kategorie = "", faelle = [];
+  for (const z of zeilen) {
+    const [a, b, c, d, e] = z.map((v) => (v == null ? "" : String(v).replace(/\s+/g, " ").trim()));
+    if (a && !b && !c) { if (!/Besuchsplanung|Mentoratsbesuche/.test(a)) kategorie = a; continue; }
+    if (!b || b === "Nachname") continue;
+    const p = personNachName(b, c);
+    const hinweis = e;
+    let stufe = "info";
+    if (/\bMA\b/.test(hinweis) || /Fachbesuche zwingend/.test(hinweis)) stufe = "zwingend";
+    else if (/BE-Masterprüfung/.test(hinweis)) stufe = "prüfen";   // welches Fach? -> von Hand klären
+    if (/bereits organisiert/.test(hinweis)) stufe = "info";
+    faelle.push({ jahr, kategorie: kategorie.trim(), jahrgang: a, name: b, vorname: c, bemerkung: d, hinweis, stufe, idstudent: p ? p.id : null });
+  }
+  const bestand = await leseJSON("stamm/spezial.json", { faelle: [] });
+  bestand.faelle = bestand.faelle.filter((x) => x.jahr !== jahr).concat(faelle);
+  await schreibeJSON("stamm/spezial.json", bestand);
+  const ohne = faelle.filter((x) => !x.idstudent);
+  $("#ergSpez").innerHTML = `<ul><li>${faelle.length} Spezialfälle, davon ⚠ zwingend: ${faelle.filter((x) => x.stufe === "zwingend").length}, ⚠ prüfen: ${faelle.filter((x) => x.stufe === "prüfen").length}</li>
+    <li>${faelle.length - ohne.length} zugeordnet; ohne Mathe-Praktikum im Tool: ${ohne.length}${ohne.length ? " (" + esc(ohne.map((x) => x.name + " " + x.vorname).join(", ")) + ")" : ""}</li></ul>`;
+  await allesLaden(); meldung("Spezialfälle eingelesen.");
+}
+
+/* Alte Excel-Liste «Buchhaltung Praxisbesuche»: Freitexte in feste Werte */
+function altImportieren(zeilen) {
+  const T = (v) => (v == null ? "" : v instanceof Date ? v : String(v).replace(/\s+/g, " ").trim());
+  const sj = (jan) => (jan ? `${String((jan - 1) % 100).padStart(2, "0")}-${String(jan % 100).padStart(2, "0")}` : "");
+  const jahrAus = (t) => { const m = String(t).match(/(?<!\d)(20\d\d|\d\d)(?!\d)/); if (!m) return 0; const j = Number(m[1]); return j > 100 ? j : 2000 + j; };
+  const bekannt = new Set([...KUERZEL_STANDARD, ...S.einst.dozierende.map((d) => d.kuerzel)]);
+  const kuerzel = (t) => { const w = (String(t).match(/\b[a-z]{2,3}\b/g) || []).find((x) => bekannt.has(x) || TIPPFEHLER[x]); return w ? TIPPFEHLER[w] || w : ""; };
+  const besuch = (t, jahrSpalte) => {
+    const r = { text: t, sj: "", wer: "", status: "", art: "" };
+    let jahr = jahrSpalte ? jahrAus(jahrSpalte) : 0;
+    if (!t) { r.sj = sj(jahr); return r; }
+    const tl = t.toLowerCase(), w = tl.match(/^w(\d\d)/);
+    if (w) { r.sj = sj(2000 + Number(w[1])); r.status = "offen"; return r; }
+    if (tl.includes("nicht besuchen")) { r.sj = sj(jahr); r.status = "nicht nötig"; return r; }
+    if (tl.includes("nochmals besuchen")) { r.sj = sj(jahr); r.status = "offen"; r.erneut = true; return r; }
+    if (tl.includes("abgebrochen")) { r.sj = sj(jahrAus(t) || jahr); r.status = "abgebrochen"; return r; }
+    const k = kuerzel(t);
+    if (k) { const j = jahrAus(t) || jahr; r.sj = sj(j); r.wer = k; r.status = j > 2026 ? "übernommen" : "besucht"; r.art = tl.includes("(w)") || tl.includes("wertsch") ? "Wertschätzung" : "regulär"; }
+    else r.sj = sj(jahr);
+    return r;
+  };
+  const halbtag = (f, g, h, i) => {
+    const r = { text: [f, g, h].filter(Boolean).join(" "), sj: "", wer: "", status: "", periode: String(h || "").toUpperCase() };
+    const m = (String(f).toUpperCase().match(/\b([HF])(\d\d)/) || String(g).toUpperCase().match(/\b([HF])(\d\d)/) || String(g).toUpperCase().match(/(\d\d)([HF])/));
+    if (m) { const [hf, yy] = /\d/.test(m[1]) ? [m[2], m[1]] : [m[1], m[2]]; const y = 2000 + Number(yy); r.sj = hf === "H" ? sj(y + 1) : sj(y); }
+    if (/kompensation/i.test(f)) { r.status = "kein Praktikum"; return r; }
+    const k = kuerzel(f); if (k) { r.wer = k; r.status = "besucht"; }
+    if (i instanceof Date) r.datum = i.toISOString().slice(0, 10);
+    return r;
+  };
+  const personen = [];
+  for (const z of zeilen.slice(3)) {
+    const c = z.map(T);
+    const [A, B, C, D, E, F, G, H, I, J, K, Lq, M, N] = c;
+    if (!A || typeof A !== "string" || !B) continue;
+    const pk03 = besuch(Lq, M);
+    const text = [C, c[19], c[20]].join(" ").toLowerCase();
+    personen.push({
+      name: A, vorname: B, studiengang: String(E).replace(/\s+/g, ""), schluessel: nameSchluessel(A, B),
+      bemerkung: [C, D].filter(Boolean).join("; "), ort: c[26] || "",
+      pk01: halbtag(F, G, H, I), pk02: besuch(J, K), pk03, diplom: besuch(N, null),
+      erneut: !!pk03.erneut || /nochmals besuchen|ungenügend|schwach/.test(text),
+      notizen: [c[19] && "Weiterverfolgen: " + c[19], c[20] && "Bemerkungen: " + c[20], c[21] && "Ort: " + c[21]].filter(Boolean).join("; "),
+      original: ["F", "J", "L", "N"].map((s, i) => `${s}: ${[F, J, Lq, N][i] || "–"}`).join(" · "),
+    });
+  }
+  return personen;
+}
+async function importAlt() {
+  const f = $("#dateiAlt").files[0]; if (!f) return meldung("Bitte zuerst die Excel-Datei wählen.");
+  if (!window.XLSX) return meldung("Excel-Leser nicht geladen (Internet nötig).");
+  const personen = altImportieren(xlsxZeilen(await f.arrayBuffer(), "Buchhaltung"));
+  await schreibeJSON("stamm/alt.json", { quelle: f.name, stand: new Date().toISOString(), personen });
+  const zug = personen.filter((a) => Object.values(S.personen).some((p) => nameSchluessel(p.name) === a.schluessel)).length;
+  $("#ergAlt").innerHTML = `<ul><li>${personen.length} Personen gelesen, ${zug} davon im Praktikumstool gefunden.</li></ul>`;
+  await allesLaden(); meldung("Alte Liste eingelesen.");
+}
+function schulorte() { return [...new Set(Object.values(S.praktika).map((p) => p.schulort).filter(Boolean))].sort((a, b) => a.localeCompare(b)); }
+/* swisstopo-Suche: Gemeinden und Ortschaften; bei mehreren den nächsten zu Luzern */
+async function ortFinden(text) {
+  const u = "https://api3.geo.admin.ch/rest/services/api/SearchServer?type=locations&limit=12&sr=4326&searchText=" + encodeURIComponent(text);
+  const d = await (await fetch(u)).json();
+  const kandidaten = (d.results || []).map((r) => r.attrs).filter((a) => a.origin === "gg25" || /^<i>Ort<\/i>/.test(a.label));
+  if (!kandidaten.length) return null;
+  const luzern = { lat: 47.05, lon: 8.31 };
+  const dist = (a) => (a.lat - luzern.lat) ** 2 + ((a.lon - luzern.lon) * 0.68) ** 2;
+  const a = kandidaten.sort((x, y) => dist(x) - dist(y))[0];
+  return { lat: a.lat, lon: a.lon, label: a.label.replace(/<[^>]+>/g, "").trim() };
+}
+async function orteSuchen() {
+  const fehlend = schulorte().filter((o) => !S.orte[o]);
+  const orte = await leseJSON("stamm/orte.json", {});
+  let gefunden = 0, nicht = [];
+  for (let i = 0; i < fehlend.length; i++) {
+    $("#ergOrte").textContent = `Suche ${i + 1} / ${fehlend.length} …`;
+    try { const o = await ortFinden(fehlend[i]); if (o) { orte[fehlend[i]] = o; gefunden++; } else nicht.push(fehlend[i]); }
+    catch (e) { nicht.push(fehlend[i]); }
+  }
+  await schreibeJSON("stamm/orte.json", orte);
+  S.orte = orte;
+  $("#ergOrte").innerHTML = `${gefunden} gefunden${nicht.length ? `, nicht gefunden: ${esc(nicht.join(", "))} (unten korrigieren)` : ""}.`;
+  zeichnen();
+}
+async function ortKorrigieren(ort) {
+  const t = await frage(`Suchtext für «${ort}» (z.B. «Ibach SZ» oder die Gemeinde)`, { wert: ort });
+  if (!t) return;
+  const o = await ortFinden(t);
+  if (!o) { meldung(`Nichts gefunden für «${t}».`); return; }
+  const orte = await leseJSON("stamm/orte.json", {});
+  orte[ort] = o; await schreibeJSON("stamm/orte.json", orte); S.orte = orte;
+  meldung(`${ort}: ${o.label}`); zeichnen();
+}
+async function einstellungenSpeichern(neuZeichnen = true) {
+  const doz = [...document.querySelectorAll("#eDoz tr")].map((tr) => { const i = tr.querySelectorAll("input");
+    return { kuerzel: i[0].value.trim(), name: i[1].value.trim(), sollHalbtag: i[2].value.trim(), sollPQ: i[3].value.trim() }; }).filter((d) => d.kuerzel);
+  S.einst = { studienjahrFest: $("#eJahr").value, studienjahr: $("#eJahr").value || studienjahrHeute(), quote: Number($("#eQuote").value) / 100, dozierende: doz,
+              arbeitssitzungProfil: $("#eArbP").value, arbeitssitzungQuartal: $("#eArbQ").value,
+              regeln: { profilErsteTage: Number($("#rProfil").value), quartalErsteTage: Number($("#rQuartal").value),
+                        letzterTag: $("#rLetzter").checked, maxProWoche: Number($("#rWoche").value), besprechungMin: Number($("#rBespr").value) } };
+  await schreibeJSON("stamm/einstellungen.json", S.einst);
+  berechnen();
+  if (neuZeichnen) { meldung("Einstellungen gespeichert."); zeichnen(); }
+  else if ($("#einstStand")) $("#einstStand").textContent = "gespeichert " + new Date().toLocaleTimeString("de-CH").slice(0, 5);
+}
+/* Checkliste (PDF) im Ordner Daten/dokumente ablegen und anzeigen */
+async function checklisteAblegen() {
+  const f = $("#dateiCheck").files[0]; if (!f) return meldung("Bitte zuerst die PDF wählen.");
+  const d = await verzeichnis("dokumente", true);
+  const w = await (await d.getFileHandle(f.name, { create: true })).createWritable();
+  await w.write(await f.arrayBuffer()); await w.close();
+  meldung("Checkliste abgelegt."); dokumenteZeigen();
+}
+async function dokumenteZeigen() {
+  const ziel = $("#dokumente"); if (!ziel) return;
+  try {
+    const d = await verzeichnis("dokumente");
+    const namen = []; for await (const [n, h] of d.entries()) if (h.kind === "file") namen.push(n);
+    ziel.innerHTML = namen.length ? "Im Ordner: " + namen.sort().map((n) => `<a href="#" onclick="dokumentOeffnen(REFS[${ref(n)}]);return false">${esc(n)}</a>`).join(" · ") : "";
+  } catch (e) { ziel.textContent = ""; }
+}
+async function dokumentOeffnen(name) {
+  const d = await verzeichnis("dokumente");
+  const f = await (await d.getFileHandle(name)).getFile();
+  window.open(URL.createObjectURL(f), "_blank");
+}
+/* ---------- Start ---------- */
+$("#nav").addEventListener("click", (e) => { const a = e.target.dataset.ansicht; if (a) geheZu(a); });
+$("#ich").addEventListener("change", (e) => { S.ich = e.target.value; merke("ich", S.ich); zeichnen(); });
+$("#neuLaden").addEventListener("click", () => S.ordner && eintraegeLaden().then(() => meldung("Neu eingelesen.")));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") detailZu(); });
+setInterval(() => {
+  const tippt = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  if (S.ordner && document.visibilityState === "visible" && !tippt && S.ansicht !== "aktualisieren" && !$("#frage").open) eintraegeLaden();
+}, 60000);
+(async () => {
+  if (await ordnerZugriff()) await allesLaden(); else zeichnen();
+})();
+</script>
+</body>
+</html>
