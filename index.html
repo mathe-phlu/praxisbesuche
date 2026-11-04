@@ -826,7 +826,7 @@ function aktionen(x) {
   if (S.ansicht === "termine") {
     k.push(`<button class="knopf klein" title="z.B. «muss im Quartal besucht werden» oder eine Bemerkung zur Person" onclick="achtungSetzen(REFS[${ref(x.person.id)}])">Achtung / Bemerkung</button>`);
     k.push(`<button class="knopf klein" title="Bericht (PDF/Word) in den Ordner der Person unter «Protokolle» legen" onclick="berichtHochladen(${ref(x.idpraktikum)})">Bericht ↑</button>`);
-    if (x.berichte && x.berichte.length) k.push(berichtLinks(x));
+    if (x.berichte && x.berichte.length) k.push(berichtLinks(x) + (x.berichte || []).slice(-1).map((b) => ` <a href="#" class="bericht" title="E-Mail-Entwurf mit diesem Bericht im Anhang" onclick="event.preventDefault();mailZuBericht(${ref(x.idpraktikum)}, ${ref(b.datei)})">✉</a>`).join(""));
     const letzte = x.notizen && x.notizen.length ? x.notizen[x.notizen.length - 1] : null;
     return reihe(k, tool) + (letzte ? `<div class="klein leise" style="white-space:normal;max-width:300px;margin-top:3px">✎ ${esc(letzte.text)} <i>(${esc(letzte.wer)})</i></div>` : "");
   }
@@ -1083,6 +1083,8 @@ async function berichtHochladen(i) {
       await w.write(await f.arrayBuffer()); await w.close();
       await eintragen({ typ: "bericht", praktikum: x.idpraktikum, person: x.person.id, datei: `${o.name}/${ziel}`, original: f.name });
       meldung(`Bericht abgelegt: Protokolle/${o.name}/${ziel}`);
+      const ok = await frage(`Bericht abgelegt: Protokolle/${o.name}/${ziel}\n\nE-Mail-Entwurf mit dem Bericht im Anhang erstellen (an Studierende, Mathe-PxL, Mentor/in)?`, { art: "wahl", wert: "ja", optionen: [["ja", "Ja, E-Mail-Entwurf erstellen"]] });
+      if (ok === "ja") mailEntwurf(x, f, ziel);
     } catch (e) { meldung("Bericht konnte nicht gespeichert werden: " + e.message); }
   };
   wahl.click();
@@ -1095,6 +1097,45 @@ async function berichtOeffnen(i) {
     const f = await (await d.getFileHandle(datei)).getFile();
     window.open(URL.createObjectURL(f), "_blank");
   } catch (e) { meldung("Bericht nicht gefunden – vielleicht noch nicht synchronisiert. (Protokolle/" + pfad + ")"); }
+}
+/* E-Mail-Entwurf als .eml mit Anhang: Doppelklick öffnet ihn in Outlook als neue Nachricht (X-Unsent) */
+function mailEntwurf(x, datei, dateiname) {
+  const k = x.kontakte || {};
+  const pxl = (k.pxl || []).filter((p) => p.mathe && p.mail);
+  const an = [k.student && k.student.mail, ...pxl.map((p) => p.mail)].filter(Boolean);
+  const cc = [k.mentor && k.mentor.mail].filter(Boolean);
+  const ich = (S.einst.dozierende || []).find((d) => d.kuerzel === S.ich) || {};
+  const datum = (x.datum || (x.termin && x.termin.datum) || "").split("-").reverse().join(".");
+  const vorname = x.person.name.split(" ").slice(1).join(" ");
+  const betreff = `Unterrichtsbesuch Mathematik – ${x.person.name} – ${x.gruppe}${datum ? " vom " + datum : ""}`;
+  const text = `Guten Tag ${[vorname, ...pxl.map((p) => p.name), k.mentor && k.mentor.name].filter(Boolean).join(", ")}\n\n` +
+    `Im Anhang finden Sie das Protokoll zum Unterrichtsbesuch Mathematik${datum ? " vom " + datum : ""} (${x.gruppe}praktikum).\n\n` +
+    `Vielen Dank für den Einblick in den Unterricht.\n\nFreundliche Grüsse\n${ich.name || S.ich}`;
+  const b64 = (u8) => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(s).replace(/.{76}/g, "$&\r\n"); };
+  const utf = (t) => b64(new TextEncoder().encode(t));
+  const kopf = (t) => `=?UTF-8?B?${btoa(String.fromCharCode(...new TextEncoder().encode(t)))}?=`;
+  const typ = /\.pdf$/i.test(dateiname) ? "application/pdf" : "application/octet-stream";
+  datei.arrayBuffer().then((buf) => {
+    const g = "----praxisbesuche" + Math.random().toString(36).slice(2);
+    const eml = [`X-Unsent: 1`, `To: ${an.join(", ")}`, ...(cc.length ? [`Cc: ${cc.join(", ")}`] : []), `Subject: ${kopf(betreff)}`, `MIME-Version: 1.0`,
+      `Content-Type: multipart/mixed; boundary="${g}"`, ``, `--${g}`, `Content-Type: text/plain; charset=UTF-8`, `Content-Transfer-Encoding: base64`, ``, utf(text), ``,
+      `--${g}`, `Content-Type: ${typ}; name="${kopf(dateiname)}"`, `Content-Disposition: attachment; filename*=UTF-8''${encodeURIComponent(dateiname)}`,
+      `Content-Transfer-Encoding: base64`, ``, b64(new Uint8Array(buf)), ``, `--${g}--`, ``].join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([eml], { type: "message/rfc822" }));
+    a.download = dateiname.replace(/\.[a-z0-9]+$/i, "") + ".eml";
+    document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1000);
+    const fehlt = [!(k.student && k.student.mail) && "Studierende", !pxl.length && "Mathe-PxL", !cc.length && "Mentor/in"].filter(Boolean);
+    meldung(`E-Mail-Entwurf gespeichert (${a.download}) – im Download-Ordner doppelklicken, öffnet in Outlook.${fehlt.length ? " Adresse fehlt: " + fehlt.join(", ") + " – bitte von Hand ergänzen." : ""}`);
+  });
+}
+async function mailZuBericht(i, j) {
+  const x = R.praktika.find((p) => p.idpraktikum === REFS[i]), pfad = REFS[j];
+  try {
+    const t = pfad.split("/"); const name = t.pop();
+    let d = await protokollBasis(false); for (const y of t) d = await d.getDirectoryHandle(y);
+    mailEntwurf(x, await (await d.getFileHandle(name)).getFile(), name);
+  } catch (e) { meldung("Bericht nicht gefunden: " + pfad); }
 }
 function berichtLinks(x, kurz) {
   return (x.berichte || []).map((b) => `<a href="#" class="bericht" title="${esc(b.datei)} – von ${esc(b.wer)}" onclick="event.preventDefault();berichtOeffnen(${ref(b.datei)})">📄${kurz ? "" : " Bericht"}</a>`).join(" ");
@@ -1474,7 +1515,7 @@ const HILFE = [
     <li>Termin passt nicht mehr: <b>Anpassen</b> → «Termin ändern» oder «Wieder abgeben». Danach öffnet sich das Tool – dort auch anpassen.</li>
     <li>Unter dem Namen: <b>Kontakte</b> (Mathe-PxL, zuständige PxL, Mentor/in mit E-Mail).</li>
     <li><b>Achtung / Bemerkung</b>: z.B. «muss im Quartal besucht werden» oder nur eine Bemerkung.</li>
-    <li><b>Bericht ↑</b>: Bericht (PDF oder Word) hochladen. Er landet im gemeinsamen Ordner unter <b>Protokolle/Name der Person</b> (fehlt der Ordner, wird er angelegt), benannt wie gewohnt «UB Nachname PK03 kürzel JJMMTT». Bei den Studierenden erscheint dann 📄.</li></ol>
+    <li><b>Bericht ↑</b>: Bericht (PDF oder Word) hochladen. Er landet im gemeinsamen Ordner unter <b>Protokolle/Name der Person</b> (fehlt der Ordner, wird er angelegt), benannt wie gewohnt «UB Nachname PK03 kürzel JJMMTT». Bei den Studierenden erscheint dann 📄. Danach auf Wunsch ein <b>E-Mail-Entwurf</b> mit dem Bericht im Anhang an Studierende, Mathe-PxL und Mentor/in – die Datei im Download-Ordner doppelklicken, sie öffnet in Outlook. ✉ erstellt den Entwurf nochmals.</li></ol>
     <p class="leise">⚠ rechts = Regel verletzt (z.B. Buchung ausserhalb dieser Seite). Ein Doppelbesuch zur selben Zeit ist kein Problem.</p>`],
   ["halbtag", "Halbtagespraktikum", "Was ist anders?", `<ol class="schritte">
     <li>Reiter <b>Halbtagespraktikum</b>. Filter nach <b>Periode</b> (A–D) statt nach Tag.</li>

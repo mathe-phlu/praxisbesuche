@@ -209,7 +209,9 @@
   // Kontakte von der Detailseite: Mentor/in und Praxislehrpersonen mit E-Mail und Telefon.
   // Die PxL, die die Mathe-Lektionen hält, wird markiert (mathe: true).
   function kontakte(doc, lektionen) {
-    const k = { mentor: null, pxl: [] };
+    const k = { mentor: null, pxl: [], student: null };
+    const sm = doc.querySelector('a[href^="mailto:"][href*="@stud.phlu.ch"]');
+    if (sm) k.student = { mail: sm.getAttribute("href").replace(/^mailto:/, "").split("?")[0] };
     const st = [...doc.querySelectorAll("p strong")].find((s) => /Mentor/i.test(s.textContent));
     const ma = st && st.parentElement.querySelector("a[href^=mailto]");
     if (ma) k.mentor = { name: ma.textContent.trim(), mail: ma.getAttribute("href").replace(/^mailto:/, "").split("?")[0] };
