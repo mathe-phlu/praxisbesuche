@@ -812,7 +812,7 @@ function ansichtOhneOrdner() {
         <li>oben <b>«…»</b> → <b>«In SharePoint öffnen»</b></li>
         <li>beim Ordner <b>Praxisbesuche</b>: <b>«Verknüpfung zu OneDrive hinzufügen»</b></li>
         <li>nach ein paar Minuten liegt er im Finder/Explorer unter <b>OneDrive – Hochschule Luzern → «Mathematik Sek1 - TM - Praxisbesuche»</b></li></ul>`)}
-    ${schritt(3, "Hier den Ordner wählen <span class=\"leise klein\">(einmal pro Browser)</span>", `<div class="klein">Knopf unten → <b>OneDrive – Hochschule Luzern</b> → <b>Mathematik Sek1 - TM - Praxisbesuche</b> anklicken (nicht «Daten» darin) → «Auswählen» → <b>«Bearbeiten erlauben»</b>. Danach oben rechts bei <b>«Ich bin»</b> dein Kürzel wählen.</div>
+    ${schritt(3, "Hier den Ordner wählen <span class=\"leise klein\">(einmal pro Browser)</span>", `<div class="klein">Knopf unten → <b>OneDrive – Hochschule Luzern</b> → <b>Mathematik Sek1 - TM - Praxisbesuche</b> anklicken (nicht «Daten» darin) → «Auswählen» → <b>«Bearbeiten erlauben»</b>. Fragt Chrome danach nochmals: <b>«Bei jedem Besuch erlauben»</b> wählen (nicht «Nur dieses Mal»), sonst musst du nach jedem Neustart von Chrome wieder erlauben. Danach oben rechts bei <b>«Ich bin»</b> dein Kürzel wählen.</div>
         <p><button class="knopf ${wartet ? "" : "haupt"} gross" onclick="ordnerWaehlen()">Ordner wählen …</button></p>`)}
     <div class="einr-hinweis"><b>Gut zu wissen:</b> Das musst du nur einmal machen. Solange du am <b>selben Rechner im selben Browser</b> arbeitest, merkt sich die Seite den Ordner – höchstens ein Klick auf «Zugriff erlauben».
       <b>Anderer Rechner oder anderer Browser</b> (z.B. Edge statt Chrome): Schritt 3 nochmals, auf einem neuen Rechner auch Schritt 1–2.</div>
@@ -1653,7 +1653,7 @@ const HILFE = [
   ["einrichten", "Einrichten", "Einmal pro Computer", `<ol class="schritte">
     <li>Die Seite in <b>Chrome oder Edge</b> öffnen (nicht Safari, Firefox oder Teams).</li>
     <li>In Teams: Kanal <b>Praktika</b> → Dateien → «In SharePoint öffnen» → beim Ordner <b>Praxisbesuche</b> «Verknüpfung zu OneDrive hinzufügen».</li>
-    <li>Hier auf <b>Ordner wählen …</b> → OneDrive – Hochschule Luzern → <b>Mathematik Sek1 - TM - Praxisbesuche</b> → «Bearbeiten erlauben».</li>
+    <li>Hier auf <b>Ordner wählen …</b> → OneDrive – Hochschule Luzern → <b>Mathematik Sek1 - TM - Praxisbesuche</b> → «Bearbeiten erlauben» → bei der nächsten Frage <b>«Bei jedem Besuch erlauben»</b>.</li>
     <li>Oben rechts bei <b>Ich bin</b> dein Kürzel wählen. Fertig.</li></ol>
     <div class="einr-hinweis">Das ist <b>einmal pro Browser</b> nötig: Am selben Rechner im selben Browser merkt sich die Seite den Ordner. Anderer Rechner oder anderer Browser: Schritt 3–4 nochmals (neuer Rechner: auch Schritt 2).</div>`],
   ["suchen", "Besuche suchen", "Wen kann ich wann besuchen?", `<ol class="schritte">
@@ -2113,7 +2113,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261104-215106";
+const STAND = "20261104-215633";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
