@@ -61,7 +61,7 @@ a.bericht:hover { text-decoration: underline; }
 .sk-ziel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sk-einzel { --f: #1d9e75; --h: #e1f5ee; --d: #085041; }
 .sk-gruppe { font-size: 13px; color: #6b6b6b; margin: 4px 0 6px; letter-spacing: .02em; }
-.sk-reihe.zwei { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.sk-reihe.gleich { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }   /* alle Praktikumskarten gleich breit, Rest bleibt leer */
 /* Praktikumsfarben: Halbtag blau (A hell … D dunkel), Einzel türkis, Profil gelb, Quartal grün, Spezial rot */
 .fk-halbtag, .fk-ht-c { --fc: #4f8fcf; --fh: #d4e5f6; --fd: #163a5c; --fa: #fff; }
 .fk-ht-a { --fc: #9cc3ec; --fh: #eef5fd; --fd: #163a5c; --fa: #163a5c; }
@@ -887,12 +887,12 @@ function ansichtStart() {
     <button class="knopf haupt gross" onclick="typeof rundgangStart === 'function' ? rundgangStart() : window.open('rundgang.html')">▶ Rundgang: die Seite in 2 Minuten</button></div>
   ${zahl ? "" : `<div class="karte"><b>Noch keine Daten.</b> Unter «Aktualisieren» die Datei aus dem Praktikumstool einlesen.</div>`}
   <div class="sk-gruppe">Während des Semesters · Halbtag und Einzel</div>
-  <div class="sk-reihe zwei">
+  <div class="sk-reihe gleich">
     ${zielKarte("halbtag", "Halbtagespraktikum", "geheZu('halbtag', { 'h.perioden': ['A', 'B', 'C', 'D'] })", ht.filter(dabei).length, ht.length, "alle besuchen")}
     ${zielKarte("einzel", "Einzelpraktikum", "geheZu('halbtag', { 'h.perioden': ['SK'] })", einzel.filter(dabei).length, einzel.length, "alle besuchen")}
   </div>
   <div class="sk-gruppe">Blockpraktika (Januar, Februar) · Profil, Quartal und Spezial</div>
-  <div class="sk-reihe">
+  <div class="sk-reihe gleich">
     ${zielKarte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", eingeteilt, ziel, `Quote ${Math.round(S.einst.quote * 100)} % von ${prof.length}`)}
     ${zielKarte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", q.filter(dabei).length, q.length, "alle mit Besuch nötig")}
     ${zielKarte("spezial", "Spezialpraktikum", "geheZu('planung', { praktika: ['Spezial'] })", spez.filter(dabei).length, spez.length, "alle besuchen")}
@@ -2168,7 +2168,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-072308";
+const STAND = "20261105-072417";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
