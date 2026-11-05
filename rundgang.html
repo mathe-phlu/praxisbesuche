@@ -622,6 +622,12 @@ function entferntListe(gruppen) {
     <ul class="klein">${a.map((x) => `<li>${esc(x.person.name)} · ${esc(praktKurz(x))} – ${esc(x.grund || "ohne Grund")} <button class="knopf klein" onclick="einblenden(${ref(x.idpraktikum)})">wieder aufnehmen</button></li>`).join("")}</ul>
   </details>`;
 }
+/* Wer die Person in anderen (früheren) Praktika besucht hat – mit Praktikum und Jahr im Tooltip */
+function frueherBesucht(x) {
+  const v = x.person.praktika.filter((y) => y !== x && y.besuchtVon && y.besuchtVon.length);
+  if (!v.length) return '<span class="leise">–</span>';
+  return v.map((y) => `<span title="${esc(praktKurz(y) + " " + sjText(y.jahr))}"><b>${esc(y.besuchtVon.join(", "))}</b> <span class="leise">${esc((PK[y.gruppe] || y.gruppe).replace("PK0", "PK"))}</span></span>`).join("<br>");
+}
 function entfernenKnopf(x) { return x.wer || x.stand === "besucht" ? "" : ` <button class="knopf mini" title="Gehört nicht in diese Liste (z.B. unterrichtet kein Mathe) – für alle entfernen" onclick="event.stopPropagation();ausblenden(${ref(x.idpraktikum)})">✕</button>`; }
 function eingebettet() { try { return window.top !== window.self; } catch (e) { return true; } }
 async function ordnerWaehlen() {
@@ -1728,6 +1734,7 @@ function filterLeiste(ansicht, anzahl) {
   const weitere = `<div class="fblock"><span class="ftitel">Name</span><input type="search" value="${esc(fw("name", ""))}" onchange="setzeFilter('name',this.value)" placeholder="Name, Studiengang, Fach"></div>
     <div class="fblock haken-liste">
       <label class="haken"><input type="checkbox" ${fw("nichtVonMir", true) ? "checked" : ""} onchange="setzeFilter('nichtVonMir',this.checked)"> nicht schon von mir besucht</label>
+      ${ansicht === "planung" ? `<label class="haken" title="Zeigt, wer die Person in früheren Praktika schon besucht hat – zum gezielten Anfragen"><input type="checkbox" ${fw("frueherSpalte", false) ? "checked" : ""} onchange="setzeFilter('frueherSpalte',this.checked)"> Spalte «früher besucht von» zeigen</label>` : ""}
       <label class="haken"><input type="checkbox" ${fw("nurMeine", false) ? "checked" : ""} onchange="setzeFilter('nurMeine',this.checked)"> nur meine</label>
       <label class="haken"><input type="checkbox" ${fw("nurAchtung", false) ? "checked" : ""} onchange="setzeFilter('nurAchtung',this.checked)"> nur ⚠ Spezialfälle</label></div>`;
   const gruppe = (titel, inhalt) => `<section class="fsek"><h4>${titel}</h4>${inhalt}</section>`;
@@ -1838,14 +1845,14 @@ function ansichtPlanung() {
   </div>
   <div class="mitfilter">${filterLeiste("planung", liste.length)}<div class="inhalt">
   ${aktivLeiste("planung", liste.length)}
-  ${liste.length ? `<table class="liste spalten"><thead><tr><th></th><th>Name</th><th>Prakt.</th><th>Zeitraum</th><th>Schule</th><th title="Besuch nötig?">nötig</th><th>Stand</th><th>Buchen</th></tr></thead><tbody>
+  ${liste.length ? `<table class="liste spalten"><thead><tr><th></th><th>Name</th><th>Prakt.</th><th>Zeitraum</th><th>Schule</th><th title="Besuch nötig?">nötig</th><th>Stand</th>${fw("frueherSpalte", false) ? `<th title="Wer die Person in früheren Praktika schon besucht hat">früher besucht von</th>` : ""}<th>Buchen</th></tr></thead><tbody>
   ${liste.map((x) => `<tr class="${farbKlasse(x)} ${x.achtung.length ? "zeile-achtung" : ""}">
     <td>${achtungZeichen(x)}</td>
     <td class="name" title="Fächer: ${esc((x.faecher || []).join(", "))}" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}${entfernenKnopf(x)}<div class="leise klein">${esc(x.person.studiengang || "")} · ${esc((x.faecher || []).join(", "))}</div></td>
     <td>${praktChip(x)}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
     <td class="noetig"><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}" title="${esc(x.warum)}">${esc({ optional: "opt.", später: "später" }[x.noetig] || x.noetig)}</span>${x.achtung.length ? `<div class="klein rot" title="${esc(x.achtung.map((f) => f.hinweis).join(" · "))}">⚠ Pflicht</div>` : ""}</td>
-    <td>${standChip(x)}</td><td style="white-space:nowrap">${buchenZelle(x)}</td></tr>`).join("")}
+    <td>${standChip(x)}</td>${fw("frueherSpalte", false) ? `<td class="klein">${frueherBesucht(x)}</td>` : ""}<td style="white-space:nowrap">${buchenZelle(x)}</td></tr>`).join("")}
   </tbody></table>` : `<div class="leer">Keine Praktika für diese Auswahl.</div>`}${entferntListe(["Profil", "Quartal", "Spezial", "Abschluss"])}</div></div>`;
 }
 
@@ -2508,7 +2515,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-105656";
+const STAND = "20261105-110215";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
