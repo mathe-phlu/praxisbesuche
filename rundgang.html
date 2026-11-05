@@ -198,7 +198,8 @@ table.liste td.name:hover { text-decoration: underline; }
 /* Stand ohne Farbe, als Kästchen (die Farben und Pillen gehören den Praktikumsarten):
    offen = gestrichelt, gebucht = Rand, besucht = schwarz gefüllt mit weisser Schrift */
 .chip.s-offen, .chip.s-uebernommen, .chip.s-gebucht, .chip.s-besucht, .chip.s-nicht, .chip.s-abbruch { border-radius: 4px; padding: 1px 7px; }
-.chip.s-uebernommen, .chip.s-gebucht, .chip.s-besucht { min-width: 104px; text-align: center; box-sizing: border-box; }
+.chip.s-uebernommen, .chip.s-gebucht, .chip.s-besucht { min-width: 104px; box-sizing: border-box; }
+.chip.s-offen, .chip.s-uebernommen, .chip.s-gebucht, .chip.s-besucht, .chip.s-nicht, .chip.s-abbruch { text-align: right; }
 .s-offen { background: #fff; border: 1px dashed #a8a39a; color: #6b665e; }
 .s-uebernommen, .s-gebucht { background: #fff; border: 1.5px solid #4a4640; color: #2e2b27; }
 .s-besucht { background: #2e2b27; border: 1.5px solid #2e2b27; color: #fff; }
@@ -246,9 +247,9 @@ table.liste thead tr.unterkopf th.p-halbtag { background: #e6f0fa; } table.liste
 th.p-info { border-bottom: 2px solid var(--ph-braun); }
 td.pspalte .ue + .ue { border-top: 1px dotted #cfc3ad; padding-top: 2px; margin-top: 2px; }
 td.p-bem, th.p-bem { border-left: 3px solid var(--ph-braun) !important; }
-.ue { display: grid; grid-template-columns: 62px 82px 52px; gap: 6px; align-items: center; font-size: 12.5px; margin: 1px 0; font-variant-numeric: tabular-nums; }
+.ue { display: grid; grid-template-columns: 62px 100px 52px; gap: 6px; align-items: center; font-size: 12.5px; margin: 1px 0; font-variant-numeric: tabular-nums; }
 .ue > * { text-align: right; } .ue .chip { justify-self: stretch; }
-.ue .chip { font-size: 12px; text-align: center; }
+.ue .chip { font-size: 12px; text-align: right; min-width: 0; box-sizing: border-box; white-space: nowrap; }
 .ue-j { color: var(--leise); } .ue-d { color: var(--tinte); }
 .paar { color: var(--ph-braun-dunkel); font-weight: 600; margin-bottom: 3px; text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 .einzeln { color: var(--leise); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
@@ -2213,7 +2214,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-074155";
+const STAND = "20261105-074320";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
