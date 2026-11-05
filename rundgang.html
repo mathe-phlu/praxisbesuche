@@ -67,6 +67,8 @@ a.bericht:hover { text-decoration: underline; }
 .sk-reihe.drei { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .start-rechts { border-left: 2px solid #e2ded5; padding-left: 24px; }
 .start-rechts > .sk { margin-bottom: 14px; }
+.mt-naechst { margin-top: 8px; background: #fff; border-left: 4px solid var(--f); padding: 6px 10px; font-size: 15px; }
+.mt-naechst .klein { display: block; color: var(--d); opacity: .8; }
 .mt-zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 4px; } .mt-zwei > div + div { border-left: 1px solid #dcd8cf; padding-left: 10px; }
 @media (max-width: 1050px) { .start-raster { grid-template-columns: 1fr; grid-template-rows: none; }
   .start-links, .start-rechts { grid-row: auto; display: block; } .start-rechts { border-left: 0; padding-left: 0; } .start-rechts .leer-gruppe { display: none; } }
@@ -928,8 +930,7 @@ function ansichtStart() {
   <div class="start-rechts"><div class="sk-gruppe">Für dich und das Team</div>
     ${karte("termine", `Meine Termine ${S.ich ? "· " + esc(S.ich) : ""}`, "geheZu('termine')", S.ich ? `<div class="mt-zwei"><div><div class="z">${meine.filter((x) => x.gruppe === "Halbtag").length}</div><div><b>Semester</b><div class="klein">Halbtag, Einzel</div></div></div>
       <div><div class="z">${meine.filter((x) => x.gruppe !== "Halbtag").length}</div><div><b>Block</b><div class="klein">Profil, Quartal, Spezial</div></div></div></div>
-      <div class="klein">gebucht oder besucht in ${sjText(sj)}</div>
-      <div class="klein" style="margin-top:6px">${naechste ? `Nächster: <b>${esc(kurzDatum(naechste.termin.datum))} ${esc(naechste.termin.zeit || "")}</b> · ${esc(naechste.person.name)}` : "Kein offener Termin."}</div>` : `<div>Oben rechts «Ich bin» wählen.</div>`)}
+      <div class="mt-naechst">${naechste ? `<span class="klein">Nächster Termin</span><div><b>${esc(kurzDatum(naechste.termin.datum))} ${esc(naechste.termin.zeit || "")}</b> · ${esc(naechste.person.name)}</div>` : `<span class="klein">Kein offener Termin.</span>`}</div>` : `<div>Oben rechts «Ich bin» wählen.</div>`)}
     <div class="sk-gruppe leer-gruppe">&nbsp;</div>
     ${karte("studierende", "Studierende", "geheZu('studierende')", `<div class="z">${Object.values(R.personen).filter((p) => !p.archiv).length}</div><div>aktuell · ${Object.values(R.personen).filter((p) => p.archiv).length} im Archiv</div>
       <div class="klein" style="margin-top:6px">Alle Praktika, Verlauf, Protokolle</div>`)}
@@ -2199,7 +2200,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-073515";
+const STAND = "20261105-073612";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
