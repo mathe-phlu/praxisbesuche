@@ -204,6 +204,11 @@ table.liste td.name:hover { text-decoration: underline; }
 .s-uebernommen, .s-gebucht { background: #fff; border: 1.5px solid #4a4640; color: #2e2b27; }
 .s-besucht { background: #2e2b27; border: 1.5px solid #2e2b27; color: #fff; }
 .s-besucht::before { content: "✓ "; }
+.s-gebucht::before, .s-uebernommen::before { content: "● "; font-size: 9px; vertical-align: 1px; }
+/* ohne Kürzel (Meine Termine, Studierende): alle gleich breit, linksbündig */
+.chip.s-kurz { min-width: 100px; text-align: left; box-sizing: border-box; }
+.ue .chip { text-align: left !important; }
+.paar-stand > div + div { margin-top: 5px; }
 .s-nicht { background: transparent; border: 1px solid transparent; color: #9a958c; }
 .n-ja { font-weight: 700; color: var(--achtung); } .n-optional { color: var(--leise); } .n-nein { color: #aaa; } .n-spaeter { color: #aaa; }
 .achtung { color: var(--achtung); font-weight: 700; cursor: help; }
@@ -967,7 +972,7 @@ function standChip(x, kurz = false, ohneWer = false) {
   // Wer übernimmt, bucht gleichzeitig im Praktikumstool – darum gibt es nur «gebucht»
   const text = { "übernommen": "gebucht" }[x.stand] || x.stand;
   const titel = { "übernommen": "gebucht", gebucht: "gebucht (im Praktikumstool)", besucht: "Besuch hat stattgefunden", offen: "Noch niemand eingeteilt" }[x.stand] || "";
-  return `<span class="chip ${cls}" title="${esc(titel)}">${esc(text)}${wer}${t}</span>${doppelt}`;
+  return `<span class="chip ${cls}${ohneWer ? " s-kurz" : ""}" title="${esc(titel)}">${esc(text)}${wer}${t}</span>${doppelt}`;
 }
 function achtungZeichen(x) {
   if (!x.achtung || !x.achtung.length) return "";
@@ -1668,7 +1673,7 @@ function ansichtHalbtag() {
     <td><div class="klein ${z.length === 2 ? "paar" : "einzeln"}">${z.length === 2 ? "Paar · Doppelbesuch" : "einzeln"}</div>${z.map(name).join("")}</td>
     <td>${praktChip(x, periode(x))}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
-    <td>${z.map((y) => `<div>${standChip(y)}</div>`).join("")}</td>
+    <td class="paar-stand">${z.map((y) => `<div>${standChip(y)}</div>`).join("")}</td>
     <td style="white-space:nowrap">${z.length === 2 && !z.some((y) => y.wer === S.ich) ? buchenZelle(x, z[1]) : z.map((y) => buchenZelle(y)).filter(Boolean).join("<br>")}</td></tr>`; }).join("")}
   </tbody></table>` : `<div class="leer">Keine Halbtagespraktika für diese Auswahl.</div>`}</div></div>`;
 }
@@ -2216,7 +2221,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-074839";
+const STAND = "20261105-075243";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
