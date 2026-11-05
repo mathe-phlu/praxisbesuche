@@ -643,18 +643,17 @@ function mailAdresse(name) {
 function anfrageText() {
   const sj = S.einst.studienjahr, pr = R.praktika.filter((p) => p.jahr === sj);
   const team = (S.einst.dozierende || []).map((d) => d.kuerzel);
-  const offen = (g) => pr.filter((p) => p.gruppe === g && p.stand === "offen" && (g === "Profil" ? p.noetig !== "nein" : p.noetig === "ja"));
+  const offen = (g) => pr.filter((p) => p.gruppe === g && p.stand === "offen" && p.noetig === "ja");
   const zeile = (x) => {
     const kennen = new Set(x.person.praktika.filter((y) => y !== x).flatMap((y) => y.besuchtVon || []));
     const frei = team.filter((k) => !kennen.has(k));
     return `- ${x.person.name} (${x.person.studiengang || ""}), ${zeitraum(x).replace(/<[^>]+>/g, "")}, ${x.schulort}${x.schulhaus ? " – " + x.schulhaus : ""}${x.achtung.length ? " ⚠" : ""}\n  noch nicht besucht von: ${frei.join(", ") || "– (alle kennen die Person schon)"}`;
   };
   const q = offen("Quartal"), p = offen("Profil");
-  const prof = pr.filter((x) => x.gruppe === "Profil"), ziel = Math.ceil(S.einst.quote * prof.length);
-  const fehlenP = Math.max(0, ziel - prof.filter((x) => x.stand !== "offen" && x.stand !== "nicht nötig").length);
-  let t = `Liebe alle\n\nFür ${sjText(sj)} sind noch Praxisbesuche offen. Bitte schaut, ob ihr davon noch etwas übernehmen könnt – am liebsten bei Personen, die ihr noch nicht besucht habt.\n\n`;
-  t += `QUARTALSPRAKTIKUM – noch ${q.length} offen\nDirekt zur Liste: ${SEITE}#offen-quartal\n${q.map(zeile).join("\n") || "- keine"}\n\n`;
-  if (fehlenP) t += `PROFILPRAKTIKUM – noch ${fehlenP} bis zur Quote (${Math.round(S.einst.quote * 100)} %)\nDirekt zur Liste: ${SEITE}#offen-profil\n${p.map(zeile).join("\n")}\n\n`;
+  let t = `Liebe alle\n\nFür ${sjText(sj)} sind noch ${q.length + p.length} Pflichtbesuche offen. Bitte schaut, ob ihr davon noch etwas übernehmen könnt – am liebsten bei Personen, die ihr noch nicht besucht habt.\n\nDirekt zur Liste (Besuch nötig, offen): ${SEITE}#offen\n\n`;
+  if (q.length) t += `QUARTALSPRAKTIKUM (${q.length})\n${q.map(zeile).join("\n")}\n\n`;
+  if (p.length) t += `PROFILPRAKTIKUM (${p.length}, Besuch Pflicht)\n${p.map(zeile).join("\n")}\n\n`;
+  if (!q.length && !p.length) t += `Im Moment ist nichts offen.\n\n`;
   t += `Übernehmen wie gewohnt in der Praxisbesuche-Seite (Termine ▸ anklicken).\n\nLiebe Grüsse\n${((S.einst.dozierende || []).find((d) => d.kuerzel === S.ich) || {}).name || S.ich}`;
   return t;
 }
@@ -679,10 +678,10 @@ function anfrageMail(i) {
 /* Link aus der Anfrage: …/#offen-quartal oder #offen-profil öffnet direkt die gefilterte Liste mit «früher besucht von» */
 function linkAnwenden() {
   const h = location.hash.replace("#", "");
-  const g = { "offen-quartal": ["Quartal"], "offen-profil": ["Profil"], "offen": ["Profil", "Quartal"] }[h];
+  const g = { "offen-quartal": ["Quartal"], "offen-profil": ["Profil"], "offen": ["Profil", "Quartal", "Spezial"] }[h];
   if (!g) return;
   S.ansicht = "planung"; merke("ansicht", "planung");
-  Object.assign(S.filter, { praktika: g, stand: ["offen"], noetig: g.includes("Profil") ? ["ja", "optional"] : ["ja"], frueherSpalte: true, nichtVonMir: true, jahr: S.einst.studienjahr });
+  Object.assign(S.filter, { praktika: g, stand: ["offen"], noetig: ["ja"], frueherSpalte: true, nichtVonMir: true, jahr: S.einst.studienjahr });
   merke("filter", JSON.stringify(S.filter));
   history.replaceState(null, "", location.pathname);
 }
@@ -1185,7 +1184,7 @@ function ansichtStart() {
   <div class="sk-reihe drei">
     ${zielKarte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", eingeteilt, ziel, `Quote ${Math.round(S.einst.quote * 100)} % von ${prof.length}`)}
     ${zielKarte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", q.filter(dabei).length, q.length, "alle mit Besuch nötig")}
-    ${ANFRAGEN_DURCH.includes(S.ich) ? karte("grau", "Offene anfragen", "anfrageZeigen()", `<div class="klein">Quartal offen: <b>${offenQ}</b> · Profil bis zur Quote: <b>${Math.max(0, ziel - eingeteilt)}</b></div>
+    ${ANFRAGEN_DURCH.includes(S.ich) ? karte("grau", "Offene anfragen", "anfrageZeigen()", `<div class="z">${pr.filter((p) => ["Profil", "Quartal"].includes(p.gruppe) && p.stand === "offen" && p.noetig === "ja").length}</div><div class="klein">Pflichtbesuche noch offen (Besuch nötig, offen)</div>
       <div class="klein" style="margin-top:6px">E-Mail ans Team mit allen offenen Besuchen und wer sie noch nicht kennt – mit Link direkt in die Liste.</div>
       <button class="knopf haupt" style="margin-top:8px" onclick="event.stopPropagation();anfrageZeigen()">✉ Anfrage vorbereiten</button>`) : ""}
   </div></div>
@@ -2579,7 +2578,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-110836";
+const STAND = "20261105-110942";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
