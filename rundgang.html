@@ -693,7 +693,7 @@ async function ordnerWaehlen() {
     if (e.name === "NotAllowedError" || e.name === "SecurityError") {
       if (eingebettet()) return frage("Die Seite läuft hier eingebettet (z.B. in Teams oder SharePoint). Dort darf sie keinen Ordner öffnen.\n\nBitte die Seite in einem eigenen Chrome-Fenster öffnen: https://mathe-phlu.github.io/praxisbesuche/", { art: "wahl", wert: "ok", optionen: [["ok", "Verstanden"]] });
       merke("lademodus", "1"); zeichnen();
-      return frage("Auf diesem Rechner sperrt die Informatik «Ordner wählen». Kein Problem: nimm stattdessen «Ordner laden».\n\nEinmal einrichten: in Chrome unter Einstellungen › Downloads den Speicherort auf «… Praxisbesuche › Daten › eintraege › dein Kürzel» setzen. Dann speichert die Seite deine Einträge dort.", { art: "wahl", wert: "ok", optionen: [["ok", "Verstanden"]] });
+      return frage("Auf diesem Rechner sperrt die Informatik «Ordner wählen». Bitte bei Rike melden.", { art: "wahl", wert: "ok", optionen: [["ok", "Verstanden"]] });
     }
     meldung("Ordner konnte nicht geöffnet werden: " + e.name + " " + (e.message || "") + " – bitte Rike melden."); return;
   }
@@ -1121,16 +1121,6 @@ function ansichtOhneOrdner() {
     ${schritt(3, "Hier den Ordner wählen <span class=\"leise klein\">(einmal pro Browser)</span>", `<div class="klein">Knopf unten → <b>OneDrive – Hochschule Luzern</b> → <b>Mathematik Sek1 - TM - Praxisbesuche</b> anklicken (nicht «Daten» darin) → «Auswählen» → <b>«Bearbeiten erlauben»</b>. Fragt Chrome danach nochmals: <b>«Bei jedem Besuch erlauben»</b> wählen (nicht «Nur dieses Mal»), sonst musst du nach jedem Neustart von Chrome wieder erlauben. Danach oben rechts bei <b>«Ich bin»</b> dein Kürzel wählen.</div>
         <div class="klein" style="margin-top:6px"><b>Windows:</b> Im Auswahlfenster links auf <b>«OneDrive – Hochschule Luzern»</b> klicken. Steht der Ordner dort nicht, liegt er unter <b>«Hochschule Luzern»</b> (Gebäude-Symbol) – das passiert, wenn man in Teams «Synchronisieren» statt «Verknüpfung hinzufügen» gewählt hat. Fehlt er ganz: Schritt 2 ist noch nicht fertig synchronisiert. Die Seite in <b>Chrome</b> öffnen, nicht in Teams selbst.</div>
         <p><button class="knopf ${wartet || lies("lademodus") ? "" : "haupt"} gross" onclick="ordnerWaehlen()">Ordner wählen …</button></p>`)}
-    <details class="karte akk" ${lies("lademodus") ? "open" : ""}><summary><h3>Rechner der PH, auf dem «Ordner wählen» nicht geht?</h3></summary>
-      <p class="klein">Dann sperrt die Informatik den direkten Ordnerzugriff. So geht es trotzdem – mit allen Funktionen:</p>
-      <ol class="klein">
-        <li><b>Eigenes Chrome-Profil</b> nur für diese Seite (damit deine übrigen Downloads nicht im Teams-Ordner landen): oben rechts auf dein Profilbild → <b>«Hinzufügen»</b> → «Ohne Konto fortfahren» → Name <b>Praxisbesuche</b>. In diesem Fenster weiterarbeiten. <span class="leise">(Geht kein neues Profil: stattdessen bei Schritt 2 «Vor dem Download Speicherort erfragen» einschalten.)</span></li>
-        <li>Im neuen Profil: ⋮ → <b>Einstellungen → Downloads → Speicherort «Ändern»</b> → OneDrive – Hochschule Luzern → Mathematik Sek1 - TM - Praxisbesuche → <b>Daten → eintraege → dein Kürzel</b> → «Ordner auswählen».</li>
-        <li>Diese Seite öffnen (https://mathe-phlu.github.io/praxisbesuche/) und unten <b>«Ordner laden»</b>: den Ordner «Mathematik Sek1 - TM - Praxisbesuche» wählen → «Hochladen» bestätigen (nichts verlässt den Rechner).</li>
-        <li>Oben rechts dein Kürzel wählen. Fragt Chrome beim ersten Speichern «mehrere Dateien herunterladen?» → <b>Zulassen</b>.</li>
-      </ol>
-      <p class="klein">Danach: bei jedem Öffnen der Seite einmal «Ordner laden». Alles, was du einträgst, landet als kleine Datei in deinem Ordner und ist über OneDrive für alle sichtbar.</p>
-      <p><button class="knopf ${lies("lademodus") ? "haupt" : ""} gross" onclick="ordnerLaden()">Ordner laden …</button></p></details>
     <div class="einr-hinweis"><b>Gut zu wissen:</b> Das musst du nur einmal machen. Solange du am <b>selben Rechner im selben Browser</b> arbeitest, merkt sich die Seite den Ordner – höchstens ein Klick auf «Zugriff erlauben».
       <b>Anderer Rechner oder anderer Browser</b> (z.B. Edge statt Chrome): Schritt 3 nochmals, auf einem neuen Rechner auch Schritt 1–2.</div>
     <p class="leise klein">Nur in Chrome oder Edge. Nur wer Zugriff auf den Teams-Ordner hat, kann ihn wählen. Zum Anschauen ohne Ordner: <a href="rundgang.html" target="_blank">Rundgang mit Beispieldaten</a>.</p>
@@ -2578,7 +2568,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-134846";
+const STAND = "20261105-152305";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
