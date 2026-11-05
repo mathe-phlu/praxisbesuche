@@ -173,7 +173,10 @@ dialog.breit { width: min(1100px, 96vw); max-width: 96vw; }
 .fchip.fn-ja, .fchip.fn-ja.an { border: 1.5px solid var(--achtung); color: var(--achtung); font-weight: 700; }
 .fchip.fn-optional, .fchip.fn-optional.an { border: 1px solid #b8b3aa; color: #6b665e; }
 .fchip.fn-nein, .fchip.fn-nein.an { border: 1px solid #d8d4cc; color: #a8a39a; }
-.fchip.fs:not(.an), .fchip[class*="fk-"]:not(.an) { opacity: .4; }
+.fchip[class*="fk-"]:not(.an) { opacity: .4; }
+/* Stand / nötig: an = brauner Rahmen rundherum + fett, aus = ganz blass */
+.fchip.fs.an { box-shadow: 0 0 0 2px var(--ph-braun); font-weight: 700; }
+.fchip.fs:not(.an) { opacity: .3; box-shadow: none; }
 .fchip.fs:not(.an):hover, .fchip[class*="fk-"]:not(.an):hover { opacity: .75; }
 .fgruppe { border-bottom: 1px solid var(--linie); padding: 0 12px; }
 .fgruppe summary { cursor: pointer; padding: 8px 0; list-style-position: inside; }
@@ -1726,7 +1729,7 @@ function filterLeiste(ansicht, anzahl) {
     return `<details class="fsek" ${offen ? "open" : ""} ontoggle="gruppeMerken('${titel}',this.open)"><summary><h4>${titel}</h4>${aktiv.length ? `<span class="faktiv">${esc(aktiv.join(" · "))}</span>` : ""}</summary>${inhalt}</details>`; };
   return `<details class="filterbox" ${lies("filterbox") === "zu" ? "" : "open"} ontoggle="merke('filterbox', this.open ? 'auf' : 'zu')">
     <summary class="fkopf"><b>Filter</b><button class="knopf klein" onclick="event.preventDefault();event.stopPropagation();filterLeeren()">zurücksetzen</button></summary>
-    <div class="fgitter">${gruppe("Auswahl", grund)}${klapp("Wann", wannAktiv, wann)}${klapp("Wo", woAktiv, wo)}${klapp("Weitere", weitereAktiv, weitere)}</div>
+    <div class="fgitter">${gruppe("Auswahl", grund)}${gruppe("Wann", wann)}${gruppe("Wo", wo)}${gruppe("Weitere", weitere)}</div>
   </details>`;
 }
 /* Über der Liste: Anzahl, aktive Filter zum Wegklicken, Liste kopieren */
@@ -2499,7 +2502,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-104610";
+const STAND = "20261105-104842";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
