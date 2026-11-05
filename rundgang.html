@@ -2214,7 +2214,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-074447";
+const STAND = "20261105-074617";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
@@ -2257,7 +2257,7 @@ const SCHRITTE = [
   // --- Buchen am Beispiel Profil
   { ziel: ".filterbox", ansicht: "planung", titel: "Buchen – Beispiel Profil", text: "<ul><li>Reiter Profil &amp; Quartal, oben der <b>Filter</b>.</li><li>Grundauswahl: Praktikum, Besuch nötig, Stand.</li><li>Aufklappen: Wann (Tag, Vormittag, Doppellektion), Wo (Ort, Umkreis), Weitere.</li><li>Beim Halbtag geht alles genauso.</li></ul>",
     vorher: () => { geheZu("planung"); merke("filterbox", "auf"); if (!ECHT) { S.filter = { praktika: ["Profil"] }; merke("filter", JSON.stringify(S.filter)); } zeichnen(); const d = document.querySelector(".filterbox details.fsek"); if (d) d.open = true; } },
-  { ziel: ".aktivleiste", ansicht: "planung", titel: "Aktive Filter", text: "<ul><li>Über der Liste stehen die aktiven Filter – mit ✕ weg.</li><li>Standardmässig an: <b>nicht schon von mir besucht</b>.</li></ul>" },
+  { ziel: ".aktivleiste", ansicht: "planung", titel: "Aktive Filter", text: "<ul><li>Über der Liste stehen die aktiven Filter, als dieselben Kästchen wie im Filter.</li><li>Jedes Kästchen mit ✕ einzeln abwählen.</li><li>Farben: Profil gelb, Quartal grün, Spezial rot · Stand: offen gestrichelt, gebucht umrandet, besucht schwarz.</li><li>Standardmässig an: <b>nicht schon von mir besucht</b>.</li></ul>" },
   { ziel: "#app table.liste tbody tr .name", ansicht: "planung", titel: "Name anklicken", text: "<ul><li>Öffnet rechts den Verlauf: alle Praktika, wer schon besucht hat, Berichte, Bemerkungen.</li></ul>",
     vorher: () => { const n = document.querySelector("#app table.liste tbody tr .name"); if (n) n.click(); }, nachher: () => detailZu() },
   { ziel: "#app table.liste tbody tr td:last-child .knopf", ansicht: "planung", titel: "Spalte «Buchen»", text: "<ul><li><b>Termine ▸</b> öffnet alle möglichen Termine.</li><li>Darunter: an welchen Tagen Mathe ist, wie viele Termine.</li></ul>" },
@@ -2265,7 +2265,7 @@ const SCHRITTE = [
     vorher: () => { const b = document.querySelector("#app table.liste tbody tr td:last-child .knopf.haupt"); if (b) b.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
   { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Doppelbesuch und Abgeben", text: "<ul><li><b>Doppelbesuch</b> (Halbtag): danach zwei Knöpfe, je Person ins Praktikumstool.</li><li><b>Termin wieder abgeben</b>: bei eigenen Buchungen; danach öffnet sich das Tool, um die Buchung dort zu löschen.</li></ul>" },
   // --- Meine Termine
-  { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "<ul><li>Alle deine Termine nach Tag; filtern nach Halbtag, Profil, Quartal.</li><li><b>✓ Erledigt</b> – nach dem Besuch.</li><li><b>Anpassen ▾</b> – Termin ändern oder abgeben, danach öffnet sich das Praktikumstool.</li><li><b>Achtung / Bemerkung</b> – z.B. «im Quartal besuchen».</li><li><b>Bericht ↑</b> – landet in «Protokolle/Person», danach öffnet sich eine E-Mail an Studierende, PxL, Mentor/in.</li><li><b>📄 · ✉ · ✕</b> – Bericht öffnen, E-Mail nochmals, löschen.</li><li><b>Tool ↗</b> – ins Praktikumstool.</li><li><b>Kontakte</b> unter dem Namen – PxL und Mentor/in mit E-Mail.</li></ul>",
+  { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "<ul><li>Alle deine Termine nach Tag; filtern nach Halbtag, Einzel, Profil, Quartal, Spezial.</li><li><b>✓ Erledigt</b> – nach dem Besuch.</li><li><b>Anpassen ▾</b> – Termin ändern oder abgeben, danach öffnet sich das Praktikumstool.</li><li><b>Achtung / Bemerkung</b> – z.B. «im Quartal besuchen».</li><li><b>Bericht ↑</b> – landet in «Protokolle/Person», danach öffnet sich eine E-Mail an Studierende, PxL, Mentor/in.</li><li><b>📄 · ✉ · ✕</b> – Bericht öffnen, E-Mail nochmals, löschen.</li><li><b>Tool ↗</b> – ins Praktikumstool.</li><li><b>Kontakte</b> unter dem Namen – PxL und Mentor/in mit E-Mail.</li></ul>",
     vorher: () => { geheZu("termine"); const d = document.querySelector("#app details.kontakte"); if (d) d.open = true; } },
   // --- Studierende
   { ziel: "#app table.liste thead", ansicht: "studierende", titel: "Studierende", text: "<ul><li>Eine Zeile pro Person: Halbtag (blau), Profil (gelb), Quartal (grün).</li><li>Je Praktikum: Jahr · Stand · von, 📄 = Bericht.</li><li><b>Klick auf ein Praktikum: korrigieren</b> – Stand, wer, Datum, Abbruch.</li><li>Suche beim Tippen; Abgeschlossene im Archiv.</li></ul>", vorher: () => geheZu("studierende") },
