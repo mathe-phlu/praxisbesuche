@@ -583,6 +583,17 @@ async function allesLaden() {
     const alte = S.personen[p.idstudent];
     if (!alte || p.jahr >= alte.jahr) S.personen[p.idstudent] = { id: p.idstudent, name: p.name, studiengang: p.studiengang, faecher: p.faecher, jahr: p.jahr };
   }
+  // Spezialpraktika ersetzen meist ein Halbtags-, Profil- oder Quartalspraktikum. Im Tool steht das in Klammern,
+  // z.B. «Spezialpraktikum 1 (Halbtagespraktikum)». «Mentorat» oder ein anderes Fach (z.B. «… EN») betrifft uns nicht.
+  const faecherAlle = new Set(Object.values(S.praktika).flatMap((p) => p.faecher || []));
+  S.spezialRaus = [];
+  for (const p of Object.values(S.praktika)) {
+    if (p.gruppe !== "Spezial" || p.zusatz == null) continue;
+    const z = p.zusatz, fremd = (z.match(/\b[A-ZÄÖÜ]{2,4}\b/g) || []).some((f) => faecherAlle.has(f) && f !== "MA");
+    if ((/Mentorat/i.test(z) || fremd) && !(p.besuche || []).length) { S.spezialRaus.push(p); delete S.praktika[p.idpraktikum]; continue; }
+    const ziel = /Halbtag/i.test(z) ? "Halbtag" : /Quartal/i.test(z) ? "Quartal" : /Profil/i.test(z) ? "Profil" : "";
+    if (ziel) S.praktika[p.idpraktikum] = { ...p, gruppe: ziel, spezialText: z };
+  }
   // Hospitationen: steht bei der Mathe-Lektion «Hosp.»/«Hospitation» als Klasse, unterrichtet die Person dort nicht selbst.
   // Solche Lektionen sind keine Besuchstermine; wer in einer Halbtag-Periode nur hospitiert (und noch keinen Besuch hat), gehört nicht in unsere Liste.
   S.nurHosp = [];
@@ -851,6 +862,8 @@ function noetigBestimmen(x) {
     else { n = "ja"; warum = profile.length ? "im Profil nicht regulär besucht" : "kein Profilbesuch bekannt"; }
   } else { n = "ja"; warum = x.gruppe; }
   if (x.achtung.some((f) => f.stufe === "zwingend")) { n = "ja"; warum = x.achtung.map((f) => f.hinweis).join(" · "); }
+  const nicht = ["Profil", "Quartal"].includes(x.gruppe) && spez.find((f) => f.stufe === "nicht");
+  if (nicht && !x.achtung.some((f) => f.stufe === "zwingend")) { n = "nein"; warum = "Spezialfall: " + nicht.hinweis; }
   if (uebersteuert) { n = uebersteuert.wert; warum = `von Hand (${uebersteuert.wer}): ${uebersteuert.text || ""}`; }
   if (x.stand === "abgebrochen") { n = "nein"; warum = "Praktikum abgebrochen"; }
   x.noetig = n; x.warum = warum;
@@ -1546,7 +1559,7 @@ function filtern(liste, ansicht) {
       const n = x.noetig === "später" ? "nein" : x.noetig;
       if (!noetig.includes(n)) return false;
     }
-    if (ansicht === "halbtag" && perioden.length) { const pe = periode(x); if (!perioden.some((p) => p === "SK" ? /^Einzel/.test(pe) : pe === "Periode " + p)) return false; }
+    if (ansicht === "halbtag" && perioden.length) { const pe = periode(x); if (pe !== "Spezial" && !perioden.some((p) => p === "SK" ? /^Einzel/.test(pe) : pe === "Periode " + p)) return false; }
     if (!stand.includes(standGruppe(x))) return false;
     // Zeitraum: Praktikum muss hineinfallen; mit Stundenplan zusätzlich eine passende freie Mathe-Lektion
     if (von && datumAus(x.bis) && datumAus(x.bis) < von) return false;
@@ -1682,7 +1695,7 @@ function ansichtHalbtag() {
   ${zeilen.map((z) => { const x = z[0];
     return `<tr class="${farbKlasse(x)} ${z.some((y) => y.achtung.length) ? "zeile-achtung" : ""}">
     <td><div class="klein ${z.length === 2 ? "paar" : "einzeln"}">${z.length === 2 ? "Paar · Doppelbesuch" : "einzeln"}</div>${z.map(name).join("")}</td>
-    <td>${praktChip(x, periode(x))}</td><td class="klein">${zeitraum(x)}</td>
+    <td>${praktChip(x, x.spezialText ? "Halbtag" : periode(x))}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
     <td class="paar-stand">${z.map((y) => `<div>${standChip(y)}</div>`).join("")}</td>
     <td style="white-space:nowrap">${z.length === 2 && !z.some((y) => y.wer === S.ich) ? buchenZelle(x, z[1]) : z.map((y) => buchenZelle(y)).filter(Boolean).join("<br>")}</td></tr>`; }).join("")}
@@ -1697,12 +1710,15 @@ function farbKlasse(x) {
   if (x.gruppe === "Halbtag") { const p = periode(x); if (/^Einzel/.test(p)) return "fk-einzel"; const m = p.match(/Periode ([A-D])/); return m ? "fk-ht-" + m[1].toLowerCase() : "fk-halbtag"; }
   return { Profil: "fk-profil", Quartal: "fk-quartal", Spezial: "fk-spezial", Abschluss: "fk-spezial" }[x.gruppe] || "";
 }
-function praktKurz(x) { if (x.gruppe !== "Halbtag") return x.gruppe; const p = periode(x); return /^Einzel/.test(p) ? "Einzel" : p.replace("Periode", "Halbtag"); }
+function praktKurz(x) { if (x.gruppe !== "Halbtag" || x.spezialText) return x.gruppe; const p = periode(x); return /^Einzel/.test(p) ? "Einzel" : p.replace("Periode", "Halbtag"); }
 /* Kategorie für Filter: Einzel (gehört technisch zum Halbtag), Spezial (inkl. Abschluss), sonst die Gruppe */
 function kategorie(x) { return x.gruppe === "Halbtag" && /^Einzel/.test(periode(x)) ? "Einzel" : x.gruppe === "Abschluss" ? "Spezial" : x.gruppe; }
-function praktChip(x, text) { return `<span class="pk ${farbKlasse(x)}">${esc(text ?? praktKurz(x))}</span>`; }
+function praktChip(x, text) {
+  return `<span class="pk ${farbKlasse(x)}">${esc(text ?? praktKurz(x))}</span>${x.spezialText ? `<div class="leise klein" title="Im Praktikumstool als Spezialpraktikum geführt">Spezial: ${esc(x.spezialText)}</div>` : ""}`;
+}
 const FILTERFARBE = { Einzel: "fk-einzel", Halbtag: "fk-halbtag", Profil: "fk-profil", Quartal: "fk-quartal", Spezial: "fk-spezial", A: "fk-ht-a", B: "fk-ht-b", C: "fk-ht-c", D: "fk-ht-d", SK: "fk-einzel" };
 function periode(x) {
+  if (x.spezialText) return "Spezial";
   const n = (S.artNamen || {})[x.art] || "";
   const m = n.match(/Periode ([A-D])/); if (m) return "Periode " + m[1];
   if (/Einzelfach/.test(n)) return "Einzel " + (n.match(/(\d)\. Fach/) || [, ""])[1] + ". Fach";
@@ -2072,9 +2088,11 @@ async function importSpezial() {
     const p = personNachName(b, c);
     const hinweis = e;
     let stufe = "info";
-    if (/\bMA\b/.test(hinweis) || /Fachbesuche zwingend/.test(hinweis)) stufe = "zwingend";
+    if (/\bMA\b/.test(hinweis) || /Fachbesuche zwingend|Studienfächer/.test(hinweis)) stufe = "zwingend";
     else if (/BE-Masterprüfung/.test(hinweis)) stufe = "prüfen";   // welches Fach? -> von Hand klären
-    if (/bereits organisiert/.test(hinweis)) stufe = "info";
+    // Quartal mit Mentoratsbesuch + anderem Fach (ohne MA) oder «bereits organisiert»: für uns kein Besuch nötig
+    const mathe = /\bMA\b|Fachbesuche zwingend|Studienfächer|BE-Masterprüfung/.test(hinweis);
+    if (/bereits organisiert/.test(hinweis) || (/Quartal/.test(kategorie) && /Mentoratsbesuch \+/.test(hinweis) && !mathe)) stufe = "nicht";
     faelle.push({ jahr, kategorie: kategorie.trim(), jahrgang: a, name: b, vorname: c, bemerkung: d, hinweis, stufe, idstudent: p ? p.id : null });
   }
   const bestand = await leseJSON("stamm/spezial.json", { faelle: [] });
@@ -2232,7 +2250,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-083618";
+const STAND = "20261105-084152";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
