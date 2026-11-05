@@ -505,7 +505,8 @@ async function istPraxisOrdner(h) {
 async function ordnerWaehlen() {
   if (!window.showDirectoryPicker) { meldung("Diese Seite braucht Chrome oder Edge (Ordnerzugriff)."); return; }
   let h;
-  try { h = await showDirectoryPicker({ id: "praxisbesuche", mode: "readwrite", startIn: "documents" }); } catch (e) { return; }
+  try { h = await showDirectoryPicker({ id: "praxisbesuche", mode: "readwrite", startIn: "documents" }); }
+  catch (e) { if (e.name !== "AbortError") meldung("Ordner konnte nicht geöffnet werden: " + (e.message || e.name) + " – bitte Rike melden."); return; }
   if (!(await istPraxisOrdner(h))) {
     const w = await frage(`Im Ordner «${h.name}» sind keine Praxisbesuche-Daten.\n\nGewählt werden muss der Ordner «Mathematik Sek1 - TM - Praxisbesuche» in OneDrive (darin liegen «Daten» und «Werkzeuge»).`,
       { art: "wahl", wert: "nochmal", optionen: [["nochmal", "Anderen Ordner wählen"], ["neu", "Trotzdem hier neu anfangen (nur beim allerersten Einrichten)"]] });
@@ -906,6 +907,7 @@ function ansichtOhneOrdner() {
         <li>beim Ordner <b>Praxisbesuche</b>: <b>«Verknüpfung zu OneDrive hinzufügen»</b></li>
         <li>nach ein paar Minuten liegt er im Finder/Explorer unter <b>OneDrive – Hochschule Luzern → «Mathematik Sek1 - TM - Praxisbesuche»</b></li></ul>`)}
     ${schritt(3, "Hier den Ordner wählen <span class=\"leise klein\">(einmal pro Browser)</span>", `<div class="klein">Knopf unten → <b>OneDrive – Hochschule Luzern</b> → <b>Mathematik Sek1 - TM - Praxisbesuche</b> anklicken (nicht «Daten» darin) → «Auswählen» → <b>«Bearbeiten erlauben»</b>. Fragt Chrome danach nochmals: <b>«Bei jedem Besuch erlauben»</b> wählen (nicht «Nur dieses Mal»), sonst musst du nach jedem Neustart von Chrome wieder erlauben. Danach oben rechts bei <b>«Ich bin»</b> dein Kürzel wählen.</div>
+        <div class="klein" style="margin-top:6px"><b>Windows:</b> Im Auswahlfenster links auf <b>«OneDrive – Hochschule Luzern»</b> klicken. Steht der Ordner dort nicht, liegt er unter <b>«Hochschule Luzern»</b> (Gebäude-Symbol) – das passiert, wenn man in Teams «Synchronisieren» statt «Verknüpfung hinzufügen» gewählt hat. Fehlt er ganz: Schritt 2 ist noch nicht fertig synchronisiert. Die Seite in <b>Chrome</b> öffnen, nicht in Teams selbst.</div>
         <p><button class="knopf ${wartet ? "" : "haupt"} gross" onclick="ordnerWaehlen()">Ordner wählen …</button></p>`)}
     <div class="einr-hinweis"><b>Gut zu wissen:</b> Das musst du nur einmal machen. Solange du am <b>selben Rechner im selben Browser</b> arbeitest, merkt sich die Seite den Ordner – höchstens ein Klick auf «Zugriff erlauben».
       <b>Anderer Rechner oder anderer Browser</b> (z.B. Edge statt Chrome): Schritt 3 nochmals, auf einem neuen Rechner auch Schritt 1–2.</div>
@@ -2252,7 +2254,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-093759";
+const STAND = "20261105-093828";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
