@@ -1231,7 +1231,7 @@ function aktionen(x) {
     for (const b of (x.berichte || []).filter((b) => b.app && b.wer === S.ich)) k.push(`<span class="ber-knoepfe" title="${esc(b.datei)}">
       <button class="knopf klein" title="Bericht öffnen" onclick="berichtOeffnen(${ref(b.datei)})">📄 öffnen</button><button class="knopf klein" title="E-Mail-Entwurf mit diesem Bericht im Anhang (öffnet in Outlook)" onclick="mailZuBericht(${ref(x.idpraktikum)}, ${ref(b.datei)})">✉ E-Mail</button><button class="knopf klein" title="Falsch hochgeladen? Bericht löschen" onclick="berichtLoeschen(${ref(x.idpraktikum)}, ${ref(b.datei)})">✕</button></span>`);
     const letzte = x.notizen && x.notizen.length ? x.notizen[x.notizen.length - 1] : null;
-    return reihe(k, tool) + (letzte ? `<div class="klein leise" style="white-space:normal;max-width:300px;margin-top:3px">✎ ${esc(letzte.text)} <i>(${esc(letzte.wer)})</i></div>` : "");
+    return reihe(k, tool + kalKnopf(x)) + (letzte ? `<div class="klein leise" style="white-space:normal;max-width:300px;margin-top:3px">✎ ${esc(letzte.text)} <i>(${esc(letzte.wer)})</i></div>` : "");
   }
   return reihe(k, tool);
 }
@@ -1922,7 +1922,8 @@ function ansichtTermine() {
   <div class="filter"><label>Studienjahr<select onchange="setzeFilter('jahr',this.value)">${jahre().map((j) => `<option value="${j}" ${j === sj ? "selected" : ""}>${sjText(j)}</option>`).join("")}</select></label>
     <span class="ftitel" style="margin-left:14px">Praktikum</span>${TERMIN_KAT.filter((v) => v !== "Spezial" || spezialUebrig(sj)).map((v) => [v, v]).map(([v, t]) =>
       `<button type="button" class="fchip ${FILTERFARBE[v]} ${tPrakt.includes(v) ? "an" : ""}" onclick="terminPraktikum('${v}')">${t}</button>`).join("")}
-    <button class="knopf klein" onclick="listeKopieren()" title="Kopiert die Liste in die Zwischenablage – danach in Excel oder eine Mail einfügen (Cmd+V / Ctrl+V)">Liste für Excel kopieren</button></div>
+    <button class="knopf klein" onclick="listeKopieren()" title="Kopiert die Liste in die Zwischenablage – danach in Excel oder eine Mail einfügen (Cmd+V / Ctrl+V)">Liste für Excel kopieren</button>
+    <button class="knopf klein" onclick="kalAlleLaden()" title="Alle kommenden gebuchten Besuche als Kalenderdatei – doppelklicken, dann übernimmt Outlook sie">📅 Alle Termine für Outlook</button></div>
   ${meine.length ? `<table class="liste"><thead><tr><th>Tag</th><th>Zeit</th><th>Name</th><th>Prakt.</th><th>Schule</th><th>Stand</th><th>Hinweise</th><th></th></tr></thead><tbody>
   ${Object.entries(tage).map(([d, xs]) => xs.map((x, i) => { const w = x.termin ? terminWarnungen(x, x.termin.datum, x.termin.zeit) : [];
     return `<tr class="${farbKlasse(x)}"><td style="white-space:nowrap">${i === 0 ? `<b>${esc(tagText(d))}</b>` : ""}</td><td>${esc(x.termin ? x.termin.zeit : "")}</td>
@@ -1930,60 +1931,52 @@ function ansichtTermine() {
     <td>${esc(x.schulort)}<div class="leise klein">${esc(x.schulhaus)}</div></td><td>${standChip(x, true, true)}</td>
     <td>${w.map((t) => `<div class="hinweis">⚠ ${esc(t)}</div>`).join("")}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`; }).join("")).join("")}
   </tbody></table>` : `<div class="leer">Noch keine Besuche übernommen.</div>`}
-  ${kalenderTeil(meine)}`;
+  ${reiseplanTeil()}`;
 }
 
-/* ---------- Kalender (Outlook): kommende Besuche als .ics, je Besuch ein Eintrag mit Anreise, Besuch, Besprechung, Rückreise ----------
-   Doppellektion = ein Block = ein Eintrag; Doppelbesuch (gleiche Zeit, gleiches Schulhaus) = ein Eintrag.
-   Anreise/Besprechung/Rückreise trägt jede Person selbst ein; die Werte bleiben nur in ihrem Browser. */
+/* ---------- Kalender (Outlook) ----------
+   Für alle: kommende eigene Besuche als .ics, je Besuch ein Eintrag genau über die Unterrichtszeit
+   (Doppellektion = ein Block, Doppelbesuch = ein Eintrag). Oben «Alle Termine für Outlook», je Zeile 📅.
+   Nur REISEPLAN_FUER: unten «Reiseplanung» – Besuch + Warten + Besprechung als ein Termin, Anreise/Reise dazwischen/Rückreise
+   als eigene Termine. Wohnort und Minuten bleiben nur im Browser (localStorage), nie im Teams-Ordner. */
+const REISEPLAN_FUER = ["alh"];
 const zuMin = (z) => { const m = String(z || "").match(/(\d{1,2})[:.](\d\d)/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
-const ausMin = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-function kalenderBesuche(meine) {
+const ausMin = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(((m % 60) + 60) % 60).padStart(2, "0")}`;
+function kalMeine() {
+  const sj = fw("jahr", S.einst.studienjahr), tPrakt = Array.isArray(S.filter["t.prakt"]) ? S.filter["t.prakt"] : TERMIN_KAT;
+  return R.praktika.filter((x) => S.ich && x.wer === S.ich && x.jahr === sj && tPrakt.includes(kategorie(x)));
+}
+function kalGruppen(liste, nurKommend = true) {
   const heute = new Date().toISOString().slice(0, 10), gruppen = {};
-  for (const x of meine) {
-    if (!x.termin || !x.termin.zeit || x.termin.datum < heute || x.stand === "besucht") continue;
+  for (const x of liste) {
+    if (!x.termin || !x.termin.zeit || (nurKommend && (x.termin.datum < heute || x.stand === "besucht"))) continue;
     const k = [x.termin.datum, x.termin.zeit, x.schulhaus || x.schulort || ""].join("|");
     (gruppen[k] ||= { key: k, xs: [] }).xs.push(x);
   }
   return Object.values(gruppen).map((g) => {
     const x = g.xs[0], t = x.termin;
-    const l = (x.lektionen || []).find((y) => (t.lektion && y.id === t.lektion) || (y.datum === t.datum && y.zeit === t.zeit)) || {};
-    const von = zuMin(t.zeit), bis = zuMin(t.bis || l.bis) || von + 45 * (l.anzahl || 1);
-    const frei = l.frei === undefined || l.frei === null ? 60 : Math.min(60, l.frei);
-    let w = {}; try { w = JSON.parse(lies("kal." + g.key) || "{}"); } catch (e) { /* leer */ }
-    const zahl = (v, std) => (v === undefined || v === "" || isNaN(Number(v)) ? std : Math.max(0, Number(v)));
-    return { ...g, x, l, von, bis, an: zahl(w.an, 0), be: zahl(w.be, frei), rueck: zahl(w.rueck, 0) };
+    const l = (x.lektionen || []).find((y) => (t.lektion && y.id === t.lektion) || (y.datum === t.datum && y.zeit === t.zeit)) || null;
+    const von = zuMin(t.zeit), bis = zuMin(t.bis || (l && l.bis)) || von + 45 * ((l && l.anzahl) || 1);
+    return { ...g, x, l, datum: t.datum, von, bis, ort: x.schulhaus || x.schulort || "Schule" };
   }).sort((a, b) => a.key.localeCompare(b.key));
 }
-function kalSetzen(i, feld, wert) {
-  const k = REFS[i]; let w = {}; try { w = JSON.parse(lies("kal." + k) || "{}"); } catch (e) { /* leer */ }
-  w[feld] = wert; merke("kal." + k, JSON.stringify(w)); zeichnen();
+function kalBesuchText(g) {
+  const art = g.l && (g.l.anzahl || 1) > 1 ? `${g.l.anzahl}er-Lektion` : "Lektion";
+  const pxl = g.xs.flatMap((y) => ((y.kontakte && y.kontakte.pxl) || []).filter((p) => p.mathe).map((p) => `PxL Mathe: ${p.name}${p.tel ? ", " + p.tel : ""}${p.mail ? ", " + p.mail : ""}`));
+  return [...g.xs.map((y) => `${y.person.name} · ${praktKurz(y)}`), `Unterricht ${ausMin(g.von)}–${ausMin(g.bis)} (${art}${g.l && g.l.klasse ? ", Kl. " + g.l.klasse : ""})`,
+    ...[...new Set(pxl)], "", "Praxisbesuche: " + SEITE];
 }
-function kalenderTeil(meine) {
-  const b = kalenderBesuche(meine);
-  if (!b.length) return "";
-  const feld = (g, f) => `<input class="eingabe" type="number" min="0" max="240" step="5" style="width:64px" value="${g[f]}" onchange="kalSetzen(${ref(g.key)}, '${f}', this.value)">`;
-  return `<h3 style="margin-top:28px">Für Outlook</h3>
-  <p class="klein leise">Alle kommenden Besuche als Kalendereinträge: je Besuch ein Eintrag von der Anreise bis nach der Rückreise; die Aufteilung steht im Text.
-    Minuten anpassen (bleibt in diesem Browser), dann herunterladen und die Datei doppelklicken. Spätere Änderungen bitte direkt in Outlook nachführen – erneutes Herunterladen kann doppelte Einträge geben.</p>
-  <table class="liste"><thead><tr><th>Tag</th><th>Besuch</th><th>Name</th><th>Schule</th><th>Anreise</th><th>Besprechung</th><th>Rückreise</th><th>im Kalender</th></tr></thead><tbody>
-  ${b.map((g) => `<tr><td style="white-space:nowrap">${esc(kurzDatum(g.x.termin.datum))}</td><td style="white-space:nowrap">${ausMin(g.von)}–${ausMin(g.bis)}</td>
-    <td>${g.xs.map((x) => esc(x.person.name)).join(" + ")}</td><td>${esc(g.x.schulort || "")}<div class="leise klein">${esc(g.x.schulhaus || "")}</div></td>
-    <td>${feld(g, "an")} <span class="klein leise">Min</span></td><td>${feld(g, "be")} <span class="klein leise">Min</span></td><td>${feld(g, "rueck")} <span class="klein leise">Min</span></td>
-    <td style="white-space:nowrap"><b>${ausMin(g.von - g.an)}–${ausMin(g.bis + g.be + g.rueck)}</b></td></tr>`).join("")}
-  </tbody></table>
-  <p><button class="knopf haupt" onclick="kalenderLaden()">📅 Alle ${b.length} Termine für Outlook herunterladen</button></p>`;
-}
+const kalTitel = (g) => `Praxisbesuch ${g.xs.map((y) => y.person.name).join(" + ")} (${[...new Set(g.xs.map(praktKurz))].join(", ")})`;
+const kalOrt = (g) => [g.x.schulhaus, g.x.schulort].filter(Boolean).join(", ");
+const kalUid = (g, art) => `${art}-${g.xs.map((y) => y.idpraktikum).join("-")}-${g.datum}@mathe-phlu`;
 function icsText(t) { return String(t || "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/([,;])/g, "\\$1"); }
 function icsFalten(zeile) {   // Zeilen höchstens 75 Bytes, Fortsetzung mit Leerzeichen
   const teile = []; let akt = "", n = 0;
   for (const ch of zeile) { const b = new TextEncoder().encode(ch).length; if (n + b > (teile.length ? 74 : 75)) { teile.push(akt); akt = ""; n = 0; } akt += ch; n += b; }
   teile.push(akt); return teile.join("\r\n ");
 }
-function kalenderLaden() {
-  const sj = fw("jahr", S.einst.studienjahr), tPrakt = Array.isArray(S.filter["t.prakt"]) ? S.filter["t.prakt"] : TERMIN_KAT;
-  const meine = R.praktika.filter((x) => S.ich && x.wer === S.ich && x.jahr === sj && tPrakt.includes(kategorie(x)));
-  const b = kalenderBesuche(meine); if (!b.length) return meldung("Keine kommenden Termine.");
+/* termine: [{ uid, datum, von, bis, titel, ort, text, kategorie }] */
+function icsLaden(termine, dateiname) {
   const dt = (datum, min) => datum.replace(/-/g, "") + "T" + ausMin(min).replace(":", "") + "00";
   const jetzt = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
   const z = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//PH Luzern Mathematik//Praxisbesuche//DE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
@@ -1991,23 +1984,110 @@ function kalenderLaden() {
     "BEGIN:DAYLIGHT", "TZOFFSETFROM:+0100", "TZOFFSETTO:+0200", "TZNAME:CEST", "DTSTART:19700329T020000", "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU", "END:DAYLIGHT",
     "BEGIN:STANDARD", "TZOFFSETFROM:+0200", "TZOFFSETTO:+0100", "TZNAME:CET", "DTSTART:19701025T030000", "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU", "END:STANDARD",
     "END:VTIMEZONE"];
-  for (const g of b) {
-    const x = g.x, d = x.termin.datum, a0 = g.von - g.an, e0 = g.bis + g.be + g.rueck;
-    const art = (g.l.anzahl || 1) > 1 ? `${g.l.anzahl}er-Lektion` : "Lektion";
-    const auf = [g.an ? `Anreise ${ausMin(a0)}–${ausMin(g.von)}` : "", `Besuch ${ausMin(g.von)}–${ausMin(g.bis)} (${art}${g.l.klasse ? ", Kl. " + g.l.klasse : ""})`,
-      g.be ? `Besprechung ${ausMin(g.bis)}–${ausMin(g.bis + g.be)}` : "", g.rueck ? `Rückreise ${ausMin(g.bis + g.be)}–${ausMin(e0)}` : ""].filter(Boolean);
-    const kontakte = g.xs.flatMap((y) => ((y.kontakte && y.kontakte.pxl) || []).filter((p) => p.mathe).map((p) => `PxL Mathe: ${p.name}${p.tel ? ", " + p.tel : ""}${p.mail ? ", " + p.mail : ""}`));
-    const text = [...auf, "", ...g.xs.map((y) => `${y.person.name} · ${praktKurz(y)}`), ...[...new Set(kontakte)], "", "Praxisbesuche: " + SEITE].join("\n");
-    z.push("BEGIN:VEVENT", `UID:praxisbesuch-${g.xs.map((y) => y.idpraktikum).join("-")}-${d}@mathe-phlu`, `DTSTAMP:${jetzt}`,
-      `DTSTART;TZID=Europe/Zurich:${dt(d, a0)}`, `DTEND;TZID=Europe/Zurich:${dt(d, e0)}`,
-      `SUMMARY:${icsText(`Praxisbesuch ${g.xs.map((y) => y.person.name).join(" + ")} (${[...new Set(g.xs.map(praktKurz))].join(", ")})`)}`,
-      `LOCATION:${icsText([x.schulhaus, x.schulort].filter(Boolean).join(", "))}`, `DESCRIPTION:${icsText(text)}`, "END:VEVENT");
-  }
+  for (const t of termine) z.push("BEGIN:VEVENT", `UID:${t.uid}`, `DTSTAMP:${jetzt}`,
+    `DTSTART;TZID=Europe/Zurich:${dt(t.datum, t.von)}`, `DTEND;TZID=Europe/Zurich:${dt(t.datum, t.bis)}`,
+    `SUMMARY:${icsText(t.titel)}`, ...(t.ort ? [`LOCATION:${icsText(t.ort)}`] : []), `DESCRIPTION:${icsText(t.text)}`,
+    ...(t.kategorie ? [`CATEGORIES:${icsText(t.kategorie)}`] : []), "TRANSP:OPAQUE", "END:VEVENT");
   z.push("END:VCALENDAR");
   const blob = new Blob([z.map(icsFalten).join("\r\n") + "\r\n"], { type: "text/calendar;charset=utf-8" });
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `Praxisbesuche ${S.ich} ${new Date().toISOString().slice(0, 10)}.ics`;
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = dateiname;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-  meldung(`${b.length} Termine heruntergeladen – die Datei doppelklicken, dann übernimmt Outlook sie.`);
+}
+const kalDatei = (zusatz) => `Praxisbesuche ${S.ich}${zusatz ? " " + zusatz : ""} ${new Date().toISOString().slice(0, 10)}.ics`;
+const kalEinfach = (g) => ({ uid: kalUid(g, "praxisbesuch"), datum: g.datum, von: g.von, bis: g.bis, titel: kalTitel(g), ort: kalOrt(g), text: kalBesuchText(g).join("\n"), kategorie: "Praxisbesuch" });
+/* Für alle */
+function kalAlleLaden() {
+  const gs = kalGruppen(kalMeine()); if (!gs.length) return meldung("Keine kommenden Termine.");
+  icsLaden(gs.map(kalEinfach), kalDatei(""));
+  meldung(`${gs.length} Termine heruntergeladen – Datei doppelklicken, dann übernimmt Outlook sie.`);
+}
+function kalEinzelLaden(i) {
+  const x = R.praktika.find((p) => p.idpraktikum === REFS[i]); if (!x || !x.termin) return;
+  const g = kalGruppen(kalMeine(), false).find((y) => y.xs.includes(x)) || kalGruppen([x], false)[0];
+  if (!g) return meldung("Für diesen Termin fehlt die Uhrzeit.");
+  icsLaden([kalEinfach(g)], `Praxisbesuch ${g.xs.map((y) => y.person.name.split(" ")[0]).join(" ")} ${g.datum}.ics`);
+  meldung("Termin heruntergeladen – Datei doppelklicken, dann übernimmt Outlook ihn.");
+}
+function kalKnopf(x) {
+  return x.wer === S.ich && x.termin && x.termin.zeit ? `<button class="knopf klein" title="Diesen Termin für Outlook herunterladen" onclick="kalEinzelLaden(${ref(x.idpraktikum)})">📅</button>` : "";
+}
+/* ---------- Reiseplanung (nur REISEPLAN_FUER) ---------- */
+function kalWerte(key) { try { return JSON.parse(lies("kal." + key) || "{}"); } catch (e) { return {}; } }
+function kalSetzen(i, feld, wert) { const k = REFS[i], w = kalWerte(k); w[feld] = wert; merke("kal." + k, JSON.stringify(w)); zeichnen(); }
+function kalHeim() { try { return JSON.parse(lies("kal.heim") || "null"); } catch (e) { return null; } }
+async function kalHeimSetzen() {
+  const text = ($("#kalHeim") || {}).value || ""; if (!text.trim()) { merke("kal.heim", "null"); return zeichnen(); }
+  try { const o = await ortFinden(text.trim()); if (!o) return meldung("Ort nicht gefunden: " + text); merke("kal.heim", JSON.stringify(o)); meldung("Wohnort: " + o.label); zeichnen(); }
+  catch (e) { meldung("Ortssuche ging nicht: " + e.message); }
+}
+function kalKm(a, b) {
+  if (!a || !b) return null;
+  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+}
+/* Schätzung fürs Auto: 10 Min + 1,5 Min je km Luftlinie, auf 5 Min gerundet */
+const kalSchaetzen = (a, b) => { const k = kalKm(a, b); return k == null ? null : Math.max(5, Math.round((10 + 1.5 * k) / 5) * 5); };
+function kalPlan(gs) {
+  const heim = kalHeim(), tage = {};
+  for (const g of gs) (tage[g.datum] ||= []).push(g);
+  const zahl = (v, std) => (v === undefined || v === "" || isNaN(Number(v)) ? std : Math.max(0, Number(v)));
+  for (const liste of Object.values(tage)) {
+    liste.sort((a, b) => a.von - b.von);
+    liste.forEach((g, i) => {
+      const w = kalWerte(g.key), hier = S.orte[g.x.schulort] || null;
+      const gruen = g.l ? besprechung(g.l) : true;
+      g.warten = zahl(w.warten, gruen ? 0 : 60); g.wartenStd = gruen ? 0 : 60;
+      g.be = zahl(w.be, 60);
+      g.ende = g.bis + g.warten + g.be;
+      const vorher = i ? liste[i - 1] : null;
+      const sv = vorher ? kalSchaetzen(S.orte[vorher.x.schulort], hier) : kalSchaetzen(heim, hier);
+      g.davorArt = vorher ? "dazwischen" : "Anreise"; g.davorStd = sv; g.davor = zahl(w.davor, sv == null ? 30 : sv);
+      g.vorher = vorher;
+      g.letzter = i === liste.length - 1;
+      if (g.letzter) { const sr = kalSchaetzen(hier, heim); g.rueckStd = sr; g.rueck = zahl(w.rueck, sr == null ? 30 : sr); }
+      g.knapp = vorher && vorher.ende > g.von - g.davor;
+    });
+  }
+  return { tage, heim };
+}
+function reiseplanTeil() {
+  if (!REISEPLAN_FUER.includes(S.ich)) return "";
+  const gs = kalGruppen(kalMeine()); if (!gs.length) return "";
+  const { tage, heim } = kalPlan(gs);
+  const feld = (g, f, std) => `<input class="eingabe" type="number" min="0" max="300" step="5" style="width:62px" value="${g[f]}" onchange="kalSetzen(${ref(g.key)}, '${f}', this.value)"
+    title="${std == null ? "keine Schätzung möglich (Ort fehlt)" : "Vorschlag: " + std + " Min"}">${g[f] !== std && std != null ? `<span class="klein leise" title="Vorschlag"> (${std})</span>` : ""}`;
+  return `<h3 style="margin-top:28px">Reiseplanung für Outlook</h3>
+  <p class="klein leise">Je Besuch ein Termin «Besuch + Besprechung»; Anreise, Reise dazwischen und Rückreise als eigene Termine.
+    Warten: Vorschlag 60 Min, wenn nach dem Block gleich Unterricht folgt (nicht grün). Reisezeiten sind grobe Auto-Schätzungen (10 Min + 1,5 Min je km Luftlinie) – bitte anpassen.
+    Alle Werte und der Wohnort bleiben nur in diesem Browser.</p>
+  <p class="klein"><label>Wohnort <input class="eingabe" id="kalHeim" style="width:180px" value="${esc(heim ? heim.label : "")}" placeholder="z.B. Kriens"></label>
+    <button class="knopf klein" onclick="kalHeimSetzen()">übernehmen</button> ${heim ? "" : `<span class="leise">ohne Wohnort: Anreise/Rückreise 30 Min</span>`}</p>
+  <table class="liste"><thead><tr><th>Tag</th><th>Reise davor</th><th>Besuch</th><th>Name</th><th>Schule</th><th>Warten</th><th>Besprechung</th><th>Termin</th><th>Rückreise</th></tr></thead><tbody>
+  ${Object.entries(tage).sort().map(([d, liste]) => liste.map((g, i) => `<tr><td style="white-space:nowrap">${i ? "" : `<b>${esc(kurzDatum(d))}</b>`}</td>
+    <td style="white-space:nowrap"><span class="klein leise">${g.davorArt}</span> ${feld(g, "davor", g.davorStd)}${g.knapp ? `<div class="hinweis">⚠ zu knapp</div>` : ""}</td>
+    <td style="white-space:nowrap">${ausMin(g.von)}–${ausMin(g.bis)}</td><td>${g.xs.map((x) => esc(x.person.name)).join(" + ")}</td>
+    <td>${esc(g.x.schulort || "")}<div class="leise klein">${esc(g.x.schulhaus || "")}</div></td>
+    <td>${feld(g, "warten", g.wartenStd)}</td><td>${feld(g, "be", 60)}</td>
+    <td style="white-space:nowrap"><b>${ausMin(g.von)}–${ausMin(g.ende)}</b></td>
+    <td>${g.letzter ? feld(g, "rueck", g.rueckStd) : ""}</td></tr>`).join("")).join("")}
+  </tbody></table>
+  <p><button class="knopf haupt" onclick="reiseplanLaden()">📅 Alle Termine mit Reisen herunterladen</button></p>`;
+}
+function reiseplanLaden() {
+  const gs = kalGruppen(kalMeine()); if (!gs.length) return meldung("Keine kommenden Termine.");
+  const { tage, heim } = kalPlan(gs), termine = [];
+  for (const liste of Object.values(tage)) for (const g of liste) {
+    if (g.davor) termine.push({ uid: kalUid(g, g.vorher ? "reise" : "anreise"), datum: g.datum, von: g.von - g.davor, bis: g.von,
+      titel: g.vorher ? `Reise ${g.vorher.ort} → ${g.ort}` : `Anreise → ${g.ort}`, ort: kalOrt(g), text: `${g.davor} Min`, kategorie: "Reise" });
+    const auf = [`Besuch ${ausMin(g.von)}–${ausMin(g.bis)}`, g.warten ? `Warten ${ausMin(g.bis)}–${ausMin(g.bis + g.warten)} (Unterricht)` : "",
+      g.be ? `Besprechung ${ausMin(g.bis + g.warten)}–${ausMin(g.ende)}` : ""].filter(Boolean);
+    termine.push({ uid: kalUid(g, "praxisbesuch"), datum: g.datum, von: g.von, bis: g.ende, titel: kalTitel(g), ort: kalOrt(g), text: [...auf, "", ...kalBesuchText(g)].join("\n"), kategorie: "Praxisbesuch" });
+    if (g.letzter && g.rueck) termine.push({ uid: kalUid(g, "rueckreise"), datum: g.datum, von: g.ende, bis: g.ende + g.rueck,
+      titel: `Rückreise ${g.ort} → ${heim ? heim.label : "nach Hause"}`, ort: "", text: `${g.rueck} Min`, kategorie: "Reise" });
+  }
+  icsLaden(termine, kalDatei("mit Reisen"));
+  meldung(`${gs.length} Besuche und ${termine.length - gs.length} Reisen heruntergeladen – Datei doppelklicken, dann übernimmt Outlook sie.`);
 }
 
 /* Kontakte aus dem Praktikumstool: Mathe-PxL zuerst, dann zuständige PxL, Mentor/in; weitere PxL eingeklappt */
@@ -2646,7 +2726,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-165531";
+const STAND = "20261105-205657";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
