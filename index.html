@@ -84,7 +84,7 @@ a.bericht:hover { text-decoration: underline; }
 .fk-spezial { --fc: #c8566e; --fh: #fcedf0; --fd: #5e1a29; --fa: #fff; }
 .fchip[class*="fk-"] { border: 1.5px solid var(--fc); color: var(--fd); }
 .fchip[class*="fk-"].an { background: var(--fc); border-color: var(--fc); color: var(--fa); }
-.pk { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 13px; background: var(--fh); color: var(--fd); border: 1px solid var(--fc); white-space: nowrap; }
+.pk { display: inline-block; min-width: 78px; box-sizing: border-box; text-align: center; padding: 1px 7px; border-radius: 4px; font-size: 13px; background: var(--fh); color: var(--fd); border: 1px solid var(--fc); white-space: nowrap; }
 tr[class*="fk-"] > td:first-child { box-shadow: inset 5px 0 0 var(--fc); padding-left: 14px; }
 .sk-spezial { --f: #c8566e; --h: #fcedf0; --d: #5e1a29; }
 .sk-termine { --f: var(--ph-braun); --h: var(--ph-sand); --d: var(--ph-braun-dunkel); }
@@ -2193,7 +2193,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-074320";
+const STAND = "20261105-074447";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
