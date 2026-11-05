@@ -67,6 +67,7 @@ a.bericht:hover { text-decoration: underline; }
 .sk-reihe.drei { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .start-rechts { border-left: 2px solid #e2ded5; padding-left: 24px; }
 .start-rechts > .sk { margin-bottom: 14px; }
+.mt-zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 4px; } .mt-zwei > div + div { border-left: 1px solid #dcd8cf; padding-left: 10px; }
 @media (max-width: 1050px) { .start-raster { grid-template-columns: 1fr; grid-template-rows: none; }
   .start-links, .start-rechts { grid-row: auto; display: block; } .start-rechts { border-left: 0; padding-left: 0; } .start-rechts .leer-gruppe { display: none; } }
 @media (max-width: 700px) { .sk-reihe.drei { grid-template-columns: 1fr; } }
@@ -81,7 +82,7 @@ a.bericht:hover { text-decoration: underline; }
 .fk-spezial { --fc: #c8566e; --fh: #fcedf0; --fd: #5e1a29; --fa: #fff; }
 .fchip[class*="fk-"] { border: 1.5px solid var(--fc); color: var(--fd); }
 .fchip[class*="fk-"].an { background: var(--fc); border-color: var(--fc); color: var(--fa); }
-.pk { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 13px; background: var(--fh); color: var(--fd); border: 1px solid var(--fc); white-space: nowrap; }
+.pk { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 13px; background: var(--fh); color: var(--fd); border: 1px solid var(--fc); white-space: nowrap; }
 tr[class*="fk-"] > td:first-child { box-shadow: inset 5px 0 0 var(--fc); padding-left: 14px; }
 .sk-spezial { --f: #c8566e; --h: #fcedf0; --d: #5e1a29; }
 .sk-termine { --f: #8a857c; --h: #f6f5f2; --d: #2e2b27; }
@@ -173,15 +174,16 @@ table.liste.spalten td.noetig { width: 1%; white-space: nowrap; text-align: cent
 table.liste td.name { font-weight: 600; cursor: pointer; color: var(--akzent); white-space: nowrap; }
 table.liste td.name:hover { text-decoration: underline; }
 .chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 13px; white-space: nowrap; }
-.s-abbruch { color: #b0413e; } .s-abbruch::before { content: "✕ "; }
+.s-abbruch { background: #fff; border: 1px solid #b0413e; color: #b0413e; } .s-abbruch::before { content: "✕ "; }
 .ue.korr { cursor: pointer; border-radius: 4px; } .ue.korr:hover { background: rgba(0,0,0,.06); }
-/* Stand als Zeichen mit Text, ohne Pille und ohne Farbe (Farben und Kästchen gehören den Praktikumsarten):
-   ○ offen · ◐ gebucht · ● besucht · – nicht nötig · ✕ abgebrochen */
-.chip.s-offen, .chip.s-uebernommen, .chip.s-gebucht, .chip.s-besucht, .chip.s-nicht, .chip.s-abbruch { background: none; border: 0; padding: 0; border-radius: 0; }
-.s-offen { color: #8a857c; } .s-offen::before { content: "○ "; }
-.s-uebernommen, .s-gebucht { color: #2e2b27; } .s-uebernommen::before, .s-gebucht::before { content: "◐ "; }
-.s-besucht { color: #2e2b27; font-weight: 700; } .s-besucht::before { content: "● "; }
-.s-nicht { color: #aaa59c; } .s-nicht::before { content: "– "; }
+/* Stand ohne Farbe, als Kästchen (die Farben und Pillen gehören den Praktikumsarten):
+   offen = gestrichelt, gebucht = Rand, besucht = schwarz gefüllt mit weisser Schrift */
+.chip.s-offen, .chip.s-uebernommen, .chip.s-gebucht, .chip.s-besucht, .chip.s-nicht, .chip.s-abbruch { border-radius: 4px; padding: 1px 7px; }
+.s-offen { background: #fff; border: 1px dashed #a8a39a; color: #6b665e; }
+.s-uebernommen, .s-gebucht { background: #fff; border: 1.5px solid #4a4640; color: #2e2b27; }
+.s-besucht { background: #2e2b27; border: 1.5px solid #2e2b27; color: #fff; }
+.s-besucht::before { content: "✓ "; }
+.s-nicht { background: transparent; border: 1px solid transparent; color: #9a958c; }
 .n-ja { font-weight: 700; color: var(--achtung); } .n-optional { color: var(--leise); } .n-nein { color: #aaa; } .n-spaeter { color: #aaa; }
 .achtung { color: var(--achtung); font-weight: 700; cursor: help; }
 .zeile-achtung td:first-child { box-shadow: inset 4px 0 0 var(--achtung); }
@@ -912,7 +914,9 @@ function ansichtStart() {
     ${zielKarte("spezial", "Spezialpraktikum", "geheZu('planung', { praktika: ['Spezial'] })", spez.filter(dabei).length, spez.length, "alle besuchen")}
   </div></div>
   <div class="start-rechts"><div class="sk-gruppe">Für dich und das Team</div>
-    ${karte("termine", `Meine Termine ${S.ich ? "· " + esc(S.ich) : ""}`, "geheZu('termine')", S.ich ? `<div class="z">${meine.length}</div><div>gebucht oder besucht in ${sjText(sj)}</div>
+    ${karte("termine", `Meine Termine ${S.ich ? "· " + esc(S.ich) : ""}`, "geheZu('termine')", S.ich ? `<div class="mt-zwei"><div><div class="z">${meine.filter((x) => x.gruppe === "Halbtag").length}</div><div><b>Semester</b><div class="klein">Halbtag, Einzel</div></div></div>
+      <div><div class="z">${meine.filter((x) => x.gruppe !== "Halbtag").length}</div><div><b>Block</b><div class="klein">Profil, Quartal, Spezial</div></div></div></div>
+      <div class="klein">gebucht oder besucht in ${sjText(sj)}</div>
       <div class="klein" style="margin-top:6px">${naechste ? `Nächster: <b>${esc(kurzDatum(naechste.termin.datum))} ${esc(naechste.termin.zeit || "")}</b> · ${esc(naechste.person.name)}` : "Kein offener Termin."}</div>` : `<div>Oben rechts «Ich bin» wählen.</div>`)}
     <div class="sk-gruppe leer-gruppe">&nbsp;</div>
     ${karte("studierende", "Studierende", "geheZu('studierende')", `<div class="z">${Object.values(R.personen).filter((p) => !p.archiv).length}</div><div>aktuell · ${Object.values(R.personen).filter((p) => p.archiv).length} im Archiv</div>
@@ -2182,7 +2186,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-073145";
+const STAND = "20261105-073336";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
