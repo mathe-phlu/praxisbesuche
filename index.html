@@ -58,6 +58,7 @@ a.bericht:hover { text-decoration: underline; }
 .sk-halbtag { --f: #4f8fcf; --h: #eaf3fc; --d: #163a5c; }
 .sk-profil { --f: #d9a823; --h: #fdf5dc; --d: #5a430a; }
 .sk-quartal { --f: #5aa64e; --h: #ecf7e9; --d: #1c4a17; }
+.sk-ziel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sk-spezial { --f: #c8566e; --h: #fcedf0; --d: #5e1a29; }
 .sk-termine { --f: var(--ph-braun); --h: var(--ph-sand); --d: var(--ph-braun-dunkel); }
 .sk-studierende { --f: #8a6bb8; --h: #f3eefa; --d: #3e2a63; }
@@ -841,7 +842,7 @@ function ansichtStart() {
   const dabei = (p) => p.stand !== "offen" && p.stand !== "nicht nötig";
   // gleich aufgebaut: grosse Zahl = eingeteilt, dahinter / Ziel, Balken, noch offen bzw. Ziel erreicht
   const zielKarte = (farbe, titel, wohin, ist, soll, was) => `<div class="sk sk-${farbe}" onclick="${wohin}"><h3>${titel}</h3>
-    <div class="z">${ist}<span class="z-von"> / ${soll}</span></div><div>eingeteilt · Ziel: ${was}</div>
+    <div class="z">${ist}<span class="z-von"> / ${soll}</span></div><div class="sk-ziel" title="Ziel: ${was}">Ziel: ${was}</div>
     ${balken(ist, soll)}<div class="klein">${soll && ist >= soll ? "<b>Ziel erreicht ✓</b>" : `noch offen: <b>${Math.max(0, soll - ist)}</b>`}</div></div>`;
   const karte = (farbe, titel, ziel, inhalt) => `<div class="sk sk-${farbe}" onclick="${ziel}"><h3>${titel}</h3>${inhalt}</div>`;
   return `<div class="start-kopf"><h2>Studienjahr ${sjText(sj)}</h2>
@@ -850,7 +851,7 @@ function ansichtStart() {
   <div class="sk-reihe">
     ${zielKarte("halbtag", "Halbtagespraktikum", "geheZu('halbtag')", ht.filter(dabei).length, ht.length, "alle besuchen")}
     ${zielKarte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", eingeteilt, ziel, `Quote ${Math.round(S.einst.quote * 100)} % von ${prof.length}`)}
-    ${zielKarte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", q.filter(dabei).length, q.length, "alle, bei denen der Besuch nötig ist")}
+    ${zielKarte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", q.filter(dabei).length, q.length, "alle mit Besuch nötig")}
     ${zielKarte("spezial", "Spezialpraktikum", "geheZu('planung', { praktika: ['Spezial'] })", spez.filter(dabei).length, spez.length, "alle besuchen")}
   </div>
   <div class="sk-reihe">
@@ -2113,7 +2114,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261104-215633";
+const STAND = "20261105-071223";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
