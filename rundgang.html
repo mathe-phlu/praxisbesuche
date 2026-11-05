@@ -85,7 +85,7 @@ a.bericht:hover { text-decoration: underline; }
 .pk { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 13px; background: var(--fh); color: var(--fd); border: 1px solid var(--fc); white-space: nowrap; }
 tr[class*="fk-"] > td:first-child { box-shadow: inset 5px 0 0 var(--fc); padding-left: 14px; }
 .sk-spezial { --f: #c8566e; --h: #fcedf0; --d: #5e1a29; }
-.sk-termine { --f: #8a857c; --h: #f6f5f2; --d: #2e2b27; }
+.sk-termine { --f: var(--ph-braun); --h: var(--ph-sand); --d: var(--ph-braun-dunkel); }
 .sk-studierende { --f: #8a857c; --h: #f6f5f2; --d: #2e2b27; }
 .sk-grau { --f: #9a9a9a; --h: #f5f5f3; --d: #3a3a3a; }
 .sk table td { padding: 2px 4px; }
@@ -151,6 +151,18 @@ details.fsek summary h4 { display: inline; }
 .fchip { font: inherit; font-size: 13.5px; padding: 3px 10px; border-radius: 14px; border: 1px solid #ccc; background: #fff; color: var(--tinte); cursor: pointer; }
 .fchip:hover { border-color: var(--ph-braun); }
 .fchip.an { background: var(--ph-braun); border-color: var(--ph-braun); color: #fff; }
+/* Filter als Kästchen; Stand und «nötig» sehen genau so aus wie in der Liste – aus = blass */
+.fchip { border-radius: 4px; }
+.fchip.fs, .fchip.fs.an { background: #fff; }
+.fchip.fs-offen, .fchip.fs-offen.an { border: 1px dashed #a8a39a; color: #6b665e; }
+.fchip.fs-eingeteilt, .fchip.fs-eingeteilt.an { border: 1.5px solid #4a4640; color: #2e2b27; }
+.fchip.fs-besucht, .fchip.fs-besucht.an { background: #2e2b27; border: 1.5px solid #2e2b27; color: #fff; }
+.fchip.fs-besucht::before { content: "✓ "; }
+.fchip.fn-ja, .fchip.fn-ja.an { border: 1.5px solid var(--achtung); color: var(--achtung); font-weight: 700; }
+.fchip.fn-optional, .fchip.fn-optional.an { border: 1px solid #b8b3aa; color: #6b665e; }
+.fchip.fn-nein, .fchip.fn-nein.an { border: 1px solid #d8d4cc; color: #a8a39a; }
+.fchip.fs:not(.an), .fchip[class*="fk-"]:not(.an) { opacity: .4; }
+.fchip.fs:not(.an):hover, .fchip[class*="fk-"]:not(.an):hover { opacity: .75; }
 .fgruppe { border-bottom: 1px solid var(--linie); padding: 0 12px; }
 .fgruppe summary { cursor: pointer; padding: 8px 0; list-style-position: inside; }
 .fgruppe[open] { padding-bottom: 8px; }
@@ -1398,7 +1410,8 @@ function umschalten(k, wert) { const a = new Set(fa(k)); a.has(wert) ? a.delete(
 function knoepfe(k, optionen) {
   const an = fa(k);
   const farbig = k === "praktika" || k === "perioden";
-  return optionen.map(([v, t]) => `<button type="button" class="fchip ${farbig ? FILTERFARBE[v] || "" : ""} ${an.includes(v) ? "an" : ""}" onclick="umschalten('${k}','${v}')">${esc(t)}</button>`).join("");
+  const aussehen = (v) => farbig ? FILTERFARBE[v] || "" : k === "stand" ? "fs fs-" + v : k === "noetig" ? "fs fn-" + v : "";
+  return optionen.map(([v, t]) => `<button type="button" class="fchip ${aussehen(v)} ${an.includes(v) ? "an" : ""}" onclick="umschalten('${k}','${v}')">${esc(t)}</button>`).join("");
 }
 function filterLeiste(ansicht, anzahl) {
   const sj = fw("jahr", S.einst.studienjahr);
@@ -2186,7 +2199,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-073336";
+const STAND = "20261105-073515";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
