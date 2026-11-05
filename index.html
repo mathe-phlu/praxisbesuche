@@ -855,6 +855,9 @@ function berechnen() {
     const fertig = person.praktika.some((x) => ["Quartal", "Abschluss"].includes(x.gruppe) && x.jahr && x.jahr < S.einst.studienjahr);
     person.archiv = !!jahrNeu && jahrNeu < S.einst.studienjahr && (fertig || jahrNeu < jahrPlus(S.einst.studienjahr, -1));
     if (!jahrNeu) person.archiv = true;   // nur alte Liste ohne Jahr
+    // von Hand zurückgeholt bzw. ins Archiv gelegt (gilt für alle)
+    const vonHand = S.eintraege.filter((e) => e.typ === "archiv" && e.person === person.id).pop();
+    if (vonHand) { person.archiv = !!vonHand.wert; person.archivVonHand = true; }
   }
   for (const person of Object.values(personen)) {
     person.praktika.sort((a, b) => (a.jahr || "").localeCompare(b.jahr || "") || GRUPPEN.indexOf(a.gruppe) - GRUPPEN.indexOf(b.gruppe));
@@ -1999,10 +2002,17 @@ function ansichtStudierende() {
     return `<tr class="${a ? "zeile-achtung" : ""}"><td>${a ? `<span class="achtung">⚠</span>` : ""}</td><td class="name" onclick="detailZeigen(REFS[${ref(p.id)}])">${esc(p.name)}</td>
     <td>${esc(p.studiengang || "")}</td><td class="klein">${esc((p.faecher || []).join(", "))}</td>
     <td class="pspalte p-halbtag">${zelle(p, "Halbtag")}</td><td class="pspalte p-profil">${zelle(p, "Profil")}</td><td class="pspalte p-quartal">${zelle(p, "Quartal")}</td><td class="klein p-bem">${bem}</td>
-    <td style="white-space:nowrap"><button class="knopf klein" onclick="achtungSetzen(REFS[${ref(p.id)}])">Achtung / Bemerkung</button></td></tr>`; }).join("")}
+    <td style="white-space:nowrap"><button class="knopf klein" onclick="achtungSetzen(REFS[${ref(p.id)}])">Achtung / Bemerkung</button>
+      ${archiv ? `<button class="knopf klein haupt" title="Wieder zu den aktuellen Studierenden" onclick="archivSetzen(REFS[${ref(p.id)}], false)">zurückholen</button>`
+        : p.archivVonHand ? `<button class="knopf klein" title="Wieder ins Archiv" onclick="archivSetzen(REFS[${ref(p.id)}], true)">ins Archiv</button>` : ""}</td></tr>`; }).join("")}
   </tbody></table>`;
 }
 
+async function archivSetzen(personId, wert) {
+  if (!S.ich) return meldung("Bitte oben rechts «Ich bin» wählen.");
+  await eintragen({ typ: "archiv", person: personId, wert });
+  meldung(wert ? "Ins Archiv gelegt." : "Zurückgeholt – steht wieder bei den aktuellen Studierenden.");
+}
 /* ---------- Hilfe ---------- */
 const HILFE = [
   ["einrichten", "Einrichten", "Einmal pro Computer", `<ol class="schritte">
@@ -2468,7 +2478,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-104525";
+const STAND = "20261105-104610";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
