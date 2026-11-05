@@ -621,37 +621,29 @@ function mailAdresse(name) {
 }
 function anfrageText() {
   const sj = S.einst.studienjahr, pr = R.praktika.filter((p) => p.jahr === sj);
-  const team = (S.einst.dozierende || []).map((d) => d.kuerzel);
-  const offen = (g) => pr.filter((p) => p.gruppe === g && p.stand === "offen" && p.noetig === "ja");
-  const zeile = (x) => {
-    const kennen = new Set(x.person.praktika.filter((y) => y !== x).flatMap((y) => y.besuchtVon || []));
-    const frei = team.filter((k) => !kennen.has(k));
-    return `- ${x.person.name} (${x.person.studiengang || ""}), ${zeitraum(x).replace(/<[^>]+>/g, "")}, ${x.schulort}${x.schulhaus ? " – " + x.schulhaus : ""}${x.achtung.length ? " ⚠" : ""}\n  noch nicht besucht von: ${frei.join(", ") || "– (alle kennen die Person schon)"}`;
-  };
-  const q = offen("Quartal"), p = offen("Profil");
-  let t = `Liebe alle\n\nFür ${sjText(sj)} sind noch ${q.length + p.length} Pflichtbesuche offen. Bitte schaut, ob ihr davon noch etwas übernehmen könnt – am liebsten bei Personen, die ihr noch nicht besucht habt.\n\nDirekt zur Liste (Besuch nötig, offen): ${SEITE}#offen\n\n`;
-  if (q.length) t += `QUARTALSPRAKTIKUM (${q.length})\n${q.map(zeile).join("\n")}\n\n`;
-  if (p.length) t += `PROFILPRAKTIKUM (${p.length}, Besuch Pflicht)\n${p.map(zeile).join("\n")}\n\n`;
-  if (!q.length && !p.length) t += `Im Moment ist nichts offen.\n\n`;
-  t += `Übernehmen wie gewohnt in der Praxisbesuche-Seite (Termine ▸ anklicken).\n\nLiebe Grüsse\n${((S.einst.dozierende || []).find((d) => d.kuerzel === S.ich) || {}).name || S.ich}`;
-  return t;
+  const offen = (g) => pr.filter((p) => p.gruppe === g && p.stand === "offen" && p.noetig === "ja").length;
+  const q = offen("Quartal"), p = offen("Profil") + offen("Spezial");
+  const name = ((S.einst.dozierende || []).find((d) => d.kuerzel === S.ich) || {}).name || S.ich;
+  return `Liebe alle\n\nFür ${sjText(sj)} sind noch ${q + p} Praxisbesuche offen, die nötig sind${q && p ? ` (Quartal ${q}, Profil ${p})` : ""}.\n\n` +
+    `Bitte schaut in der Liste, ob ihr davon noch etwas übernehmen könnt:\n${SEITE}#offen\n\n` +
+    `Der Link zeigt nur die offenen, nötigen Besuche – zuerst die Personen, die ihr noch nicht besucht habt («nicht schon von mir besucht»; lässt sich abwählen). Übernehmen wie gewohnt mit «Termine ▸».\n\nLiebe Grüsse\n${name}`;
 }
 function anfrageZeigen() {
   const t = anfrageText();
   const an = (S.einst.dozierende || []).filter((d) => d.kuerzel !== S.ich).map((d) => d.mail || mailAdresse(d.name)).filter(Boolean);
   const d = $("#frage");
   $("#frageText").textContent = "Anfrage ans Team – so geht die E-Mail raus:";
-  $("#frageFeld").innerHTML = `<textarea id="anfrageText" style="width:100%;height:340px;font:13px/1.4 inherit">${esc(t)}</textarea>
+  $("#frageFeld").innerHTML = `<textarea id="anfrageText" style="width:100%;height:220px;font:13px/1.4 inherit">${esc(t)}</textarea>
     <p class="klein leise">An: ${esc(an.join(", "))}</p>
     <p style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="knopf haupt" onclick="anfrageMail(${ref(an.join(","))})">✉ E-Mail öffnen</button>
       <button type="button" class="knopf" onclick="navigator.clipboard.writeText($('#anfrageText').value).then(() => meldung('Text kopiert – in eine E-Mail einfügen (Cmd+V / Ctrl+V).'))">Text kopieren</button></p>
-    <p class="klein leise">Ist die Liste lang, kann das E-Mail-Programm den Text abschneiden – dann «Text kopieren» und einfügen.</p>`;
+`;
   $("#frageOk").style.display = "none"; d.classList.add("breit");
   d.returnValue = ""; d.showModal();
   d.onclose = () => { $("#frageOk").style.display = ""; d.classList.remove("breit"); };
 }
 function pruefenFilter() {
-  geheZu("planung", { praktika: ["Profil", "Quartal", "Spezial"], stand: ["offen"], noetig: ["ja"], frueherSpalte: true, nichtVonMir: false, jahr: S.einst.studienjahr });
+  geheZu("planung", { praktika: ["Profil", "Quartal", "Spezial"], stand: ["offen"], noetig: ["ja"], nichtVonMir: false, jahr: S.einst.studienjahr });
   meldung("Gefiltert: Besuch nötig + offen. In der Spalte «nötig» per Klick anpassen, wenn ein Besuch nicht mehr Pflicht ist.");
 }
 function anfrageMail(i) {
@@ -664,7 +656,7 @@ function linkAnwenden() {
   const g = { "offen-quartal": ["Quartal"], "offen-profil": ["Profil"], "offen": ["Profil", "Quartal", "Spezial"] }[h];
   if (!g) return;
   S.ansicht = "planung"; merke("ansicht", "planung");
-  Object.assign(S.filter, { praktika: g, stand: ["offen"], noetig: ["ja"], frueherSpalte: true, nichtVonMir: true, jahr: S.einst.studienjahr });
+  Object.assign(S.filter, { praktika: g, stand: ["offen"], noetig: ["ja"], nichtVonMir: true, jahr: S.einst.studienjahr });
   merke("filter", JSON.stringify(S.filter));
   history.replaceState(null, "", location.pathname);
 }
@@ -1776,7 +1768,6 @@ function filterLeiste(ansicht, anzahl) {
   const weitere = `<div class="fblock"><span class="ftitel">Name</span><input type="search" value="${esc(fw("name", ""))}" onchange="setzeFilter('name',this.value)" placeholder="Name, Studiengang, Fach"></div>
     <div class="fblock haken-liste">
       <label class="haken"><input type="checkbox" ${fw("nichtVonMir", true) ? "checked" : ""} onchange="setzeFilter('nichtVonMir',this.checked)"> nicht schon von mir besucht</label>
-      ${ansicht === "planung" ? `<label class="haken" title="Zeigt, wer die Person in früheren Praktika schon besucht hat – zum gezielten Anfragen"><input type="checkbox" ${fw("frueherSpalte", false) ? "checked" : ""} onchange="setzeFilter('frueherSpalte',this.checked)"> Spalte «früher besucht von» zeigen</label>` : ""}
       <label class="haken"><input type="checkbox" ${fw("nurMeine", false) ? "checked" : ""} onchange="setzeFilter('nurMeine',this.checked)"> nur meine</label>
       <label class="haken"><input type="checkbox" ${fw("nurAchtung", false) ? "checked" : ""} onchange="setzeFilter('nurAchtung',this.checked)"> nur ⚠ Spezialfälle</label></div>`;
   const gruppe = (titel, inhalt) => `<section class="fsek"><h4>${titel}</h4>${inhalt}</section>`;
@@ -1891,14 +1882,14 @@ function ansichtPlanung() {
   </div>
   <div class="mitfilter">${filterLeiste("planung", liste.length)}<div class="inhalt">
   ${aktivLeiste("planung", liste.length)}
-  ${liste.length ? `<table class="liste spalten"><thead><tr><th></th><th>Name</th><th>Prakt.</th><th>Zeitraum</th><th>Schule</th><th title="Besuch nötig?">nötig</th><th>Stand</th>${fw("frueherSpalte", false) ? `<th title="Wer die Person in früheren Praktika schon besucht hat">früher besucht von</th>` : ""}<th>Buchen</th></tr></thead><tbody>
+  ${liste.length ? `<table class="liste spalten"><thead><tr><th></th><th>Name</th><th>Prakt.</th><th>Zeitraum</th><th>Schule</th><th title="Besuch nötig?">nötig</th><th>Stand</th><th>Buchen</th></tr></thead><tbody>
   ${liste.map((x) => `<tr class="${farbKlasse(x)} ${x.achtung.length ? "zeile-achtung" : ""}">
     <td>${achtungZeichen(x)}</td>
     <td class="name" title="Fächer: ${esc((x.faecher || []).join(", "))}" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}${entfernenKnopf(x)}<div class="leise klein">${esc(x.person.studiengang || "")} · ${esc((x.faecher || []).join(", "))}</div></td>
     <td>${praktChip(x)}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
     <td class="noetig" style="cursor:pointer" title="${esc(x.warum)} – Klick: ändern" onclick="noetigSetzen(REFS[${ref(x.idpraktikum)}])"><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}">${esc({ optional: "opt.", später: "später" }[x.noetig] || x.noetig)}</span>${x.achtung.length ? `<div class="klein rot" title="${esc(x.achtung.map((f) => f.hinweis).join(" · "))}">⚠ Pflicht</div>` : ""}</td>
-    <td>${standChip(x)}</td>${fw("frueherSpalte", false) ? `<td class="klein">${frueherBesucht(x)}</td>` : ""}<td style="white-space:nowrap">${buchenZelle(x)}</td></tr>`).join("")}
+    <td>${standChip(x)}</td><td style="white-space:nowrap">${buchenZelle(x)}</td></tr>`).join("")}
   </tbody></table>` : `<div class="leer">Keine Praktika für diese Auswahl.</div>`}${entferntListe(["Profil", "Quartal", "Spezial", "Abschluss"])}</div></div>`;
 }
 
@@ -2564,7 +2555,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-111232";
+const STAND = "20261105-111642";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
