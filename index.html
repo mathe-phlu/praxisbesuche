@@ -893,6 +893,9 @@ function ansichtStart() {
   const balken = (wert, von) => `<div class="sk-balken"><div style="width:${von ? Math.min(100, Math.round(100 * wert / von)) : 0}%"></div></div>`;
   const naechste = meine.filter((x) => x.termin && x.stand !== "besucht").sort((a, b) => (a.termin.datum + a.termin.zeit).localeCompare(b.termin.datum + b.termin.zeit))[0];
   const dabei = (p) => p.stand !== "offen" && p.stand !== "nicht nötig";
+  // eigenes Soll (Aktualisieren › Einstellungen): nur anzeigen, wenn eingetragen
+  const meinSoll = (S.einst.dozierende || []).find((d) => d.kuerzel === S.ich) || {};
+  const sollVon = (soll) => Number(soll) ? `<span class="z-von"> / ${Number(soll)}</span>` : "";
   // gleich aufgebaut: grosse Zahl = eingeteilt, dahinter / Ziel, Balken, noch offen bzw. Ziel erreicht
   const zielKarte = (farbe, titel, wohin, ist, soll, was) => `<div class="sk sk-${farbe}" onclick="${wohin}"><h3>${titel}</h3>
     <div class="z">${ist}<span class="z-von"> / ${soll}</span></div><div class="sk-ziel" title="Ziel: ${was}">Ziel: ${was}</div>
@@ -914,13 +917,12 @@ function ansichtStart() {
     ${zielKarte("spezial", "Spezialpraktikum", "geheZu('planung', { praktika: ['Spezial'] })", spez.filter(dabei).length, spez.length, "alle besuchen")}
   </div></div>
   <div class="start-rechts"><div class="sk-gruppe">Für dich und das Team</div>
-    ${karte("termine", `Meine Termine ${S.ich ? "· " + esc(S.ich) : ""}`, "geheZu('termine')", S.ich ? `<div class="mt-zwei"><div><div class="z">${meine.filter((x) => x.gruppe === "Halbtag").length}</div><div><b>Semester</b><div class="klein">Halbtag, Einzel</div></div></div>
-      <div><div class="z">${meine.filter((x) => x.gruppe !== "Halbtag").length}</div><div><b>Block</b><div class="klein">Profil, Quartal, Spezial</div></div></div></div>
+    ${karte("termine", `Meine Termine ${S.ich ? "· " + esc(S.ich) : ""}`, "geheZu('termine')", S.ich ? `<div class="mt-zwei"><div><div class="z">${meine.filter((x) => x.gruppe === "Halbtag").length}${sollVon(meinSoll.sollHalbtag)}</div><div><b>Semester</b><div class="klein">Halbtag, Einzel</div></div></div>
+      <div><div class="z">${meine.filter((x) => x.gruppe !== "Halbtag").length}${sollVon(meinSoll.sollPQ || meinSoll.soll)}</div><div><b>Block</b><div class="klein">Profil, Quartal, Spezial</div></div></div></div>
       <div class="mt-naechst">${naechste ? `<span class="klein">Nächster Termin</span><div><b>${esc(kurzDatum(naechste.termin.datum))} ${esc(naechste.termin.zeit || "")}</b> · ${esc(naechste.person.name)}</div>` : `<span class="klein">Kein offener Termin.</span>`}</div>` : `<div>Oben rechts «Ich bin» wählen.</div>`)}
     <div class="sk-gruppe leer-gruppe">&nbsp;</div>
     ${karte("studierende", "Studierende", "geheZu('studierende')", `<div class="z">${Object.values(R.personen).filter((p) => !p.archiv).length}</div><div>aktuell · ${Object.values(R.personen).filter((p) => p.archiv).length} im Archiv</div>
       <div class="klein" style="margin-top:6px">Alle Praktika, Verlauf, Protokolle</div>`)}
-    ${sollKarte(sj)}
   </div></div>`;
 }
 function sollKarte(sj) {
@@ -2193,7 +2195,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-074642";
+const STAND = "20261105-074743";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
