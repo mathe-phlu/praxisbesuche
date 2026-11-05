@@ -506,7 +506,13 @@ async function ordnerWaehlen() {
   if (!window.showDirectoryPicker) { meldung("Diese Seite braucht Chrome oder Edge (Ordnerzugriff)."); return; }
   let h;
   try { h = await showDirectoryPicker({ id: "praxisbesuche", mode: "readwrite", startIn: "documents" }); }
-  catch (e) { if (e.name !== "AbortError") meldung("Ordner konnte nicht geöffnet werden: " + (e.message || e.name) + " – bitte Rike melden."); return; }
+  catch (e) {
+    if (e.name === "AbortError") return;
+    // auf verwalteten Rechnern kann die Informatik den Ordnerzugriff per Richtlinie sperren – dann kommt gar kein Auswahlfenster
+    if (e.name === "NotAllowedError" || e.name === "SecurityError")
+      return frage("Chrome lässt auf diesem Rechner keinen Ordnerzugriff zu (" + e.name + ": " + (e.message || "") + ").\n\nDas ist meist eine Einstellung der Informatik (Chrome-Richtlinie «File System Access» / FileSystemWriteAskForUrls). Bitte diese Meldung den Informatikdiensten schicken und um Freigabe für https://mathe-phlu.github.io bitten – oder Edge versuchen.", { art: "wahl", wert: "ok", optionen: [["ok", "Verstanden"]] });
+    meldung("Ordner konnte nicht geöffnet werden: " + e.name + " " + (e.message || "") + " – bitte Rike melden."); return;
+  }
   if (!(await istPraxisOrdner(h))) {
     const w = await frage(`Im Ordner «${h.name}» sind keine Praxisbesuche-Daten.\n\nGewählt werden muss der Ordner «Mathematik Sek1 - TM - Praxisbesuche» in OneDrive (darin liegen «Daten» und «Werkzeuge»).`,
       { art: "wahl", wert: "nochmal", optionen: [["nochmal", "Anderen Ordner wählen"], ["neu", "Trotzdem hier neu anfangen (nur beim allerersten Einrichten)"]] });
@@ -2254,7 +2260,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-093828";
+const STAND = "20261105-093922";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
