@@ -86,6 +86,10 @@ a.bericht:hover { text-decoration: underline; }
 .fchip[class*="fk-"].an { background: var(--fc); border-color: var(--fc); color: var(--fa); }
 .pk { display: inline-block; min-width: 78px; box-sizing: border-box; text-align: center; padding: 1px 7px; border-radius: 4px; font-size: 13px; background: var(--fh); color: var(--fd); border: 1px solid var(--fc); white-space: nowrap; }
 tr[class*="fk-"] > td:first-child { box-shadow: inset 5px 0 0 var(--fc); padding-left: 14px; }
+.sk-perioden { margin-top: 8px; border-top: 1px solid rgba(0,0,0,.08); padding-top: 6px; display: grid; gap: 3px; }
+.sk-per { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; align-items: center; font-size: 13px; border-radius: 4px; padding: 1px 4px; }
+.sk-per:hover { background: rgba(0,0,0,.05); } .sk-per .leise { grid-column: 2 / 4; }
+.sk-mini .sk-balken { margin: 0; height: 6px; }
 .sk-spezial { --f: #c8566e; --h: #fcedf0; --d: #5e1a29; }
 .sk-termine { --f: var(--ph-braun); --h: var(--ph-sand); --d: var(--ph-braun-dunkel); }
 .sk-studierende { --f: #8a857c; --h: #f6f5f2; --d: #2e2b27; }
@@ -629,6 +633,60 @@ function frueherBesucht(x) {
   return v.map((y) => `<span title="${esc(praktKurz(y) + " " + sjText(y.jahr))}"><b>${esc(y.besuchtVon.join(", "))}</b> <span class="leise">${esc((PK[y.gruppe] || y.gruppe).replace("PK0", "PK"))}</span></span>`).join("<br>");
 }
 function entfernenKnopf(x) { return x.wer || x.stand === "besucht" ? "" : ` <button class="knopf mini" title="Gehört nicht in diese Liste (z.B. unterrichtet kein Mathe) – für alle entfernen" onclick="event.stopPropagation();ausblenden(${ref(x.idpraktikum)})">✕</button>`; }
+/* Offene anfragen (Maurus): E-Mail ans Team mit allen noch offenen Besuchen, Link direkt in die gefilterte Liste */
+const ANFRAGEN_DURCH = ["kum"];
+const SEITE = "https://mathe-phlu.github.io/praxisbesuche/";
+function mailAdresse(name) {
+  const t = String(name || "").toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/\s+/).filter(Boolean);
+  return t.length >= 2 ? `${t[0]}.${t.slice(1).join("-")}@phlu.ch` : "";
+}
+function anfrageText() {
+  const sj = S.einst.studienjahr, pr = R.praktika.filter((p) => p.jahr === sj);
+  const team = (S.einst.dozierende || []).map((d) => d.kuerzel);
+  const offen = (g) => pr.filter((p) => p.gruppe === g && p.stand === "offen" && (g === "Profil" ? p.noetig !== "nein" : p.noetig === "ja"));
+  const zeile = (x) => {
+    const kennen = new Set(x.person.praktika.filter((y) => y !== x).flatMap((y) => y.besuchtVon || []));
+    const frei = team.filter((k) => !kennen.has(k));
+    return `- ${x.person.name} (${x.person.studiengang || ""}), ${zeitraum(x).replace(/<[^>]+>/g, "")}, ${x.schulort}${x.schulhaus ? " – " + x.schulhaus : ""}${x.achtung.length ? " ⚠" : ""}\n  noch nicht besucht von: ${frei.join(", ") || "– (alle kennen die Person schon)"}`;
+  };
+  const q = offen("Quartal"), p = offen("Profil");
+  const prof = pr.filter((x) => x.gruppe === "Profil"), ziel = Math.ceil(S.einst.quote * prof.length);
+  const fehlenP = Math.max(0, ziel - prof.filter((x) => x.stand !== "offen" && x.stand !== "nicht nötig").length);
+  let t = `Liebe alle\n\nFür ${sjText(sj)} sind noch Praxisbesuche offen. Bitte schaut, ob ihr davon noch etwas übernehmen könnt – am liebsten bei Personen, die ihr noch nicht besucht habt.\n\n`;
+  t += `QUARTALSPRAKTIKUM – noch ${q.length} offen\nDirekt zur Liste: ${SEITE}#offen-quartal\n${q.map(zeile).join("\n") || "- keine"}\n\n`;
+  if (fehlenP) t += `PROFILPRAKTIKUM – noch ${fehlenP} bis zur Quote (${Math.round(S.einst.quote * 100)} %)\nDirekt zur Liste: ${SEITE}#offen-profil\n${p.map(zeile).join("\n")}\n\n`;
+  t += `Übernehmen wie gewohnt in der Praxisbesuche-Seite (Termine ▸ anklicken).\n\nLiebe Grüsse\n${((S.einst.dozierende || []).find((d) => d.kuerzel === S.ich) || {}).name || S.ich}`;
+  return t;
+}
+function anfrageZeigen() {
+  const t = anfrageText();
+  const an = (S.einst.dozierende || []).filter((d) => d.kuerzel !== S.ich).map((d) => d.mail || mailAdresse(d.name)).filter(Boolean);
+  const d = $("#frage");
+  $("#frageText").textContent = "Anfrage ans Team – so geht die E-Mail raus:";
+  $("#frageFeld").innerHTML = `<textarea id="anfrageText" style="width:100%;height:340px;font:13px/1.4 inherit">${esc(t)}</textarea>
+    <p class="klein leise">An: ${esc(an.join(", "))}</p>
+    <p style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="knopf haupt" onclick="anfrageMail(${ref(an.join(","))})">✉ E-Mail öffnen</button>
+      <button type="button" class="knopf" onclick="navigator.clipboard.writeText($('#anfrageText').value).then(() => meldung('Text kopiert – in eine E-Mail einfügen (Cmd+V / Ctrl+V).'))">Text kopieren</button></p>
+    <p class="klein leise">Ist die Liste lang, kann das E-Mail-Programm den Text abschneiden – dann «Text kopieren» und einfügen.</p>`;
+  $("#frageOk").style.display = "none"; d.classList.add("breit");
+  d.returnValue = ""; d.showModal();
+  d.onclose = () => { $("#frageOk").style.display = ""; d.classList.remove("breit"); };
+}
+function anfrageMail(i) {
+  const t = $("#anfrageText").value;
+  location.href = `mailto:${REFS[i]}?subject=${encodeURIComponent("Praxisbesuche " + sjText(S.einst.studienjahr) + ": noch offene Besuche")}&body=${encodeURIComponent(t)}`;
+}
+/* Link aus der Anfrage: …/#offen-quartal oder #offen-profil öffnet direkt die gefilterte Liste mit «früher besucht von» */
+function linkAnwenden() {
+  const h = location.hash.replace("#", "");
+  const g = { "offen-quartal": ["Quartal"], "offen-profil": ["Profil"], "offen": ["Profil", "Quartal"] }[h];
+  if (!g) return;
+  S.ansicht = "planung"; merke("ansicht", "planung");
+  Object.assign(S.filter, { praktika: g, stand: ["offen"], noetig: g.includes("Profil") ? ["ja", "optional"] : ["ja"], frueherSpalte: true, nichtVonMir: true, jahr: S.einst.studienjahr });
+  merke("filter", JSON.stringify(S.filter));
+  history.replaceState(null, "", location.pathname);
+}
+window.addEventListener("hashchange", () => { linkAnwenden(); zeichnen(); });
 function eingebettet() { try { return window.top !== window.self; } catch (e) { return true; } }
 async function ordnerWaehlen() {
   if (!window.showDirectoryPicker) { meldung("Diese Seite braucht Chrome oder Edge (Ordnerzugriff)."); return; }
@@ -1118,13 +1176,18 @@ function ansichtStart() {
   <div class="start-raster"><div class="start-links">
   <div class="sk-gruppe">Während des Semesters · Halbtag und Einzel</div>
   <div class="sk-reihe drei">
-    ${zielKarte("halbtag", "Halbtagespraktikum", "geheZu('halbtag', { 'h.perioden': ['A', 'B', 'C', 'D'] })", ht.filter(dabei).length, ht.length, "alle besuchen")}
+    ${zielKarte("halbtag", "Halbtagespraktikum", "geheZu('halbtag', { 'h.perioden': ['A', 'B', 'C', 'D'] })", ht.filter(dabei).length, ht.length, "alle besuchen").replace(/<\/div>$/, `<div class="sk-perioden">${["A", "B", "C", "D"].map((b) => {
+      const l = ht.filter((x) => periode(x) === "Periode " + b), e = l.filter(dabei).length;
+      return `<div class="sk-per" onclick="event.stopPropagation();geheZu('halbtag', { 'h.perioden': ['${b}'] })" title="Periode ${b} anzeigen"><b>${b}</b>${l.length ? `<span class="sk-mini">${balken(e, l.length)}</span><span>${e} / ${l.length}${e >= l.length ? " ✓" : ""}</span>` : `<span class="leise">noch niemand eingetragen</span>`}</div>`; }).join("")}</div></div>`)}
     ${zielKarte("einzel", "Einzelpraktikum", "geheZu('halbtag', { 'h.perioden': ['SK'] })", einzel.filter(dabei).length, einzel.length, "alle besuchen")}
   </div>
   <div class="sk-gruppe">Blockpraktika (Januar, Februar) · Profil und Quartal</div>
   <div class="sk-reihe drei">
     ${zielKarte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", eingeteilt, ziel, `Quote ${Math.round(S.einst.quote * 100)} % von ${prof.length}`)}
     ${zielKarte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", q.filter(dabei).length, q.length, "alle mit Besuch nötig")}
+    ${ANFRAGEN_DURCH.includes(S.ich) ? karte("grau", "Offene anfragen", "anfrageZeigen()", `<div class="klein">Quartal offen: <b>${offenQ}</b> · Profil bis zur Quote: <b>${Math.max(0, ziel - eingeteilt)}</b></div>
+      <div class="klein" style="margin-top:6px">E-Mail ans Team mit allen offenen Besuchen und wer sie noch nicht kennt – mit Link direkt in die Liste.</div>
+      <button class="knopf haupt" style="margin-top:8px" onclick="event.stopPropagation();anfrageZeigen()">✉ Anfrage vorbereiten</button>`) : ""}
   </div></div>
   <div class="start-rechts"><div class="sk-gruppe">Für dich und das Team</div>
     ${karte("termine", `Meine Termine ${S.ich ? "· " + esc(S.ich) : ""}`, "geheZu('termine')", S.ich ? `<div class="mt-zwei"><div><div class="z">${meine.filter((x) => x.gruppe === "Halbtag").length}${sollVon(meinSoll.sollHalbtag)}</div><div><b>Semester</b><div class="klein">Halbtag, Einzel</div></div></div>
@@ -2510,12 +2573,13 @@ setInterval(() => {
   if (S.ordner && document.visibilityState === "visible" && !tippt && S.ansicht !== "aktualisieren" && !$("#frage").open) eintraegeLaden();
 }, 60000);
 (async () => {
+  linkAnwenden();
   if (await ordnerZugriff()) await allesLaden(); else zeichnen();
 })();
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-110215";
+const STAND = "20261105-110836";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
