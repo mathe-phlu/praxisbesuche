@@ -562,6 +562,16 @@ async function allesLaden() {
     const alte = S.personen[p.idstudent];
     if (!alte || p.jahr >= alte.jahr) S.personen[p.idstudent] = { id: p.idstudent, name: p.name, studiengang: p.studiengang, faecher: p.faecher, jahr: p.jahr };
   }
+  // Hospitationen: steht bei der Mathe-Lektion «Hosp.»/«Hospitation» als Klasse, unterrichtet die Person dort nicht selbst.
+  // Solche Lektionen sind keine Besuchstermine; wer in einer Halbtag-Periode nur hospitiert (und noch keinen Besuch hat), gehört nicht in unsere Liste.
+  S.nurHosp = [];
+  for (const p of Object.values(S.praktika)) {
+    if (!p.lektionen || !p.lektionen.length) continue;
+    const eigene = p.lektionen.filter((l) => !/hosp/i.test(l.klasse || ""));
+    if (eigene.length === p.lektionen.length) continue;
+    if (!eigene.length && p.gruppe === "Halbtag" && !(p.besuche || []).length) { S.nurHosp.push(p); delete S.praktika[p.idpraktikum]; continue; }
+    S.praktika[p.idpraktikum] = { ...p, lektionen: eigene, hospitationen: p.lektionen.length - eigene.length };
+  }
   // Quartal: das Praktikumstool führt Teil 1 und Teil 2 mit eigener Nummer – hier ist das ein einziges Quartalspraktikum
   S.alias = {};
   const teile = {};
@@ -1614,7 +1624,8 @@ function paareBilden(liste) {
   const gruppen = {};
   for (const x of liste) (gruppen[[x.jahr, x.art, x.schulort, x.schulhaus, x.von, x.bis].join("|")] ||= []).push(x);
   const zeilen = [];
-  const lekt = (x) => new Set((x.lektionen || []).map((l) => l.datum + " " + l.zeit));
+  // gleicher Tag und gleiche Zeit allein reicht nicht: auch dieselbe Praxislehrperson (sonst zwei verschiedene Klassen = Einzelbesuche)
+  const lekt = (x) => new Set((x.lektionen || []).map((l) => l.datum + " " + l.zeit + " " + nameSchluessel(l.lehrer || "?")));
   for (const g of Object.values(gruppen)) {
     const rest = [...g];
     while (rest.length) {
@@ -1622,7 +1633,7 @@ function paareBilden(liste) {
       let best = -1, wert = 0;
       rest.forEach((b, i) => {
         const la = lekt(a), lb = lekt(b);
-        const gemeinsam = la.size && lb.size ? [...la].filter((t) => lb.has(t)).length / Math.min(la.size, lb.size) : 0.6;
+        const gemeinsam = la.size && lb.size ? [...la].filter((t) => lb.has(t)).length / Math.min(la.size, lb.size) : 0;
         if (gemeinsam > wert) { wert = gemeinsam; best = i; }
       });
       zeilen.push(best >= 0 && wert >= 0.5 ? [a, rest.splice(best, 1)[0]] : [a]);
@@ -2200,7 +2211,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-075349";
+const STAND = "20261105-083618";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
