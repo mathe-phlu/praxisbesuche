@@ -1016,7 +1016,7 @@ function buchenZelle(x, partner) {
   if (!l.length) return `<span class="leise klein">keine passende Lektion</span>`;
   const ohneB = ohneBesprechungTrotzdem(x, l);
   const tage = ["Mo", "Di", "Mi", "Do", "Fr"].filter((t) => l.some((a) => wochentag(a.datum) === t));
-  return `<button class="knopf klein haupt" title="Alle möglichen Termine anzeigen – anklicken bucht" onclick="termineZeigen(${ref(x.idpraktikum)}${partner ? ", " + ref(partner.idpraktikum) : ""})">${partner ? "Termine (beide) ▸" : "Termine ▸"}</button>
+  return `<button class="knopf klein haupt" title="Alle möglichen Termine anzeigen – anklicken bucht" onclick="termineZeigen(${ref(x.idpraktikum)}${partner ? ", " + ref(partner.idpraktikum) : ""})">Termine ▸</button>
     <div class="leise klein" style="margin-top:2px">${tage.join(" · ")} · ${l.length} Termin${l.length === 1 ? "" : "e"}</div>${ohneB ? `<div class="klein rot" title="Muss besucht werden, aber nach keinem Termin ist Zeit zum Besprechen – darum trotzdem angezeigt">ohne Besprechungszeit danach</div>` : ""}`;
 }
 function termineZeigen(i, ip) {
@@ -2195,7 +2195,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-074743";
+const STAND = "20261105-074839";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
