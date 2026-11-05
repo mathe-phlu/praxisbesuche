@@ -1157,7 +1157,9 @@ function ansichtStart() {
   </div>
   <div class="sk-gruppe">Blockpraktika (Januar, Februar) · Profil und Quartal</div>
   <div class="sk-reihe drei">
-    ${zielKarte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", eingeteilt, ziel, `Quote ${Math.round(S.einst.quote * 100)} % von ${prof.length}`)}
+    ${zielKarte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", eingeteilt, ziel, `Quote ${Math.round(S.einst.quote * 100)} % von ${prof.length}`).replace(/<\/div>$/, (() => {
+      const pf = prof.filter((x) => x.noetig === "ja"), e = pf.filter(dabei).length;
+      return `<div class="sk-perioden"><div class="sk-per" onclick="event.stopPropagation();geheZu('planung', { praktika: ['Profil'], noetig: ['ja'] })" title="Profilpraktika, bei denen ein Besuch Pflicht ist (Spezialfall, Achtung)"><b style="grid-column:1/2">!</b>${pf.length ? `<span class="sk-mini">${balken(e, pf.length)}</span><span>Pflicht ${e} / ${pf.length}${e >= pf.length ? " ✓" : ""}</span>` : `<span class="leise">keine Pflichtbesuche</span>`}</div></div></div>`; })())}
     ${zielKarte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", q.filter(dabei).length, q.length, "alle mit Besuch nötig")}
   </div></div>
   <div class="start-rechts"><div class="sk-gruppe">Für dich und das Team</div>
@@ -1876,7 +1878,7 @@ function ansichtPlanung() {
       <button class="knopf" title="Filter auf «Besuch nötig» + «offen»: jeden Fall prüfen, «nötig» per Klick anpassen" onclick="pruefenFilter()">🔍 Prüfen (${pflichtOffen} offen und nötig)</button>
       <button class="knopf haupt" title="E-Mail ans Team mit allen noch offenen Pflichtbesuchen" onclick="anfrageZeigen()">✉ E-Mail ans Team</button></div>` : ""}</div>
   <div class="kacheln">
-    <div class="kachel gruppe fk-profil">${k("Profil · Quote", Math.round(S.einst.quote * 100) + " %")}${k("Ziel", ziel)}${k("eingeteilt", eing(prof))}${k("fehlen", Math.max(0, ziel - eing(prof)), ziel - eing(prof) > 0 ? "rot" : "gruen")}</div>
+    <div class="kachel gruppe fk-profil">${k("Profil · Quote", Math.round(S.einst.quote * 100) + " %")}${k("Ziel", ziel)}${k("eingeteilt", eing(prof))}${k("fehlen", Math.max(0, ziel - eing(prof)), ziel - eing(prof) > 0 ? "rot" : "gruen")}${(() => { const pf = prof.filter((x) => x.noetig === "ja"); return pf.length ? k("Pflicht", eing(pf) + " / " + pf.length, eing(pf) < pf.length ? "rot" : "gruen") : ""; })()}</div>
     <div class="kachel gruppe fk-quartal">${k("Quartal · nötig", quart.length)}${k("eingeteilt", eing(quart))}${k("fehlen", quart.length - eing(quart), quart.length - eing(quart) > 0 ? "rot" : "gruen")}</div>
     <div class="kachel gruppe fk-quartal" style="margin-left:auto">${k("Prognose Quartal " + sjText(jahrPlus(sj, 1)), Math.max(0, prof.length - eing(prof)))}</div>
   </div>
@@ -2555,7 +2557,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-112007";
+const STAND = "20261105-112155";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
