@@ -502,6 +502,7 @@ async function istPraxisOrdner(h) {
     return true;
   } catch (e) { return false; }
 }
+function eingebettet() { try { return window.top !== window.self; } catch (e) { return true; } }
 async function ordnerWaehlen() {
   if (!window.showDirectoryPicker) { meldung("Diese Seite braucht Chrome oder Edge (Ordnerzugriff)."); return; }
   let h;
@@ -509,8 +510,10 @@ async function ordnerWaehlen() {
   catch (e) {
     if (e.name === "AbortError") return;
     // auf verwalteten Rechnern kann die Informatik den Ordnerzugriff per Richtlinie sperren – dann kommt gar kein Auswahlfenster
-    if (e.name === "NotAllowedError" || e.name === "SecurityError")
-      return frage("Chrome lässt auf diesem Rechner keinen Ordnerzugriff zu (" + e.name + ": " + (e.message || "") + ").\n\nDas ist meist eine Einstellung der Informatik (Chrome-Richtlinie «File System Access» / FileSystemWriteAskForUrls). Bitte diese Meldung den Informatikdiensten schicken und um Freigabe für https://mathe-phlu.github.io bitten – oder Edge versuchen.", { art: "wahl", wert: "ok", optionen: [["ok", "Verstanden"]] });
+    if (e.name === "NotAllowedError" || e.name === "SecurityError") {
+      if (eingebettet()) return frage("Die Seite läuft hier eingebettet (z.B. in Teams oder SharePoint). Dort darf sie keinen Ordner öffnen.\n\nBitte die Seite in einem eigenen Chrome-Fenster öffnen: https://mathe-phlu.github.io/praxisbesuche/", { art: "wahl", wert: "ok", optionen: [["ok", "Verstanden"]] });
+      return frage("Chrome lässt auf diesem Rechner keinen Ordnerzugriff zu (" + e.name + ": " + (e.message || "") + ").\n\nDas ist meist eine Einstellung der Informatik (Chrome-Richtlinie für den Dateisystem-Zugriff, z.B. DefaultFileSystemWriteGuardSetting / FileSystemWriteAskForUrls). Bitte diese Meldung den Informatikdiensten schicken und um Freigabe für https://mathe-phlu.github.io bitten – oder Edge versuchen.", { art: "wahl", wert: "ok", optionen: [["ok", "Verstanden"]] });
+    }
     meldung("Ordner konnte nicht geöffnet werden: " + e.name + " " + (e.message || "") + " – bitte Rike melden."); return;
   }
   if (!(await istPraxisOrdner(h))) {
@@ -903,6 +906,7 @@ function ansichtOhneOrdner() {
   const wartet = S.ordnerWartet;
   const schritt = (n, titel, inhalt) => `<div class="einr-schritt"><div class="einr-n">${n}</div><div><b>${titel}</b>${inhalt}</div></div>`;
   return `<div class="karte einrichten">
+    ${eingebettet() ? `<div class="einr-hinweis" style="border-color:#a33a2e"><b class="rot">Diese Seite läuft gerade eingebettet</b> (z.B. in Teams oder SharePoint) und kann dort keinen Ordner öffnen. <a href="https://mathe-phlu.github.io/praxisbesuche/" target="_blank" rel="noopener"><b>In eigenem Chrome-Fenster öffnen ↗</b></a></div>` : ""}
     <h2>Willkommen – einmal einrichten</h2>
     <p>Die Seite speichert nichts im Internet. Sie arbeitet mit dem gemeinsamen Ordner <b>«Praxisbesuche»</b> aus dem Teams-Kanal <b>Praktika</b>. Dafür braucht es drei Schritte.</p>
     ${wartet ? `<p><button class="knopf haupt gross" onclick="zugriffErlauben()">Zugriff auf «${esc(wartet.name)}» erlauben</button></p>` : ""}
@@ -2260,7 +2264,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-093922";
+const STAND = "20261105-094158";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
