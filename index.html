@@ -874,6 +874,12 @@ function berechnen() {
       }
     }
   }
+  // Besucht, aber ohne Kürzel (frühere Jahre: Tool kennt nur die Zahl der Besuche): Kürzel aus dem Dateinamen des Berichts
+  for (const person of Object.values(personen)) for (const x of person.praktika) {
+    if (x.wer || x.stand !== "besucht") continue;
+    const k = (x.berichte || []).map((b) => (b.wer || "").toLowerCase()).filter(Boolean).map((w) => TIPPFEHLER[w] || w)[0];
+    if (k) { x.wer = k; x.werAusBericht = true; x.besuchtVon = [k]; person.besucher.add(k); }
+  }
   for (const x of liste) noetigBestimmen(x);
   for (const person of Object.values(personen)) for (const x of person.praktika) if (x.quelle === "alt") noetigBestimmen(x);
   R = { praktika: liste, personen, ausgeblendet, fremdBesucht };
@@ -2462,7 +2468,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-104405";
+const STAND = "20261105-104525";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
