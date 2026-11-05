@@ -376,14 +376,14 @@ dialog label input, dialog label select { margin-top: 2px; }
 
 const KUERZEL_STANDARD = ["alh", "clu", "hmo", "kum", "lam", "nas"];
 // frühere Kürzel – nur zum Lesen der alten Excel-Liste
-const KUERZEL_ALT = ["nsa", "srg", "wec", "wem", "wma"];
+const KUERZEL_ALT = ["srg", "wec", "wem", "wma"];
 /* Gehört ein Name aus dem Praktikumstool zum Team (Einstellungen)? -> Kürzel, sonst null (z.B. Mentor/in) */
 function teamKuerzel(text) {
   const t = String(text || "").toLowerCase();
   const d = (S.einst.dozierende || []).filter((d) => d.name).find((d) => d.name.toLowerCase().split(/\s+/).every((w) => t.includes(w)));
   return d ? d.kuerzel : null;
 }
-const TIPPFEHLER = { km: "kum" };
+const TIPPFEHLER = { km: "kum", nsa: "nas" };   // «nsa» war Samanthas Kürzel, bevor es feststand
 const GRUPPEN = ["Halbtag", "Profil", "Quartal", "Spezial", "Abschluss"];
 const TOOL = "https://praktikumstool.phlu.ch";
 
@@ -722,9 +722,9 @@ async function allesLaden() {
     // keine eigene Lektion: Hospitation, Besprechung, Ausfall
     const eigene = p.lektionen.filter((l) => !/hosp|besp|ausfall/i.test(l.klasse || ""));
     const matheBesuch = (p.besuche || []).some((b) => /^MA\b/i.test(b.fach || ""));
-    // Halbtag: wer an weniger als 2 Tagen selbst Mathe unterrichtet (letzter Tag zählt nicht, der ist gesperrt), gehört nicht in unsere Liste
-    const letzter = datumAus(p.bis), tage = new Set(eigene.filter((l) => l.datum !== letzter).map((l) => l.datum));
-    if (p.gruppe === "Halbtag" && tage.size < 2 && !matheBesuch) { S.nurHosp.push(p); delete S.praktika[p.idpraktikum]; continue; }
+    // Halbtag: nur wer in dieser Periode gar keine eigene Mathe-Lektion hat, fällt weg. Alles Unklare bleibt drin
+    // (lieber eine Person zu viel) – Fehleinträge entfernt man von Hand mit ✕.
+    if (p.gruppe === "Halbtag" && !eigene.length && !matheBesuch) { S.nurHosp.push(p); delete S.praktika[p.idpraktikum]; continue; }
     if (eigene.length === p.lektionen.length) continue;
     S.praktika[p.idpraktikum] = { ...p, lektionen: eigene, hospitationen: p.lektionen.length - eigene.length };
   }
@@ -911,7 +911,7 @@ function standBestimmen(x, altBesuch) {
     // passt nur, wenn die Periode stimmt; ohne Periode in der alten Liste: nur das Praktikum mit Mathe-Besuch
     if (altPer ? altPer !== per : !(x.fachbesuche > 0)) alt = null;
   }
-  let wer = alt && alt.wer ? alt.wer : "", stand = alt && alt.status ? alt.status : "", art = alt && alt.art ? alt.art : "", datum = alt && alt.datum ? alt.datum : "";
+  let wer = alt && alt.wer ? TIPPFEHLER[alt.wer] || alt.wer : "", stand = alt && alt.status ? alt.status : "", art = alt && alt.art ? alt.art : "", datum = alt && alt.datum ? alt.datum : "";
   if (stand === "besucht" && !wer) stand = "";
   // Ohne Liste «Angemeldete Besuche» (ältere Jahre): Zahl der Fachbesuche aus der Fächerliste. Mit Liste zählen nur Besuche des Teams.
   if (x.quelle === "tool" && !x.besuche && x.fachbesuche > 0 && stand !== "besucht") stand = x.jahr < S.einst.studienjahr ? "besucht" : "gebucht";
@@ -1267,6 +1267,28 @@ async function terminGewaehlt(ip, il, ipartner, platz = "haupt") {
     const pa = R.praktika.find((p) => p.idpraktikum === ia), pb = R.praktika.find((p) => p.idpraktikum === ib);
     if (pa && pb && !(pa.wer === S.ich && pb.wer === S.ich)) setTimeout(() => termineZeigen(ref(ia), ref(ib)), 700);
   }
+}
+/* Halbtag: Doppelbesuch von Hand verbinden oder trennen (gilt für alle) */
+async function paarVerbinden(i) {
+  const x = R.praktika.find((p) => p.idpraktikum === REFS[i]); if (!x) return;
+  if (!S.ich) return meldung("Bitte oben rechts «Ich bin» wählen.");
+  const zeilen = paareBilden(filtern(R.praktika.filter((p) => p.gruppe === "Halbtag"), "halbtag"));
+  const einzeln = zeilen.filter((z) => z.length === 1 && z[0] !== x && z[0].jahr === x.jahr && periode(z[0]) === periode(x)).map((z) => z[0])
+    .sort((a, b) => (b.schulhaus === x.schulhaus) - (a.schulhaus === x.schulhaus) || a.person.name.localeCompare(b.person.name));
+  if (!einzeln.length) return meldung("In dieser Periode gibt es niemanden sonst, der einzeln steht.");
+  const wahl = await frage(`${x.person.name} (${periode(x)}, ${x.schulhaus || x.schulort}) zu einem Doppelbesuch verbinden mit:`,
+    { art: "wahl", wert: einzeln[0].idpraktikum, optionen: einzeln.map((y) => [y.idpraktikum, `${y.person.name} – ${y.schulhaus || y.schulort}${y.schulhaus === x.schulhaus ? " (gleiches Schulhaus)" : ""}`]) });
+  if (!wahl) return;
+  await eintragen({ typ: "paar", praktikum: x.idpraktikum, partner: wahl });
+  meldung("Als Doppelbesuch verbunden.");
+}
+async function paarTrennen(i, j) {
+  if (!S.ich) return meldung("Bitte oben rechts «Ich bin» wählen.");
+  const a = REFS[i], b = REFS[j];
+  const ok = await frage("Diesen Doppelbesuch in zwei Einzelbesuche trennen? (gilt für alle)", { art: "wahl", wert: "ja", optionen: [["ja", "Ja, trennen"]] });
+  if (ok !== "ja") return;
+  await eintragen({ typ: "paar_weg", praktikum: a, partner: b });
+  meldung("Getrennt.");
 }
 function paarMerken(i, j) { S.nachBuchen = [REFS[i], REFS[j]]; }
 /* Gleiche buchbare Lektionen (Tag + Zeit)? Dann reicht ein gemeinsamer Stundenplan */
@@ -1858,6 +1880,15 @@ function hauptLehrer(x) {
 }
 /* Halbtag: Doppelbesuch = gleiche Periode + gleiches Schulhaus + gleiche Praxislehrperson (Stundenpläne dürfen verschieden eingetragen sein) */
 function paareBilden(liste) {
+  // von Hand verbunden / getrennt (Einträge «paar» / «paar_weg») hat Vorrang vor der Regel
+  const vonHand = {}, getrennt = new Set();
+  for (const e of S.eintraege) {
+    if (e.typ === "paar") { vonHand[e.praktikum] = e.partner; vonHand[e.partner] = e.praktikum; getrennt.delete(e.praktikum + "|" + e.partner); getrennt.delete(e.partner + "|" + e.praktikum); }
+    if (e.typ === "paar_weg") { if (vonHand[e.praktikum] === e.partner) { delete vonHand[e.praktikum]; delete vonHand[e.partner]; } getrennt.add(e.praktikum + "|" + e.partner); getrennt.add(e.partner + "|" + e.praktikum); }
+  }
+  const nach = Object.fromEntries(liste.map((x) => [x.idpraktikum, x])), vergeben = new Set(), feste = [];
+  for (const x of liste) { const y = nach[vonHand[x.idpraktikum]]; if (y && !vergeben.has(x.idpraktikum) && !vergeben.has(y.idpraktikum)) { feste.push([x, y]); vergeben.add(x.idpraktikum); vergeben.add(y.idpraktikum); } }
+  liste = liste.filter((x) => !vergeben.has(x.idpraktikum));
   const gruppen = {};
   for (const x of liste) (gruppen[[x.jahr, periode(x), x.schulort, x.schulhaus].join("|")] ||= []).push(x);
   const zeilen = [];
@@ -1868,13 +1899,14 @@ function paareBilden(liste) {
       const a = rest.shift(), la = hauptLehrer(a);
       let best = -1, wert = -1;
       rest.forEach((b, i) => {
-        if (!la || hauptLehrer(b) !== la) return;
+        if (!la || hauptLehrer(b) !== la || getrennt.has(a.idpraktikum + "|" + b.idpraktikum)) return;
         const ta = tage(a), tb = tage(b), gemeinsam = [...ta].filter((t) => tb.has(t)).length;
         if (gemeinsam > wert) { wert = gemeinsam; best = i; }
       });
       zeilen.push(best >= 0 ? [a, rest.splice(best, 1)[0]] : [a]);
     }
   }
+  zeilen.push(...feste.map((z) => (z.vonHand = true, z)));
   return zeilen.sort((a, b) => a[0].art - b[0].art || (a[0].schulort || "").localeCompare(b[0].schulort || "") || a[0].person.name.localeCompare(b[0].person.name));
 }
 const TERMIN_KAT = ["Halbtag", "Einzel", "Profil", "Quartal", "Spezial"];
@@ -1896,7 +1928,8 @@ function ansichtHalbtag() {
   ${zeilen.length ? `<table class="liste spalten"><thead><tr><th>Studierende</th><th>Periode</th><th>Zeitraum</th><th>Schule</th><th>Stand</th><th>Buchen</th></tr></thead><tbody>
   ${zeilen.map((z) => { const x = z[0];
     return `<tr class="${farbKlasse(x)} ${z.some((y) => y.achtung.length) ? "zeile-achtung" : ""}">
-    <td><div class="klein ${z.length === 2 ? "paar" : "einzeln"}">${z.length === 2 ? "Paar · Doppelbesuch" : "einzeln"}</div>${z.map(name).join("")}</td>
+    <td><div class="klein ${z.length === 2 ? "paar" : "einzeln"}">${z.length === 2 ? `Paar · Doppelbesuch${z.vonHand ? " (von Hand)" : ""} <button class="knopf mini" title="Doch kein Doppelbesuch: in zwei Einzelbesuche trennen" onclick="paarTrennen(${ref(z[0].idpraktikum)}, ${ref(z[1].idpraktikum)})">trennen</button>`
+      : `einzeln <button class="knopf mini" title="Eigentlich ein Doppelbesuch: mit einer zweiten Person verbinden" onclick="paarVerbinden(${ref(x.idpraktikum)})">⇄ Doppelbesuch</button>`}</div>${z.map(name).join("")}</td>
     <td>${praktChip(x, periode(x) === "Spezial" ? "Halbtag" : periode(x))}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
     <td class="paar-stand">${z.map((y) => `<div>${standChip(y)}</div>`).join("")}</td>
@@ -2450,7 +2483,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-103656";
+const STAND = "20261105-104127";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
