@@ -674,6 +674,18 @@ function anfrageMail(i) {
 /* Link aus der Anfrage: …/#offen-quartal oder #offen-profil öffnet direkt die gefilterte Liste mit «früher besucht von» */
 function linkAnwenden() {
   const h = location.hash.replace("#", "");
+  // Reisezeiten aus einem Link: #reise=20270108-0800-140-0-60-120,…  (Datum-Zeit-Reise davor-Warten-Besprechung-Rückreise, Minuten)
+  if (h.startsWith("reise=")) {
+    let n = 0;
+    for (const t of h.slice(6).split(",")) {
+      const m = t.match(/^(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)-(\d+)-(\d+)-(\d+)-(\d+)$/); if (!m) continue;
+      merke(`kal.vor.${m[1]}-${m[2]}-${m[3]}|${m[4]}:${m[5]}`, JSON.stringify({ davor: m[6], warten: m[7], be: m[8], rueck: m[9] })); n++;
+    }
+    history.replaceState(null, "", location.pathname);
+    S.ansicht = "termine"; merke("ansicht", "termine");
+    setTimeout(() => meldung(`Reisezeiten für ${n} Termine übernommen – unten in «Meine Termine» bei der Reiseplanung.`), 500);
+    return;
+  }
   const g = { "offen-quartal": ["Quartal"], "offen-profil": ["Profil"], "offen": ["Profil", "Quartal", "Spezial"] }[h];
   if (!g) return;
   S.ansicht = "planung"; merke("ansicht", "planung");
@@ -2012,7 +2024,11 @@ function kalKnopf(x) {
   return x.wer === S.ich && x.termin && x.termin.zeit ? `<button class="knopf klein" title="Diesen Termin für Outlook herunterladen" onclick="kalEinzelLaden(${ref(x.idpraktikum)})">📅</button>` : "";
 }
 /* ---------- Reiseplanung (nur REISEPLAN_FUER) ---------- */
-function kalWerte(key) { try { return JSON.parse(lies("kal." + key) || "{}"); } catch (e) { return {}; } }
+function kalWerte(key) {
+  const j = (k) => { try { return JSON.parse(lies(k) || "{}"); } catch (e) { return {}; } };
+  const [datum, zeit] = key.split("|");
+  return { ...j(`kal.vor.${datum}|${ausMin(zuMin(zeit))}`), ...j("kal." + key) };   // eigene Eingaben gehen vor
+}
 function kalSetzen(i, feld, wert) { const k = REFS[i], w = kalWerte(k); w[feld] = wert; merke("kal." + k, JSON.stringify(w)); zeichnen(); }
 function kalPlan(gs) {
   const tage = {};
@@ -2709,7 +2725,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-214154";
+const STAND = "20261105-220019";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
