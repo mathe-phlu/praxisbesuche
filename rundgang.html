@@ -644,7 +644,7 @@ function anfrageText() {
   const sj = S.einst.studienjahr, pr = R.praktika.filter((p) => p.jahr === sj);
   const offen = (g) => pr.filter((p) => p.gruppe === g && p.stand === "offen" && p.noetig === "ja").length;
   const q = offen("Quartal"), p = offen("Profil") + offen("Spezial");
-  const name = ((S.einst.dozierende || []).find((d) => d.kuerzel === S.ich) || {}).name || S.ich;
+  const name = (((S.einst.dozierende || []).find((d) => d.kuerzel === S.ich) || {}).name || S.ich).split(/\s+/)[0];   // nur Vorname – wir duzen uns
   return `Liebe alle\n\nFür ${sjText(sj)} sind noch ${q + p} Praxisbesuche offen, die nötig sind${q && p ? ` (Quartal ${q}, Profil ${p})` : ""}.\n\n` +
     `Bitte schaut in der Liste, ob ihr davon noch etwas übernehmen könnt:\n${SEITE}#offen\n\n` +
     `Der Link zeigt nur die offenen, nötigen Besuche – zuerst die Personen, die ihr noch nicht besucht habt («nicht schon von mir besucht»; lässt sich abwählen). Übernehmen wie gewohnt mit «Termine ▸».\n\nLiebe Grüsse\n${name}`;
@@ -2576,7 +2576,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-111642";
+const STAND = "20261105-112007";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
