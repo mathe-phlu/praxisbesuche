@@ -849,7 +849,7 @@ function ansichtStart() {
   const prof = pr.filter((p) => p.gruppe === "Profil");
   const spez = pr.filter((p) => (p.gruppe === "Spezial" || p.gruppe === "Abschluss") && p.noetig === "ja");
   const htAlle = pr.filter((p) => p.gruppe === "Halbtag");
-  const einzel = htAlle.filter((p) => /Einzelfach/.test(periode(p))), ht = htAlle.filter((p) => !/Einzelfach/.test(periode(p)));
+  const einzel = htAlle.filter((p) => /^Einzel/.test(periode(p))), ht = htAlle.filter((p) => !/^Einzel/.test(periode(p)));
   const meine = pr.filter((p) => S.ich && p.wer === S.ich);
   const offenQ = q.filter((p) => p.stand === "offen").length;
   const ziel = Math.ceil(S.einst.quote * prof.length), eingeteilt = prof.filter((p) => p.stand !== "offen" && p.stand !== "nicht nötig").length;
@@ -865,12 +865,12 @@ function ansichtStart() {
   return `<div class="start-kopf"><h2>Studienjahr ${sjText(sj)}</h2>
     <button class="knopf haupt gross" onclick="typeof rundgangStart === 'function' ? rundgangStart() : window.open('rundgang.html')">▶ Rundgang: die Seite in 2 Minuten</button></div>
   ${zahl ? "" : `<div class="karte"><b>Noch keine Daten.</b> Unter «Aktualisieren» die Datei aus dem Praktikumstool einlesen.</div>`}
-  <div class="sk-gruppe">Halbtag und Einzelfach</div>
+  <div class="sk-gruppe">Während des Semesters · Halbtag und Einzel</div>
   <div class="sk-reihe zwei">
     ${zielKarte("halbtag", "Halbtagespraktikum", "geheZu('halbtag', { 'h.perioden': ['A', 'B', 'C', 'D'] })", ht.filter(dabei).length, ht.length, "alle besuchen")}
-    ${zielKarte("einzel", "Einzelfachpraktikum", "geheZu('halbtag', { 'h.perioden': ['SK'] })", einzel.filter(dabei).length, einzel.length, "alle besuchen")}
+    ${zielKarte("einzel", "Einzelpraktikum", "geheZu('halbtag', { 'h.perioden': ['SK'] })", einzel.filter(dabei).length, einzel.length, "alle besuchen")}
   </div>
-  <div class="sk-gruppe">Profil, Quartal und Spezial</div>
+  <div class="sk-gruppe">Blockpraktika (Januar, Februar) · Profil, Quartal und Spezial</div>
   <div class="sk-reihe">
     ${zielKarte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", eingeteilt, ziel, `Quote ${Math.round(S.einst.quote * 100)} % von ${prof.length}`)}
     ${zielKarte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", q.filter(dabei).length, q.length, "alle mit Besuch nötig")}
@@ -890,8 +890,8 @@ function sollKarte(sj) {
   if (!doz.length) return "";
   const ist = (k, gr) => R.praktika.filter((x) => x.jahr === sj && x.wer === k && gr.includes(x.gruppe)).length;
   return `<div class="sk sk-grau" style="cursor:default"><h3>Besuche je Dozent/in</h3><table class="klein" style="width:100%">
-    <tr class="leise"><td></td><td>Halbtag</td><td>Profil + Quartal</td></tr>
-    ${doz.map((d) => { const h = ist(d.kuerzel, ["Halbtag"]), pq = ist(d.kuerzel, ["Profil", "Quartal", "Spezial"]);
+    <tr class="leise"><td></td><td><b>Semester</b><div style="font-size:11.5px">Halbtag, Einzel</div></td><td><b>Block</b><div style="font-size:11.5px">Profil, Quartal, Spezial</div></td></tr>
+    ${doz.map((d) => { const h = ist(d.kuerzel, ["Halbtag"]) /* inkl. Einzel */, pq = ist(d.kuerzel, ["Profil", "Quartal", "Spezial"]);
       const z = (i, s) => s ? `<span class="${i >= Number(s) ? "gruen" : "rot"}">${i} / ${s}</span>` : i;
       return `<tr><td><b>${esc(d.kuerzel)}</b> ${esc(d.name || "")}</td><td>${z(h, d.sollHalbtag)}</td><td>${z(pq, d.sollPQ || d.soll)}</td></tr>`; }).join("")}
   </table></div>`;
@@ -1462,7 +1462,7 @@ function filtern(liste, ansicht) {
       const n = x.noetig === "später" ? "nein" : x.noetig;
       if (!noetig.includes(n)) return false;
     }
-    if (ansicht === "halbtag" && perioden.length) { const pe = periode(x); if (!perioden.some((p) => p === "SK" ? /SK/.test(pe) : pe === "Periode " + p)) return false; }
+    if (ansicht === "halbtag" && perioden.length) { const pe = periode(x); if (!perioden.some((p) => p === "SK" ? /^Einzel/.test(pe) : pe === "Periode " + p)) return false; }
     if (!stand.includes(standGruppe(x))) return false;
     // Zeitraum: Praktikum muss hineinfallen; mit Stundenplan zusätzlich eine passende freie Mathe-Lektion
     if (von && datumAus(x.bis) && datumAus(x.bis) < von) return false;
@@ -1518,8 +1518,8 @@ function ansichtPlanung() {
 
 function ansichtTermine() {
   const sj = fw("jahr", S.einst.studienjahr);
-  const tPrakt = Array.isArray(S.filter["t.praktika"]) ? S.filter["t.praktika"] : ["Halbtag", "Profil", "Quartal", "Spezial"];
-  const meine = R.praktika.filter((x) => S.ich && x.wer === S.ich && x.jahr === sj && tPrakt.includes(x.gruppe === "Abschluss" ? "Spezial" : x.gruppe))
+  const tPrakt = Array.isArray(S.filter["t.prakt"]) ? S.filter["t.prakt"] : TERMIN_KAT;
+  const meine = R.praktika.filter((x) => S.ich && x.wer === S.ich && x.jahr === sj && tPrakt.includes(kategorie(x)))
     .sort((a, b) => ((a.termin ? a.termin.datum + a.termin.zeit : "9") + a.person.name).localeCompare((b.termin ? b.termin.datum + b.termin.zeit : "9") + b.person.name));
   if (!S.ich) return `<h2>Meine Termine</h2><div class="leer">Bitte oben rechts «Ich bin» wählen.</div>`;
   const tage = {};
@@ -1530,7 +1530,7 @@ function ansichtTermine() {
     <div class="kachel"><div class="t">Tage</div><div class="z">${Object.keys(tage).filter((t) => t !== "ohne Termin").length}</div></div>
     <div class="kachel"><div class="t">besucht</div><div class="z">${meine.filter((x) => x.stand === "besucht").length}</div></div></div>
   <div class="filter"><label>Studienjahr<select onchange="setzeFilter('jahr',this.value)">${jahre().map((j) => `<option value="${j}" ${j === sj ? "selected" : ""}>${sjText(j)}</option>`).join("")}</select></label>
-    <span class="ftitel" style="margin-left:14px">Praktikum</span>${[["Halbtag", "Halbtag"], ["Profil", "Profil"], ["Quartal", "Quartal"], ["Spezial", "Spezial"]].map(([v, t]) =>
+    <span class="ftitel" style="margin-left:14px">Praktikum</span>${TERMIN_KAT.map((v) => [v, v]).map(([v, t]) =>
       `<button type="button" class="fchip ${FILTERFARBE[v]} ${tPrakt.includes(v) ? "an" : ""}" onclick="terminPraktikum('${v}')">${t}</button>`).join("")}
     <button class="knopf klein" onclick="listeKopieren()" title="Kopiert die Liste in die Zwischenablage – danach in Excel oder eine Mail einfügen (Cmd+V / Ctrl+V)">Liste für Excel kopieren</button></div>
   ${meine.length ? `<table class="liste"><thead><tr><th>Tag</th><th>Zeit</th><th>Name</th><th>Prakt.</th><th>Schule</th><th>Stand</th><th>Hinweise</th><th></th></tr></thead><tbody>
@@ -1577,9 +1577,10 @@ function paareBilden(liste) {
   }
   return zeilen.sort((a, b) => a[0].art - b[0].art || (a[0].schulort || "").localeCompare(b[0].schulort || "") || a[0].person.name.localeCompare(b[0].person.name));
 }
+const TERMIN_KAT = ["Halbtag", "Einzel", "Profil", "Quartal", "Spezial"];
 function terminPraktikum(v) {
-  const a = new Set(Array.isArray(S.filter["t.praktika"]) ? S.filter["t.praktika"] : ["Halbtag", "Profil", "Quartal", "Spezial"]);
-  a.has(v) ? a.delete(v) : a.add(v); S.filter["t.praktika"] = [...a]; merke("filter", JSON.stringify(S.filter)); zeichnen();
+  const a = new Set(Array.isArray(S.filter["t.prakt"]) ? S.filter["t.prakt"] : TERMIN_KAT);
+  a.has(v) ? a.delete(v) : a.add(v); S.filter["t.prakt"] = [...a]; merke("filter", JSON.stringify(S.filter)); zeichnen();
 }
 function ansichtHalbtag() {
   const sj = fw("jahr", S.einst.studienjahr);
@@ -1588,7 +1589,7 @@ function ansichtHalbtag() {
   const zeilen = paareBilden(liste);
   const k = (t, z) => `<div class="kachel"><div class="t">${t}</div><div class="z">${z}</div></div>`;
   const name = (x) => `<div class="pname"><span class="name" title="Grundinformationen anzeigen" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${achtungZeichen(x)} ${esc(x.person.name)}</span> <span class="leise klein">${esc(x.person.studiengang || "")}</span></div>`;
-  return `<h2>Halbtags- und Einzelfachpraktikum ${sjText(sj)}</h2>
+  return `<h2>Halbtags- und Einzelpraktikum ${sjText(sj)}</h2>
   <div class="kacheln">${k("Personen", alle.length)}${k("Paare / einzeln", `${zeilen.filter((z) => z.length === 2).length} / ${zeilen.filter((z) => z.length === 1).length}`)}${k("eingeteilt", alle.filter((p) => ["übernommen", "gebucht"].includes(p.stand)).length)}${k("besucht", alle.filter((p) => p.stand === "besucht").length)}${k("offen", alle.filter((p) => p.stand === "offen").length)}</div>
   <div class="mitfilter">${filterLeiste("halbtag", liste.length)}<div class="inhalt">
   ${aktivLeiste("halbtag", liste.length)}
@@ -1596,7 +1597,7 @@ function ansichtHalbtag() {
   ${zeilen.map((z) => { const x = z[0];
     return `<tr class="${farbKlasse(x)} ${z.some((y) => y.achtung.length) ? "zeile-achtung" : ""}">
     <td><div class="klein ${z.length === 2 ? "paar" : "einzeln"}">${z.length === 2 ? "Paar · Doppelbesuch" : "einzeln"}</div>${z.map(name).join("")}</td>
-    <td>${praktChip(x, /Einzelfach/.test(periode(x)) ? praktKurz(x) : periode(x))}</td><td class="klein">${zeitraum(x)}</td>
+    <td>${praktChip(x, periode(x))}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
     <td>${z.map((y) => `<div>${standChip(y)}</div>`).join("")}</td>
     <td style="white-space:nowrap">${z.length === 2 && !z.some((y) => y.wer === S.ich) ? buchenZelle(x, z[1]) : z.map((y) => buchenZelle(y)).filter(Boolean).join("<br>")}</td></tr>`; }).join("")}
@@ -1608,16 +1609,18 @@ function paarAktionen([a, b]) {
   return k.join("<br>");
 }
 function farbKlasse(x) {
-  if (x.gruppe === "Halbtag") { const p = periode(x); if (/Einzelfach/.test(p)) return "fk-einzel"; const m = p.match(/Periode ([A-D])/); return m ? "fk-ht-" + m[1].toLowerCase() : "fk-halbtag"; }
+  if (x.gruppe === "Halbtag") { const p = periode(x); if (/^Einzel/.test(p)) return "fk-einzel"; const m = p.match(/Periode ([A-D])/); return m ? "fk-ht-" + m[1].toLowerCase() : "fk-halbtag"; }
   return { Profil: "fk-profil", Quartal: "fk-quartal", Spezial: "fk-spezial", Abschluss: "fk-spezial" }[x.gruppe] || "";
 }
-function praktKurz(x) { if (x.gruppe !== "Halbtag") return x.gruppe; const p = periode(x); return /Einzelfach/.test(p) ? "Einzel" + (p.match(/\d/) ? " " + p.match(/\d/)[0] + ". Fach" : "") : p.replace("Periode", "Halbtag"); }
+function praktKurz(x) { if (x.gruppe !== "Halbtag") return x.gruppe; const p = periode(x); return /^Einzel/.test(p) ? "Einzel" : p.replace("Periode", "Halbtag"); }
+/* Kategorie für Filter: Einzel (gehört technisch zum Halbtag), Spezial (inkl. Abschluss), sonst die Gruppe */
+function kategorie(x) { return x.gruppe === "Halbtag" && /^Einzel/.test(periode(x)) ? "Einzel" : x.gruppe === "Abschluss" ? "Spezial" : x.gruppe; }
 function praktChip(x, text) { return `<span class="pk ${farbKlasse(x)}">${esc(text ?? praktKurz(x))}</span>`; }
-const FILTERFARBE = { Halbtag: "fk-halbtag", Profil: "fk-profil", Quartal: "fk-quartal", Spezial: "fk-spezial", A: "fk-ht-a", B: "fk-ht-b", C: "fk-ht-c", D: "fk-ht-d", SK: "fk-einzel" };
+const FILTERFARBE = { Einzel: "fk-einzel", Halbtag: "fk-halbtag", Profil: "fk-profil", Quartal: "fk-quartal", Spezial: "fk-spezial", A: "fk-ht-a", B: "fk-ht-b", C: "fk-ht-c", D: "fk-ht-d", SK: "fk-einzel" };
 function periode(x) {
   const n = (S.artNamen || {})[x.art] || "";
   const m = n.match(/Periode ([A-D])/); if (m) return "Periode " + m[1];
-  if (/Einzelfach/.test(n)) return "SK Einzelfach " + (n.match(/(\d)\. Fach/) || [, ""])[1];
+  if (/Einzelfach/.test(n)) return "Einzel " + (n.match(/(\d)\. Fach/) || [, ""])[1] + ". Fach";
   return n;
 }
 
@@ -1642,7 +1645,7 @@ function ansichtStudierende() {
   // je Praktikum eine Zeile: Studienjahr (Periode) · Datum · Stand · Kürzel (NN = unbekannt)
   const eintrag = (x) => {
     const cls = { offen: "s-offen", "übernommen": "s-uebernommen", gebucht: "s-gebucht", besucht: "s-besucht", abgebrochen: "s-abbruch" }[x.stand] || "s-nicht";
-    const per = x.gruppe === "Halbtag" ? (periode(x).match(/Periode ([A-D])/) || [, ""])[1] : "";
+    const per = x.gruppe === "Halbtag" ? ((periode(x).match(/Periode ([A-D])/) || [])[1] || (/^Einzel/.test(periode(x)) ? "Einzel" : "")) : "";
     const d = x.termin ? x.termin.datum : x.datum;
     const stand = { "übernommen": "gebucht" }[x.stand] || x.stand;
     const wer = ["besucht", "gebucht", "übernommen"].includes(x.stand) ? (x.wer || "NN") : "";
@@ -2144,7 +2147,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-072133";
+const STAND = "20261105-072308";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
