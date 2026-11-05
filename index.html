@@ -569,7 +569,7 @@ async function allesLaden() {
   for (const p of Object.values(S.praktika)) {
     if (p.gruppe !== "Spezial" || p.zusatz == null) continue;
     const z = p.zusatz, fremd = (z.match(/\b[A-ZÄÖÜ]{2,4}\b/g) || []).some((f) => faecherAlle.has(f) && f !== "MA");
-    if ((/Mentorat/i.test(z) || fremd) && !(p.besuche || []).length) { S.spezialRaus.push(p); delete S.praktika[p.idpraktikum]; continue; }
+    if ((/Mentorat/i.test(z) || fremd) && !(p.besuche || []).some((b) => /^MA\b/i.test(b.fach || ""))) { S.spezialRaus.push(p); delete S.praktika[p.idpraktikum]; continue; }
     const ziel = /Halbtag/i.test(z) ? "Halbtag" : /Quartal/i.test(z) ? "Quartal" : /Profil/i.test(z) ? "Profil" : "";
     if (ziel) S.praktika[p.idpraktikum] = { ...p, gruppe: ziel, spezialText: z };
   }
@@ -591,7 +591,8 @@ async function allesLaden() {
     if (!p.lektionen || !p.lektionen.length) continue;
     const eigene = p.lektionen.filter((l) => !/hosp/i.test(l.klasse || ""));
     if (eigene.length === p.lektionen.length) continue;
-    if (!eigene.length && p.gruppe === "Halbtag" && !(p.besuche || []).length) { S.nurHosp.push(p); delete S.praktika[p.idpraktikum]; continue; }
+    const matheBesuch = (p.besuche || []).some((b) => /^MA\b/i.test(b.fach || ""));
+    if (!eigene.length && p.gruppe === "Halbtag" && !matheBesuch) { S.nurHosp.push(p); delete S.praktika[p.idpraktikum]; continue; }
     S.praktika[p.idpraktikum] = { ...p, lektionen: eigene, hospitationen: p.lektionen.length - eigene.length };
   }
   // Quartal: das Praktikumstool führt Teil 1 und Teil 2 mit eigener Nummer – hier ist das ein einziges Quartalspraktikum
@@ -2251,7 +2252,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-092024";
+const STAND = "20261105-093759";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
