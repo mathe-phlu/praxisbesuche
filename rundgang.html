@@ -570,15 +570,24 @@ class VOrdner {
   async queryPermission() { return "granted"; }
   async requestPermission() { return "granted"; }
 }
-/* Nur in den eigenen Ordner «eintraege/<Kürzel>» kann per Download gespeichert werden */
+/* Per Download landet alles im eigenen Ordner «eintraege/<Kürzel>». Eigene Einträge direkt; alles andere
+   (Stammdaten, Einstellungen, Schulorte, Dokumente) als «Ablage»: ablage__<Zeit>__stamm__praktika.json.
+   Beim Laden übernimmt jede Seite die neueste Ablage (ablagenAnwenden) – so kann man im Lade-Modus alles. */
+const ABLAGE_ZIEL = /^(stamm\/(praktika|alt|spezial|orte|einstellungen)\.json|dokumente\/[^/]+)$/;
 async function downloadSpeichern(h, blob) {
+  if (!S.ich) { meldung("Bitte oben rechts «Ich bin» wählen."); throw new DOMException("Kürzel fehlt", "NotAllowedError"); }
   const m = h.pfad.match(/(?:^|\/)eintraege\/([^/]+)\/[^/]+$/);
+  let name = h.name;
   if (!m || m[1] !== S.ich) {
-    meldung("Im Lade-Modus kann die Seite nur deine eigenen Einträge speichern (nicht: " + h.pfad.replace(/^\//, "") + ").");
-    throw new DOMException("Lade-Modus: nur eigene Einträge", "NotAllowedError");
+    const basis = (S.ordner && S.ordner.pfad) || "", rel = h.pfad.startsWith(basis + "/") ? h.pfad.slice(basis.length + 1) : "";
+    if (!ABLAGE_ZIEL.test(rel)) {
+      meldung("Im Lade-Modus lässt sich das nicht speichern: " + h.pfad.replace(/^\//, ""));
+      throw new DOMException("Lade-Modus: Ziel nicht möglich", "NotAllowedError");
+    }
+    name = "ablage__" + new Date().toISOString().replace(/[-:.]/g, "") + "__" + rel.split("/").join("__");
   }
-  h.file = new File([blob], h.name, { type: blob.type || "application/octet-stream" });
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = h.name;
+  h.file = new File([blob], h.name, { type: blob.type || "application/octet-stream", lastModified: Date.now() });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 60000);
 }
@@ -740,9 +749,41 @@ async function schreibeJSON(pfad, obj) {
   await w.close();
 }
 
+/* Ablagen aus dem Lade-Modus übernehmen: die neueste je Ziel, wenn sie neuer ist als die Datei am Ziel.
+   Mit vollem Ordnerzugriff wird sie ans Ziel geschrieben (danach ist das Ziel neuer); im Lade-Modus nur im Speicher ersetzt. */
+async function ablagenAnwenden() {
+  const neu = {};
+  try {
+    const e = await verzeichnis("eintraege");
+    for await (const [, d] of e.entries()) {
+      if (d.kind !== "directory") continue;
+      for await (const [n, f] of d.entries()) {
+        const m = f.kind === "file" && n.match(/^ablage__(\d{4})(\d\d)(\d\d)T(\d\d)(\d\d)(\d\d)(\d{3})Z__(.+)$/);
+        if (!m) continue;
+        const rel = m[8].split("__").join("/"); if (!ABLAGE_ZIEL.test(rel)) continue;
+        const zeit = Date.parse(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}.${m[7]}Z`);
+        if (!neu[rel] || zeit > neu[rel].zeit) neu[rel] = { zeit, h: f };
+      }
+    }
+  } catch (err) { return; }
+  for (const [rel, a] of Object.entries(neu)) {
+    try {
+      const teile = rel.split("/"), name = teile.pop(), d = await verzeichnis(teile.join("/"), true);
+      let alt = null; try { alt = await (await d.getFileHandle(name)).getFile(); } catch (e) { /* neu */ }
+      if (alt && alt.lastModified >= a.zeit) continue;
+      const f = await a.h.getFile();
+      if (!f.size) continue;
+      if (/\.json$/.test(name)) JSON.parse(await f.text());   // halb synchronisiert → beim nächsten Mal
+      if (S.lademodus) d.kinder.set(name, new VDatei(name, new File([f], name, { type: f.type, lastModified: a.zeit }), d.pfad + "/" + name));
+      else { const w = await (await d.getFileHandle(name, { create: true })).createWritable(); await w.write(await f.arrayBuffer()); await w.close(); }
+    } catch (e) { /* beim nächsten Laden */ }
+  }
+}
+
 /* ---------- Laden ---------- */
 async function allesLaden() {
   if (!S.ordner) return zeichnen();
+  await ablagenAnwenden();
   S.orte = await leseJSON("stamm/orte.json", {});
   const [pr, alt, sp, einst] = await Promise.all([
     leseJSON("stamm/praktika.json", { praktika: [] }), leseJSON("stamm/alt.json", { personen: [] }),
@@ -849,7 +890,7 @@ async function eintraegeLaden() {
     for await (const [name, d] of wurzel.entries()) {
       if (d.kind !== "directory") continue;
       for await (const [dn, f] of d.entries()) {
-        if (f.kind !== "file" || !dn.endsWith(".json")) continue;
+        if (f.kind !== "file" || !dn.endsWith(".json") || dn.startsWith("ablage__")) continue;
         try {
           const e = JSON.parse(await (await f.getFile()).text());
           if (!e.id || gesehen.has(e.id)) continue;      // Konfliktkopien enthalten dieselbe id
@@ -2565,7 +2606,7 @@ async function dokumentOeffnen(name) {
 /* ---------- Start ---------- */
 $("#nav").addEventListener("click", (e) => { const a = e.target.dataset.ansicht; if (a) geheZu(a); });
 $("#ich").addEventListener("change", (e) => { S.ich = e.target.value; merke("ich", S.ich); zeichnen(); });
-$("#neuLaden").addEventListener("click", () => S.ordner && eintraegeLaden().then(() => meldung("Neu eingelesen.")));
+$("#neuLaden").addEventListener("click", () => S.lademodus ? ordnerLaden() : S.ordner && eintraegeLaden().then(() => meldung("Neu eingelesen.")));
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") detailZu(); });
 setInterval(() => {
   const tippt = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
@@ -2578,7 +2619,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-112155";
+const STAND = "20261105-133932";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
