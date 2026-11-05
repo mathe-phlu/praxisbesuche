@@ -146,9 +146,9 @@ details.fsek summary h4 { display: inline; }
 .fsek input[type=search], .fsek input[list] { width: 100%; }
 .aktivleiste { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: #fff; border: 1px solid var(--linie); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
 .aktivchip { font: inherit; font-size: 13px; background: var(--ph-sand); border: 1px solid #d8c8a8; border-radius: 4px; padding: 1px 9px; cursor: pointer; }
-.aktivgruppe { font: inherit; font-size: 13px; background: none; border: 1px solid transparent; border-radius: 4px; padding: 1px 4px; cursor: pointer; }
-.aktivgruppe:hover { border-color: var(--ph-braun); }
-.aktivgruppe .fchip { cursor: inherit; pointer-events: none; font-size: 12.5px; padding: 1px 7px; }
+.aktivgruppe { font-size: 13px; padding: 1px 4px; white-space: nowrap; }
+.aktivgruppe .fchip { font-size: 12.5px; padding: 1px 7px; }
+.aktivgruppe .fchip:hover { opacity: .7; }
 .aktivchip:hover { border-color: var(--ph-braun); }
 .filterbox-alt { background: #fff; border: 1px solid var(--linie); border-radius: 8px; margin-bottom: 12px; }
 .fgrund { display: block; }
@@ -1476,7 +1476,10 @@ function aktivLeiste(ansicht, anzahl) {
   const weg = (k, t) => c.push(`<button type="button" class="aktivchip" onclick="filterWeg('${k}')" title="Filter entfernen">${esc(t)} ✕</button>`);
   const gleich = (k) => JSON.stringify([...fa(k)].sort()) === JSON.stringify([...STD[k]].sort());
   const TEXT = { eingeteilt: "gebucht", SK: "Einzel" };
-  const wegKaesten = (k, titel) => c.push(`<button type="button" class="aktivgruppe" onclick="filterWeg('${k}')" title="Filter entfernen"><span class="leise">${titel}</span> ${fa(k).length ? fa(k).map((v) => `<span class="fchip ${filterAussehen(k, v)} an">${esc(TEXT[v] || v)}</span>`).join(" ") : "<i>keins</i>"} ✕</button>`);
+  // jeder gewählte Wert ist ein eigenes Kästchen (wie im Filter) und lässt sich einzeln abwählen
+  const wegKaesten = (k, titel) => c.push(`<span class="aktivgruppe"><span class="leise">${titel}</span> ${fa(k).length
+    ? fa(k).map((v) => `<button type="button" class="fchip ${filterAussehen(k, v)} an" onclick="umschalten('${k}','${v}')" title="${esc(TEXT[v] || v)} abwählen">${esc(TEXT[v] || v)} ✕</button>`).join(" ")
+    : `<button type="button" class="aktivchip" onclick="filterWeg('${k}')" title="Filter zurücksetzen">keins ✕</button>`}</span>`);
   if (ansicht === "planung" && !gleich("praktika")) wegKaesten("praktika", "Praktikum");
   if (ansicht === "planung" && !gleich("noetig")) wegKaesten("noetig", "Besuch nötig");
   if (!gleich("stand")) wegKaesten("stand", "Stand");
@@ -2210,7 +2213,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-073936";
+const STAND = "20261105-074155";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
