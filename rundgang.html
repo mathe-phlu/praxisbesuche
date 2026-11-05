@@ -671,6 +671,10 @@ function anfrageZeigen() {
   d.returnValue = ""; d.showModal();
   d.onclose = () => { $("#frageOk").style.display = ""; d.classList.remove("breit"); };
 }
+function pruefenFilter() {
+  geheZu("planung", { praktika: ["Profil", "Quartal", "Spezial"], stand: ["offen"], noetig: ["ja"], frueherSpalte: true, nichtVonMir: false, jahr: S.einst.studienjahr });
+  meldung("Gefiltert: Besuch nötig + offen. In der Spalte «nötig» per Klick anpassen, wenn ein Besuch nicht mehr Pflicht ist.");
+}
 function anfrageMail(i) {
   const t = $("#anfrageText").value;
   location.href = `mailto:${REFS[i]}?subject=${encodeURIComponent("Praxisbesuche " + sjText(S.einst.studienjahr) + ": noch offene Besuche")}&body=${encodeURIComponent(t)}`;
@@ -1071,7 +1075,7 @@ function noetigBestimmen(x) {
   if (x.achtung.some((f) => f.stufe === "zwingend")) { n = "ja"; warum = x.achtung.map((f) => f.hinweis).join(" · "); }
   const nicht = ["Profil", "Quartal"].includes(x.gruppe) && spez.find((f) => f.stufe === "nicht");
   if (nicht && !x.achtung.some((f) => f.stufe === "zwingend")) { n = "nein"; warum = "Spezialfall: " + nicht.hinweis; }
-  if (uebersteuert) { n = uebersteuert.wert; warum = `von Hand (${uebersteuert.wer}): ${uebersteuert.text || ""}`; }
+  if (uebersteuert && uebersteuert.wert) { n = uebersteuert.wert; warum = `von Hand (${uebersteuert.wer}): ${uebersteuert.text || ""}`; }
   if (x.stand === "abgebrochen") { n = "nein"; warum = "Praktikum abgebrochen"; }
   x.noetig = n; x.warum = warum;
   if (x.stand === "offen" && n === "nein") x.stand = "nicht nötig";
@@ -1184,9 +1188,6 @@ function ansichtStart() {
   <div class="sk-reihe drei">
     ${zielKarte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", eingeteilt, ziel, `Quote ${Math.round(S.einst.quote * 100)} % von ${prof.length}`)}
     ${zielKarte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", q.filter(dabei).length, q.length, "alle mit Besuch nötig")}
-    ${ANFRAGEN_DURCH.includes(S.ich) ? karte("grau", "Offene anfragen", "anfrageZeigen()", `<div class="z">${pr.filter((p) => ["Profil", "Quartal"].includes(p.gruppe) && p.stand === "offen" && p.noetig === "ja").length}</div><div class="klein">Pflichtbesuche noch offen (Besuch nötig, offen)</div>
-      <div class="klein" style="margin-top:6px">E-Mail ans Team mit allen offenen Besuchen und wer sie noch nicht kennt – mit Link direkt in die Liste.</div>
-      <button class="knopf haupt" style="margin-top:8px" onclick="event.stopPropagation();anfrageZeigen()">✉ Anfrage vorbereiten</button>`) : ""}
   </div></div>
   <div class="start-rechts"><div class="sk-gruppe">Für dich und das Team</div>
     ${karte("termine", `Meine Termine ${S.ich ? "· " + esc(S.ich) : ""}`, "geheZu('termine')", S.ich ? `<div class="mt-zwei"><div><div class="z">${meine.filter((x) => x.gruppe === "Halbtag").length}${sollVon(meinSoll.sollHalbtag)}</div><div><b>Semester</b><div class="klein">Halbtag, Einzel</div></div></div>
@@ -1899,7 +1900,11 @@ function ansichtPlanung() {
   let liste = R.praktika.filter((p) => welche.includes(p.gruppe === "Abschluss" ? "Spezial" : p.gruppe));
   liste = filtern(liste, "planung").sort((a, b) => GRUPPEN.indexOf(a.gruppe) - GRUPPEN.indexOf(b.gruppe) || (b.achtung.length - a.achtung.length) || a.person.name.localeCompare(b.person.name));
   const k = (t, z, cls = "") => `<div class="kachel"><div class="t">${t}</div><div class="z ${cls}">${z}</div></div>`;
-  return `<h2>Profil- und Quartalspraktikum ${sjText(sj)}</h2>
+  const pflichtOffen = alleJahr.filter((p) => ["Profil", "Quartal", "Spezial"].includes(p.gruppe) && p.stand === "offen" && p.noetig === "ja").length;
+  return `<div class="start-kopf"><h2>Profil- und Quartalspraktikum ${sjText(sj)}</h2>
+    ${ANFRAGEN_DURCH.includes(S.ich) ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="knopf" title="Filter auf «Besuch nötig» + «offen»: jeden Fall prüfen, «nötig» per Klick anpassen" onclick="pruefenFilter()">🔍 Prüfen (${pflichtOffen} offen und nötig)</button>
+      <button class="knopf haupt" title="E-Mail ans Team mit allen noch offenen Pflichtbesuchen" onclick="anfrageZeigen()">✉ E-Mail ans Team</button></div>` : ""}</div>
   <div class="kacheln">
     <div class="kachel gruppe fk-profil">${k("Profil · Quote", Math.round(S.einst.quote * 100) + " %")}${k("Ziel", ziel)}${k("eingeteilt", eing(prof))}${k("fehlen", Math.max(0, ziel - eing(prof)), ziel - eing(prof) > 0 ? "rot" : "gruen")}</div>
     <div class="kachel gruppe fk-quartal">${k("Quartal · nötig", quart.length)}${k("eingeteilt", eing(quart))}${k("fehlen", quart.length - eing(quart), quart.length - eing(quart) > 0 ? "rot" : "gruen")}</div>
@@ -1913,7 +1918,7 @@ function ansichtPlanung() {
     <td class="name" title="Fächer: ${esc((x.faecher || []).join(", "))}" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}${entfernenKnopf(x)}<div class="leise klein">${esc(x.person.studiengang || "")} · ${esc((x.faecher || []).join(", "))}</div></td>
     <td>${praktChip(x)}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
-    <td class="noetig"><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}" title="${esc(x.warum)}">${esc({ optional: "opt.", später: "später" }[x.noetig] || x.noetig)}</span>${x.achtung.length ? `<div class="klein rot" title="${esc(x.achtung.map((f) => f.hinweis).join(" · "))}">⚠ Pflicht</div>` : ""}</td>
+    <td class="noetig" style="cursor:pointer" title="${esc(x.warum)} – Klick: ändern" onclick="noetigSetzen(REFS[${ref(x.idpraktikum)}])"><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}">${esc({ optional: "opt.", später: "später" }[x.noetig] || x.noetig)}</span>${x.achtung.length ? `<div class="klein rot" title="${esc(x.achtung.map((f) => f.hinweis).join(" · "))}">⚠ Pflicht</div>` : ""}</td>
     <td>${standChip(x)}</td>${fw("frueherSpalte", false) ? `<td class="klein">${frueherBesucht(x)}</td>` : ""}<td style="white-space:nowrap">${buchenZelle(x)}</td></tr>`).join("")}
   </tbody></table>` : `<div class="leer">Keine Praktika für diese Auswahl.</div>`}${entferntListe(["Profil", "Quartal", "Spezial", "Abschluss"])}</div></div>`;
 }
@@ -2246,9 +2251,11 @@ async function notizZu(id) {
   await eintragen({ typ: "notiz", praktikum: id, text: t });
 }
 async function noetigSetzen(id) {
-  const wert = await frage("Besuch nötig? (von Hand festlegen)", { art: "wahl", wert: "ja", optionen: [["ja", "ja"], ["nein", "nein"], ["optional", "optional"], ["", "wieder nach Regel"]] });
+  if (!S.ich) return meldung("Bitte oben rechts «Ich bin» wählen.");
+  const x = R.praktika.find((p) => p.idpraktikum === id);
+  const wert = await frage(`${x ? x.person.name + " · " + praktKurz(x) + "\nJetzt: " + x.noetig + " – " + (x.warum || "") + "\n\n" : ""}Besuch nötig?`, { art: "wahl", wert: x && x.noetig === "ja" ? "nein" : "ja", optionen: [["ja", "ja – muss besucht werden"], ["nein", "nein – nicht mehr nötig"], ["optional", "optional"], ["", "wieder nach Regel"]] });
   if (wert === null) return;
-  const grund = wert ? (await frage("Grund (kurz)")) || "" : "";
+  const grund = wert ? (await frage("Grund (kurz, z.B. «2 Fachbesuche schon in anderen Fächern erledigt»)")) || "" : "";
   await eintragen({ typ: "noetig", praktikum: id, wert: wert || null, text: grund });
 }
 
@@ -2578,7 +2585,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-110942";
+const STAND = "20261105-111232";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
