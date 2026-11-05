@@ -601,11 +601,11 @@ function ordnerLaden() {
 async function ausblenden(i) {
   const x = R.praktika.find((p) => p.idpraktikum === REFS[i]); if (!x) return;
   if (!S.ich) return meldung("Bitte oben rechts «Ich bin» wählen.");
-  const grund = await frage(`${x.person.name} · ${praktKurz(x)} ${sjText(x.jahr)}\n\nAus der Liste entfernen? Das gilt für alle. Ganz unten bei «Entfernt» lässt es sich wieder zurückholen.\n\nGrund (z.B. «unterrichtet kein Mathe»):`,
+  const grund = await frage(`${x.person.name} · ${praktKurz(x)} ${sjText(x.jahr)}\n\nAus der Liste entfernen? Das gilt für alle. Unten bei «Entfernt» lässt es sich wieder aufnehmen.\n\nGrund (z.B. «unterrichtet kein Mathe»):`,
     { art: "text", wert: "", haken: "Ja, " + x.person.name + " wirklich aus der Liste entfernen" });
   if (grund === null) return;
   await eintragen({ typ: "ausblenden", praktikum: x.idpraktikum, person: x.person.id, text: grund });
-  meldung(x.person.name + " entfernt.");
+  meldung(x.person.name + " entfernt – steht unten bei «Entfernt».");
 }
 async function einblenden(i) {
   const id = REFS[i];
@@ -615,12 +615,11 @@ async function einblenden(i) {
 }
 function entferntListe(gruppen) {
   const sj = fw("jahr", S.einst.studienjahr);
-  const a = (R.ausgeblendet || []).filter((x) => gruppen.includes(x.gruppe) && x.jahr === sj);
-  const f = (R.fremdBesucht || []).filter((x) => gruppen.includes(x.gruppe) && x.jahr === sj);
-  if (!a.length && !f.length) return "";
-  return `<details class="karte akk" style="margin-top:14px"><summary><h3>Entfernt (${a.length + f.length})</h3></summary>
-    ${a.length ? `<p class="klein"><b>Von Hand entfernt:</b></p><ul class="klein">${a.map((x) => `<li>${esc(x.person.name)} · ${esc(praktKurz(x))} – ${esc(x.grund || "ohne Grund")} <span class="leise">(${esc(x.von)}, ${datumText(x.zeit)})</span> <button class="knopf klein" onclick="einblenden(${ref(x.idpraktikum)})">wieder aufnehmen</button></li>`).join("")}</ul>` : ""}
-    ${f.length ? `<p class="klein"><b>Mathe-Besuch macht jemand ausserhalb des Teams</b> (im Praktikumstool gebucht):</p><ul class="klein">${f.map((x) => `<li>${esc(x.person.name)} · ${esc(praktKurz(x))} – ${esc(x.fremd.join(", "))}</li>`).join("")}</ul>` : ""}
+  const a = (R.ausgeblendet || []).filter((x) => gruppen.includes(x.gruppe) && x.jahr === sj).sort((x, y) => x.person.name.localeCompare(y.person.name));
+  if (!a.length) return "";
+  return `<details class="karte akk" style="margin-top:14px"><summary><h3>Entfernt (${a.length})</h3></summary>
+    <p class="klein leise">Nicht in der Liste oben. Gehört jemand doch dazu: «wieder aufnehmen».</p>
+    <ul class="klein">${a.map((x) => `<li>${esc(x.person.name)} · ${esc(praktKurz(x))} – ${esc(x.grund || "ohne Grund")} <button class="knopf klein" onclick="einblenden(${ref(x.idpraktikum)})">wieder aufnehmen</button></li>`).join("")}</ul>
   </details>`;
 }
 function entfernenKnopf(x) { return x.wer || x.stand === "besucht" ? "" : ` <button class="knopf mini" title="Gehört nicht in diese Liste (z.B. unterrichtet kein Mathe) – für alle entfernen" onclick="event.stopPropagation();ausblenden(${ref(x.idpraktikum)})">✕</button>`; }
@@ -702,7 +701,7 @@ async function allesLaden() {
   for (const p of Object.values(S.praktika)) {
     if (p.gruppe !== "Spezial" || p.zusatz == null) continue;
     const z = p.zusatz, fremd = (z.match(/\b[A-ZÄÖÜ]{2,4}\b/g) || []).some((f) => faecherAlle.has(f) && f !== "MA");
-    if ((/Mentorat/i.test(z) || fremd) && !(p.besuche || []).some((b) => /^MA\b/i.test(b.fach || ""))) { S.spezialRaus.push(p); delete S.praktika[p.idpraktikum]; continue; }
+    if ((/Mentorat/i.test(z) || fremd) && !(p.besuche || []).some((b) => /^MA\b/i.test(b.fach || ""))) { S.spezialRaus.push(p); S.praktika[p.idpraktikum] = { ...p, ausblendGrund: "Spezialpraktikum: " + z }; continue; }
     const ziel = /Halbtag/i.test(z) ? "Halbtag" : /Quartal/i.test(z) ? "Quartal" : /Profil/i.test(z) ? "Profil" : "";
     if (ziel) S.praktika[p.idpraktikum] = { ...p, gruppe: ziel, spezialText: z };
   }
@@ -727,7 +726,7 @@ async function allesLaden() {
     const matheBesuch = (p.besuche || []).some((b) => /^MA\b/i.test(b.fach || ""));
     // Halbtag: nur wer in dieser Periode gar keine eigene Mathe-Lektion hat, fällt weg. Alles Unklare bleibt drin
     // (lieber eine Person zu viel) – Fehleinträge entfernt man von Hand mit ✕.
-    if (p.gruppe === "Halbtag" && !eigene.length && !matheBesuch) { S.nurHosp.push(p); delete S.praktika[p.idpraktikum]; continue; }
+    if (p.gruppe === "Halbtag" && !eigene.length && !matheBesuch) { S.nurHosp.push(p); S.praktika[p.idpraktikum] = { ...p, lektionen: eigene, ausblendGrund: "unterrichtet in dieser Periode kein Mathe (nur Hospitation/Besprechung)" }; continue; }
     if (eigene.length === p.lektionen.length) continue;
     S.praktika[p.idpraktikum] = { ...p, lektionen: eigene, hospitationen: p.lektionen.length - eigene.length };
   }
@@ -851,11 +850,14 @@ function berechnen() {
   for (const pr of Object.values(S.praktika)) {
     const person = personen[pr.idstudent];
     const ein = [...(proPrakt[pr.idpraktikum] || [])].reverse().find((e) => e.typ === "ausblenden" || e.typ === "einblenden");
-    if (ein && ein.typ === "ausblenden") { ausgeblendet.push({ ...pr, person, grund: ein.text || "", von: ein.wer, zeit: ein.zeit }); continue; }
-    // Mathe-Fachbesuch durch jemanden ausserhalb des Teams (im Tool: mehr «Fach-besuche», als das Team gebucht hat) – nicht unsere Sache
-    const teamTage = new Set((pr.besuche || []).filter((b) => /^MA\b/i.test(b.fach || "") && teamKuerzel(b.dozent)).map((b) => b.datum));
-    const fremd = [...new Set((pr.besuche || []).filter((b) => /^MA\b/i.test(b.fach || "") && !teamKuerzel(b.dozent)).map((b) => b.dozent))];
-    if ((Number(pr.fachbesuche) || 0) > teamTage.size && fremd.length && !(proPrakt[pr.idpraktikum] || []).length) { fremdBesucht.push({ ...pr, person, fremd }); continue; }
+    if (ein && ein.typ === "ausblenden") { ausgeblendet.push({ ...pr, person, grund: ein.text || "" }); continue; }
+    if (!ein) {   // automatisch weggelassen – lässt sich unten bei «Entfernt» wieder aufnehmen
+      if (pr.ausblendGrund) { ausgeblendet.push({ ...pr, person, grund: pr.ausblendGrund }); continue; }
+      // Mathe-Fachbesuch durch jemanden ausserhalb des Teams (im Tool: mehr «Fach-besuche», als das Team gebucht hat) – nicht unsere Sache
+      const teamTage = new Set((pr.besuche || []).filter((b) => /^MA\b/i.test(b.fach || "") && teamKuerzel(b.dozent)).map((b) => b.datum));
+      const fremd = [...new Set((pr.besuche || []).filter((b) => /^MA\b/i.test(b.fach || "") && !teamKuerzel(b.dozent)).map((b) => b.dozent))];
+      if ((Number(pr.fachbesuche) || 0) > teamTage.size && fremd.length && !(proPrakt[pr.idpraktikum] || []).length) { ausgeblendet.push({ ...pr, person, grund: "Mathe-Besuch macht " + fremd.join(", ") }); continue; }
+    }
     const x = { ...pr, person, eintraege: proPrakt[pr.idpraktikum] || [], quelle: "tool" };
     standBestimmen(x);
     liste.push(x); person.praktika.push(x);
@@ -909,7 +911,7 @@ function berechnen() {
   }
   for (const x of liste) noetigBestimmen(x);
   for (const person of Object.values(personen)) for (const x of person.praktika) if (x.quelle === "alt") noetigBestimmen(x);
-  R = { praktika: liste, personen, ausgeblendet, fremdBesucht };
+  R = { praktika: liste, personen, ausgeblendet };
 }
 
 function standBestimmen(x, altBesuch) {
@@ -1944,7 +1946,7 @@ function ansichtHalbtag() {
   ${zeilen.length ? `<table class="liste spalten"><thead><tr><th>Studierende</th><th>Periode</th><th>Zeitraum</th><th>Schule</th><th>Stand</th><th>Buchen</th></tr></thead><tbody>
   ${zeilen.map((z) => { const x = z[0];
     return `<tr class="${farbKlasse(x)} ${z.some((y) => y.achtung.length) ? "zeile-achtung" : ""}">
-    <td><div class="klein ${z.length === 2 ? "paar" : "einzeln"}">${z.length === 2 ? `Paar · Doppelbesuch${z.vonHand ? " (von Hand)" : ""} <button class="knopf mini" title="Doch kein Doppelbesuch: in zwei Einzelbesuche trennen" onclick="paarTrennen(${ref(z[0].idpraktikum)}, ${ref(z[1].idpraktikum)})">trennen</button>`
+    <td><div class="klein ${z.length === 2 ? "paar" : "einzeln"}">${z.length === 2 ? `Paar · Doppelbesuch <button class="knopf mini" title="Doch kein Doppelbesuch: in zwei Einzelbesuche trennen" onclick="paarTrennen(${ref(z[0].idpraktikum)}, ${ref(z[1].idpraktikum)})">trennen</button>`
       : `einzeln <button class="knopf mini" title="Eigentlich ein Doppelbesuch: mit einer zweiten Person verbinden" onclick="paarVerbinden(${ref(x.idpraktikum)})">⇄ Doppelbesuch</button>`}</div>${z.map(name).join("")}</td>
     <td>${praktChip(x, periode(x) === "Spezial" ? "Halbtag" : periode(x))}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
@@ -2506,7 +2508,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-105440";
+const STAND = "20261105-105656";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
@@ -2555,6 +2557,7 @@ const SCHRITTE = [
   { ziel: "#app table.liste tbody tr td:last-child .knopf", ansicht: "planung", titel: "Spalte «Buchen»", text: "<ul><li><b>Termine ▸</b> öffnet alle möglichen Termine.</li><li>Darunter: an welchen Tagen Mathe ist, wie viele Termine.</li></ul>" },
   { ziel: "#frageFeld .leg-zeile", ansicht: "planung", titel: "Termin wählen = buchen", text: "<ul><li>Woche für Woche alle möglichen Termine.</li><li>Flach = Einzel-, hoch = Doppellektion, grün = danach frei zum Besprechen.</li><li>Termine gegen die Regeln sind schon weg.</li><li><b>Termin anklicken = buchen.</b></li></ul><div class='t-tool'>↗ Sobald du buchst, öffnet sich <b>sofort das Praktikumstool bei dieser Person</b> – dort «Besuch eintragen», Fenster schliessen, fertig.</div>",
     vorher: () => { const b = document.querySelector("#app table.liste tbody tr td:last-child .knopf.haupt"); if (b) b.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
+  { ziel: "#app table.liste tbody tr td:first-child", ansicht: "halbtag", titel: "Halbtag: aufräumen", text: "<ul><li><b>✕</b> beim Namen: wer fälschlich in der Liste steht (z.B. Stundenplan falsch eingetragen), lässt sich entfernen – mit Sicherheitshaken.</li><li>Unten bei <b>«Entfernt»</b> stehen alle Entfernten, mit <b>«wieder aufnehmen»</b>.</li><li><b>trennen</b>: zwei als Doppelbesuch erkannt, sind aber nicht zusammen → zwei Einzelbesuche.</li><li><b>⇄ Doppelbesuch</b>: zwei Einzelne gehören zusammen → verbinden.</li><li>Haben die beiden ihre Stundenpläne verschieden eingetragen, stehen sie im Terminfenster nebeneinander: links und rechts je den Termin anklicken.</li></ul>", vorher: () => geheZu("halbtag") },
   { ziel: "#app table.liste tbody tr td:last-child", ansicht: "planung", titel: "Doppelbesuch und Abgeben", text: "<ul><li><b>Doppelbesuch</b> (Halbtag): danach zwei Knöpfe, je Person ins Praktikumstool.</li><li><b>Termin wieder abgeben</b>: bei eigenen Buchungen; danach öffnet sich das Tool, um die Buchung dort zu löschen.</li></ul>" },
   // --- Meine Termine
   { ziel: "#app table.liste tbody tr", ansicht: "termine", titel: "Meine Termine", text: "<ul><li>Alle deine Termine nach Tag; filtern nach Halbtag, Einzel, Profil, Quartal.</li><li><b>✓ Erledigt</b> – nach dem Besuch.</li><li><b>Anpassen ▾</b> – Termin ändern oder abgeben, danach öffnet sich das Praktikumstool.</li><li><b>Achtung / Bemerkung</b> – z.B. «im Quartal besuchen».</li><li><b>Bericht ↑</b> – landet in «Protokolle/Person», danach öffnet sich eine E-Mail an Studierende, PxL, Mentor/in.</li><li><b>📄 · ✉ · ✕</b> – Bericht öffnen, E-Mail nochmals, löschen.</li><li><b>Tool ↗</b> – ins Praktikumstool.</li><li><b>Kontakte</b> unter dem Namen – PxL und Mentor/in mit E-Mail.</li></ul>",
