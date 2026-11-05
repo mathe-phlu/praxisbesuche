@@ -1320,13 +1320,26 @@ async function berichtHochladen(i) {
   };
   wahl.click();
 }
+/* Datei zeigen: das Fenster sofort beim Klick öffnen (sonst blockiert Chrome es, wenn OneDrive die Datei erst holen muss).
+   PDF erscheint im Fenster; Word & Co. kann der Browser nicht anzeigen – die werden heruntergeladen und dort geöffnet. */
+async function dateiZeigen(holen) {
+  const fenster = window.open("", "_blank");
+  try {
+    const f = await holen(), url = URL.createObjectURL(f);
+    if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) { if (fenster && !fenster.closed) fenster.location.href = url; else window.open(url, "_blank"); return; }
+    if (fenster) fenster.close();
+    const a = document.createElement("a"); a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+    meldung(`«${f.name}» wird heruntergeladen – unten bzw. im Download-Ordner öffnen.`);
+  } catch (e) { if (fenster) fenster.close(); throw e; }
+}
 async function berichtOeffnen(i) {
   const pfad = REFS[i];
   try {
-    const t = pfad.split("/"); const datei = t.pop();
-    let d = await protokollBasis(false); for (const x of t) d = await d.getDirectoryHandle(x);
-    const f = await (await d.getFileHandle(datei)).getFile();
-    window.open(URL.createObjectURL(f), "_blank");
+    await dateiZeigen(async () => {
+      const t = pfad.split("/"); const datei = t.pop();
+      let d = await protokollBasis(false); for (const x of t) d = await d.getDirectoryHandle(x);
+      return (await d.getFileHandle(datei)).getFile();
+    });
   } catch (e) { meldung("Bericht nicht gefunden – vielleicht noch nicht synchronisiert. (Protokolle/" + pfad + ")"); }
 }
 /* E-Mail an Studierende (An), Mathe-PxL (An) und Mentor/in (Cc) vorbereiten */
@@ -2242,9 +2255,7 @@ async function dokumenteZeigen() {
   } catch (e) { ziel.textContent = ""; }
 }
 async function dokumentOeffnen(name) {
-  const d = await verzeichnis("dokumente");
-  const f = await (await d.getFileHandle(name)).getFile();
-  window.open(URL.createObjectURL(f), "_blank");
+  await dateiZeigen(async () => (await (await verzeichnis("dokumente")).getFileHandle(name)).getFile());
 }
 /* ---------- Start ---------- */
 $("#nav").addEventListener("click", (e) => { const a = e.target.dataset.ansicht; if (a) geheZu(a); });
@@ -2261,7 +2272,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-091752";
+const STAND = "20261105-092024";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
