@@ -59,6 +59,22 @@ a.bericht:hover { text-decoration: underline; }
 .sk-profil { --f: #d9a823; --h: #fdf5dc; --d: #5a430a; }
 .sk-quartal { --f: #5aa64e; --h: #ecf7e9; --d: #1c4a17; }
 .sk-ziel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sk-einzel { --f: #1d9e75; --h: #e1f5ee; --d: #085041; }
+.sk-gruppe { font-size: 13px; color: #6b6b6b; margin: 4px 0 6px; letter-spacing: .02em; }
+.sk-reihe.zwei { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+/* Praktikumsfarben: Halbtag blau (A hell … D dunkel), Einzel türkis, Profil gelb, Quartal grün, Spezial rot */
+.fk-halbtag, .fk-ht-c { --fc: #4f8fcf; --fh: #d4e5f6; --fd: #163a5c; --fa: #fff; }
+.fk-ht-a { --fc: #9cc3ec; --fh: #eef5fd; --fd: #163a5c; --fa: #163a5c; }
+.fk-ht-b { --fc: #73a9e0; --fh: #e1edfa; --fd: #163a5c; --fa: #163a5c; }
+.fk-ht-d { --fc: #2b5f97; --fh: #c4d9f0; --fd: #0f2b47; --fa: #fff; }
+.fk-einzel { --fc: #1d9e75; --fh: #e1f5ee; --fd: #085041; --fa: #fff; }
+.fk-profil { --fc: #d9a823; --fh: #fdf5dc; --fd: #5a430a; --fa: #3d2d05; }
+.fk-quartal { --fc: #5aa64e; --fh: #ecf7e9; --fd: #1c4a17; --fa: #fff; }
+.fk-spezial { --fc: #c8566e; --fh: #fcedf0; --fd: #5e1a29; --fa: #fff; }
+.fchip[class*="fk-"] { border: 1.5px solid var(--fc); color: var(--fd); }
+.fchip[class*="fk-"].an { background: var(--fc); border-color: var(--fc); color: var(--fa); }
+.pk { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 13px; background: var(--fh); color: var(--fd); border: 1px solid var(--fc); white-space: nowrap; }
+tr[class*="fk-"] > td:first-child { box-shadow: inset 5px 0 0 var(--fc); padding-left: 14px; }
 .sk-spezial { --f: #c8566e; --h: #fcedf0; --d: #5e1a29; }
 .sk-termine { --f: var(--ph-braun); --h: var(--ph-sand); --d: var(--ph-braun-dunkel); }
 .sk-studierende { --f: #8a6bb8; --h: #f3eefa; --d: #3e2a63; }
@@ -255,7 +271,7 @@ dialog label input, dialog label select { margin-top: 2px; }
   <h1>Praxisbesuche Mathematik</h1>
   <nav id="nav">
     <button data-ansicht="start">Start</button>
-    <button data-ansicht="halbtag">Halbtagespraktikum</button>
+    <button data-ansicht="halbtag">Halbtag &amp; Einzel</button>
     <button data-ansicht="planung">Profil &amp; Quartal</button>
     <button data-ansicht="termine">Meine Termine</button>
     <button data-ansicht="studierende">Studierende</button>
@@ -832,7 +848,8 @@ function ansichtStart() {
   const q = pr.filter((p) => p.gruppe === "Quartal" && p.noetig === "ja");
   const prof = pr.filter((p) => p.gruppe === "Profil");
   const spez = pr.filter((p) => (p.gruppe === "Spezial" || p.gruppe === "Abschluss") && p.noetig === "ja");
-  const ht = pr.filter((p) => p.gruppe === "Halbtag");
+  const htAlle = pr.filter((p) => p.gruppe === "Halbtag");
+  const einzel = htAlle.filter((p) => /Einzelfach/.test(periode(p))), ht = htAlle.filter((p) => !/Einzelfach/.test(periode(p)));
   const meine = pr.filter((p) => S.ich && p.wer === S.ich);
   const offenQ = q.filter((p) => p.stand === "offen").length;
   const ziel = Math.ceil(S.einst.quote * prof.length), eingeteilt = prof.filter((p) => p.stand !== "offen" && p.stand !== "nicht nötig").length;
@@ -848,8 +865,13 @@ function ansichtStart() {
   return `<div class="start-kopf"><h2>Studienjahr ${sjText(sj)}</h2>
     <button class="knopf haupt gross" onclick="typeof rundgangStart === 'function' ? rundgangStart() : window.open('rundgang.html')">▶ Rundgang: die Seite in 2 Minuten</button></div>
   ${zahl ? "" : `<div class="karte"><b>Noch keine Daten.</b> Unter «Aktualisieren» die Datei aus dem Praktikumstool einlesen.</div>`}
+  <div class="sk-gruppe">Halbtag und Einzelfach</div>
+  <div class="sk-reihe zwei">
+    ${zielKarte("halbtag", "Halbtagespraktikum", "geheZu('halbtag', { 'h.perioden': ['A', 'B', 'C', 'D'] })", ht.filter(dabei).length, ht.length, "alle besuchen")}
+    ${zielKarte("einzel", "Einzelfachpraktikum", "geheZu('halbtag', { 'h.perioden': ['SK'] })", einzel.filter(dabei).length, einzel.length, "alle besuchen")}
+  </div>
+  <div class="sk-gruppe">Profil, Quartal und Spezial</div>
   <div class="sk-reihe">
-    ${zielKarte("halbtag", "Halbtagespraktikum", "geheZu('halbtag')", ht.filter(dabei).length, ht.length, "alle besuchen")}
     ${zielKarte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", eingeteilt, ziel, `Quote ${Math.round(S.einst.quote * 100)} % von ${prof.length}`)}
     ${zielKarte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", q.filter(dabei).length, q.length, "alle mit Besuch nötig")}
     ${zielKarte("spezial", "Spezialpraktikum", "geheZu('planung', { praktika: ['Spezial'] })", spez.filter(dabei).length, spez.length, "alle besuchen")}
@@ -1336,7 +1358,8 @@ function fa(k) { const v = S.filter[fk(k)]; return Array.isArray(v) ? v : STD[k]
 function umschalten(k, wert) { const a = new Set(fa(k)); a.has(wert) ? a.delete(wert) : a.add(wert); setzeFilter(k, [...a]); }
 function knoepfe(k, optionen) {
   const an = fa(k);
-  return optionen.map(([v, t]) => `<button type="button" class="fchip ${an.includes(v) ? "an" : ""}" onclick="umschalten('${k}','${v}')">${esc(t)}</button>`).join("");
+  const farbig = k === "praktika" || k === "perioden";
+  return optionen.map(([v, t]) => `<button type="button" class="fchip ${farbig ? FILTERFARBE[v] || "" : ""} ${an.includes(v) ? "an" : ""}" onclick="umschalten('${k}','${v}')">${esc(t)}</button>`).join("");
 }
 function filterLeiste(ansicht, anzahl) {
   const sj = fw("jahr", S.einst.studienjahr);
@@ -1350,7 +1373,7 @@ function filterLeiste(ansicht, anzahl) {
     grund += `<div class="fzeile"><span class="ftitel">Praktikum</span><button type="button" class="fchip ${alle ? "an" : ""}" onclick="setzeFilter('praktika',${esc(JSON.stringify(STD.praktika))})">alle</button>${knoepfe("praktika", [["Profil", "Profil"], ["Quartal", "Quartal"], ["Spezial", "Spezial"]])}</div>`;
     grund += `<div class="fzeile"><span class="ftitel">Besuch nötig</span>${knoepfe("noetig", [["ja", "ja"], ["optional", "optional"], ["nein", "nein"]])}</div>`;
   } else {
-    grund += `<div class="fzeile"><span class="ftitel">Periode</span>${knoepfe("perioden", [["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"], ["SK", "SK Einzelfach"]])}</div>`;
+    grund += `<div class="fzeile"><span class="ftitel">Periode</span>${knoepfe("perioden", [["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"], ["SK", "Einzel"]])}</div>`;
   }
   grund += `<div class="fzeile"><span class="ftitel">Stand</span>${knoepfe("stand", [["offen", "offen"], ["eingeteilt", "gebucht"], ["besucht", "besucht"]])}</div>`;
   // Wann
@@ -1483,10 +1506,10 @@ function ansichtPlanung() {
   <div class="mitfilter">${filterLeiste("planung", liste.length)}<div class="inhalt">
   ${aktivLeiste("planung", liste.length)}
   ${liste.length ? `<table class="liste spalten"><thead><tr><th></th><th>Name</th><th>Prakt.</th><th>Zeitraum</th><th>Schule</th><th title="Besuch nötig?">nötig</th><th>Stand</th><th>Buchen</th></tr></thead><tbody>
-  ${liste.map((x) => `<tr class="${x.achtung.length ? "zeile-achtung" : ""}">
+  ${liste.map((x) => `<tr class="${farbKlasse(x)} ${x.achtung.length ? "zeile-achtung" : ""}">
     <td>${achtungZeichen(x)}</td>
     <td class="name" title="Fächer: ${esc((x.faecher || []).join(", "))}" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}<div class="leise klein">${esc(x.person.studiengang || "")} · ${esc((x.faecher || []).join(", "))}</div></td>
-    <td>${esc(x.gruppe)}</td><td class="klein">${zeitraum(x)}</td>
+    <td>${praktChip(x)}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
     <td class="noetig"><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}" title="${esc(x.warum)}">${esc({ optional: "opt.", später: "später" }[x.noetig] || x.noetig)}</span>${x.achtung.length ? `<div class="klein rot" title="${esc(x.achtung.map((f) => f.hinweis).join(" · "))}">⚠ Pflicht</div>` : ""}</td>
     <td>${standChip(x)}</td><td style="white-space:nowrap">${buchenZelle(x)}</td></tr>`).join("")}
@@ -1508,12 +1531,12 @@ function ansichtTermine() {
     <div class="kachel"><div class="t">besucht</div><div class="z">${meine.filter((x) => x.stand === "besucht").length}</div></div></div>
   <div class="filter"><label>Studienjahr<select onchange="setzeFilter('jahr',this.value)">${jahre().map((j) => `<option value="${j}" ${j === sj ? "selected" : ""}>${sjText(j)}</option>`).join("")}</select></label>
     <span class="ftitel" style="margin-left:14px">Praktikum</span>${[["Halbtag", "Halbtag"], ["Profil", "Profil"], ["Quartal", "Quartal"], ["Spezial", "Spezial"]].map(([v, t]) =>
-      `<button type="button" class="fchip ${tPrakt.includes(v) ? "an" : ""}" onclick="terminPraktikum('${v}')">${t}</button>`).join("")}
+      `<button type="button" class="fchip ${FILTERFARBE[v]} ${tPrakt.includes(v) ? "an" : ""}" onclick="terminPraktikum('${v}')">${t}</button>`).join("")}
     <button class="knopf klein" onclick="listeKopieren()" title="Kopiert die Liste in die Zwischenablage – danach in Excel oder eine Mail einfügen (Cmd+V / Ctrl+V)">Liste für Excel kopieren</button></div>
   ${meine.length ? `<table class="liste"><thead><tr><th>Tag</th><th>Zeit</th><th>Name</th><th>Prakt.</th><th>Schule</th><th>Stand</th><th>Hinweise</th><th></th></tr></thead><tbody>
   ${Object.entries(tage).map(([d, xs]) => xs.map((x, i) => { const w = x.termin ? terminWarnungen(x, x.termin.datum, x.termin.zeit) : [];
-    return `<tr><td style="white-space:nowrap">${i === 0 ? `<b>${esc(tagText(d))}</b>` : ""}</td><td>${esc(x.termin ? x.termin.zeit : "")}</td>
-    <td><span class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</span>${kontakteZelle(x)}</td><td>${esc(x.gruppe)}</td>
+    return `<tr class="${farbKlasse(x)}"><td style="white-space:nowrap">${i === 0 ? `<b>${esc(tagText(d))}</b>` : ""}</td><td>${esc(x.termin ? x.termin.zeit : "")}</td>
+    <td><span class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</span>${kontakteZelle(x)}</td><td>${praktChip(x)}</td>
     <td>${esc(x.schulort)}<div class="leise klein">${esc(x.schulhaus)}</div></td><td>${standChip(x, true, true)}</td>
     <td>${w.map((t) => `<div class="hinweis">⚠ ${esc(t)}</div>`).join("")}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`; }).join("")).join("")}
   </tbody></table>` : `<div class="leer">Noch keine Besuche übernommen.</div>`}`;
@@ -1565,15 +1588,15 @@ function ansichtHalbtag() {
   const zeilen = paareBilden(liste);
   const k = (t, z) => `<div class="kachel"><div class="t">${t}</div><div class="z">${z}</div></div>`;
   const name = (x) => `<div class="pname"><span class="name" title="Grundinformationen anzeigen" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${achtungZeichen(x)} ${esc(x.person.name)}</span> <span class="leise klein">${esc(x.person.studiengang || "")}</span></div>`;
-  return `<h2>Halbtagespraktikum ${sjText(sj)}</h2>
+  return `<h2>Halbtags- und Einzelfachpraktikum ${sjText(sj)}</h2>
   <div class="kacheln">${k("Personen", alle.length)}${k("Paare / einzeln", `${zeilen.filter((z) => z.length === 2).length} / ${zeilen.filter((z) => z.length === 1).length}`)}${k("eingeteilt", alle.filter((p) => ["übernommen", "gebucht"].includes(p.stand)).length)}${k("besucht", alle.filter((p) => p.stand === "besucht").length)}${k("offen", alle.filter((p) => p.stand === "offen").length)}</div>
   <div class="mitfilter">${filterLeiste("halbtag", liste.length)}<div class="inhalt">
   ${aktivLeiste("halbtag", liste.length)}
   ${zeilen.length ? `<table class="liste spalten"><thead><tr><th>Studierende</th><th>Periode</th><th>Zeitraum</th><th>Schule</th><th>Stand</th><th>Buchen</th></tr></thead><tbody>
   ${zeilen.map((z) => { const x = z[0];
-    return `<tr class="${z.some((y) => y.achtung.length) ? "zeile-achtung" : ""}">
+    return `<tr class="${farbKlasse(x)} ${z.some((y) => y.achtung.length) ? "zeile-achtung" : ""}">
     <td><div class="klein ${z.length === 2 ? "paar" : "einzeln"}">${z.length === 2 ? "Paar · Doppelbesuch" : "einzeln"}</div>${z.map(name).join("")}</td>
-    <td class="klein">${esc(periode(x))}</td><td class="klein">${zeitraum(x)}</td>
+    <td>${praktChip(x, /Einzelfach/.test(periode(x)) ? praktKurz(x) : periode(x))}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
     <td>${z.map((y) => `<div>${standChip(y)}</div>`).join("")}</td>
     <td style="white-space:nowrap">${z.length === 2 && !z.some((y) => y.wer === S.ich) ? buchenZelle(x, z[1]) : z.map((y) => buchenZelle(y)).filter(Boolean).join("<br>")}</td></tr>`; }).join("")}
@@ -1584,6 +1607,13 @@ function paarAktionen([a, b]) {
   for (const x of [a, b]) if (x.wer === S.ich && x.stand !== "besucht") k.push(`<button class="knopf klein" title="Aus meiner Liste nehmen – im Praktikumstool die Buchung auch löschen" onclick="handlung('abgeben',${ref(x.idpraktikum)})">${esc(x.person.name.split(" ")[0])}: Termin wieder abgeben</button>`);
   return k.join("<br>");
 }
+function farbKlasse(x) {
+  if (x.gruppe === "Halbtag") { const p = periode(x); if (/Einzelfach/.test(p)) return "fk-einzel"; const m = p.match(/Periode ([A-D])/); return m ? "fk-ht-" + m[1].toLowerCase() : "fk-halbtag"; }
+  return { Profil: "fk-profil", Quartal: "fk-quartal", Spezial: "fk-spezial", Abschluss: "fk-spezial" }[x.gruppe] || "";
+}
+function praktKurz(x) { if (x.gruppe !== "Halbtag") return x.gruppe; const p = periode(x); return /Einzelfach/.test(p) ? "Einzel" + (p.match(/\d/) ? " " + p.match(/\d/)[0] + ". Fach" : "") : p.replace("Periode", "Halbtag"); }
+function praktChip(x, text) { return `<span class="pk ${farbKlasse(x)}">${esc(text ?? praktKurz(x))}</span>`; }
+const FILTERFARBE = { Halbtag: "fk-halbtag", Profil: "fk-profil", Quartal: "fk-quartal", Spezial: "fk-spezial", A: "fk-ht-a", B: "fk-ht-b", C: "fk-ht-c", D: "fk-ht-d", SK: "fk-einzel" };
 function periode(x) {
   const n = (S.artNamen || {})[x.art] || "";
   const m = n.match(/Periode ([A-D])/); if (m) return "Periode " + m[1];
@@ -2114,7 +2144,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-071223";
+const STAND = "20261105-072133";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
@@ -2150,7 +2180,7 @@ const SCHRITTE = [
   // --- Überblick
   { ansicht: "start", titel: "Willkommen", text: () => (ECHT ? "Der Rundgang zeigt nur – er bucht und speichert nichts." : "Mit erfundenen Beispieldaten.") + "<ul><li>Zuerst: was die Reiter oben können.</li><li>Dann: wie Buchen geht (am Beispiel Profil).</li><li>Dann: Meine Termine, Studierende, Hilfe.</li></ul>", vorher: () => geheZu("start") },
   { ziel: "#ich", ansicht: "start", titel: "Wer bin ich?", text: () => (ECHT ? "Hier steht dein Kürzel." : "Hier das eigene Kürzel wählen (im Beispiel: clu).") + "<ul><li>Dann gehören deine Buchungen und «Meine Termine» dir.</li><li>Rundgang jederzeit mit «✕ Beenden» abbrechen; das Kästchen lässt sich oben am Griff verschieben.</li></ul>", vorher: () => { if (!ECHT) { S.ich = "clu"; merke("ich", "clu"); zeichnen(); } } },
-  { ziel: "nav button[data-ansicht=halbtag]", ansicht: "start", titel: "Reiter: Halbtagespraktikum", text: "<ul><li>Alle Halbtagespraktika, Paare fürs Doppelbesuchen untereinander.</li><li>Buchen wie bei Profil &amp; Quartal (gleich im Beispiel).</li></ul>" },
+  { ziel: "nav button[data-ansicht=halbtag]", ansicht: "start", titel: "Reiter: Halbtag &amp; Einzel", text: "<ul><li>Alle Halbtags- und Einzelfachpraktika, Paare fürs Doppelbesuchen untereinander.</li><li>Farben: Halbtag blau (Periode A hell bis D dunkel), Einzel türkis.</li><li>Buchen wie bei Profil &amp; Quartal (gleich im Beispiel).</li></ul>" },
   { ziel: "nav button[data-ansicht=planung]", ansicht: "start", titel: "Reiter: Profil & Quartal", text: "<ul><li>Profil-, Quartals- und Spezialpraktika planen und buchen.</li></ul>" },
   { ziel: "nav button[data-ansicht=termine]", ansicht: "start", titel: "Reiter: Meine Termine", text: "<ul><li>Deine Besuche: erledigen, anpassen, Bericht hochladen, Kontakte.</li></ul>" },
   { ziel: "nav button[data-ansicht=studierende]", ansicht: "start", titel: "Reiter: Studierende", text: "<ul><li>Alle Praktika einer Person, Berichte, Verlauf.</li><li>Hier kann man auch korrigieren (z.B. Abbruch).</li></ul>" },
