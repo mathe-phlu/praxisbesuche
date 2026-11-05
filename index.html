@@ -1658,6 +1658,10 @@ function umschalten(k, wert) { const a = new Set(fa(k)); a.has(wert) ? a.delete(
 function filterAussehen(k, v) {
   return k === "praktika" || k === "perioden" ? FILTERFARBE[v] || "" : k === "stand" ? "fs fs-" + v : k === "noetig" ? "fs fn-" + v : "";
 }
+function alleKnopf(k, werte) {
+  const an = werte.every((v) => fa(k).includes(v));
+  return `<button type="button" class="fchip ${an ? "an" : ""}" onclick="setzeFilter('${k}',${esc(JSON.stringify(werte))})">alle</button>`;
+}
 function knoepfe(k, optionen) {
   const an = fa(k);
   const aussehen = (v) => filterAussehen(k, v);
@@ -1673,11 +1677,11 @@ function filterLeiste(ansicht, anzahl) {
   if (planung) {
     const alle = fa("praktika").length === 3;
     grund += `<div class="fzeile"><span class="ftitel">Praktikum</span><button type="button" class="fchip ${alle ? "an" : ""}" onclick="setzeFilter('praktika',${esc(JSON.stringify(STD.praktika))})">alle</button>${knoepfe("praktika", [["Profil", "Profil"], ["Quartal", "Quartal"], ...(spezialUebrig(sj) ? [["Spezial", "Spezial (nicht zugeordnet)"]] : [])])}</div>`;
-    grund += `<div class="fzeile"><span class="ftitel">Besuch nötig</span>${knoepfe("noetig", [["ja", "ja"], ["optional", "optional"], ["nein", "nein"]])}</div>`;
+    grund += `<div class="fzeile"><span class="ftitel">Besuch nötig</span>${alleKnopf("noetig", ["ja", "optional", "nein"])}${knoepfe("noetig", [["ja", "ja"], ["optional", "optional"], ["nein", "nein"]])}</div>`;
   } else {
     grund += `<div class="fzeile"><span class="ftitel">Periode</span>${knoepfe("perioden", [["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"], ["SK", "Einzel"]])}</div>`;
   }
-  grund += `<div class="fzeile"><span class="ftitel">Stand</span>${knoepfe("stand", [["offen", "offen"], ["eingeteilt", "gebucht"], ["besucht", "besucht"]])}</div>`;
+  grund += `<div class="fzeile"><span class="ftitel">Stand</span>${alleKnopf("stand", ["offen", "eingeteilt", "besucht"])}${knoepfe("stand", [["offen", "offen"], ["eingeteilt", "gebucht"], ["besucht", "besucht"]])}</div>`;
   // Wann
   const wannAktiv = [fw("von", "") && "ab " + kurzDatum(fw("von", "")), fw("bis", "") && "bis " + kurzDatum(fw("bis", "")),
     fa("tage").join(" "), fa("tageszeit").map((t) => t === "vormittag" ? "Vormittag" : "Nachmittag").join(" "),
@@ -2481,7 +2485,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-104842";
+const STAND = "20261105-105107";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
