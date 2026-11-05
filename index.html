@@ -84,7 +84,7 @@ a.bericht:hover { text-decoration: underline; }
 .fk-spezial { --fc: #c8566e; --fh: #fcedf0; --fd: #5e1a29; --fa: #fff; }
 .fchip[class*="fk-"] { border: 1.5px solid var(--fc); color: var(--fd); }
 .fchip[class*="fk-"].an { background: var(--fc); border-color: var(--fc); color: var(--fa); }
-.pk { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 13px; background: var(--fh); color: var(--fd); border: 1px solid var(--fc); white-space: nowrap; }
+.pk { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 13px; background: var(--fh); color: var(--fd); border: 1px solid var(--fc); white-space: nowrap; }
 tr[class*="fk-"] > td:first-child { box-shadow: inset 5px 0 0 var(--fc); padding-left: 14px; }
 .sk-spezial { --f: #c8566e; --h: #fcedf0; --d: #5e1a29; }
 .sk-termine { --f: var(--ph-braun); --h: var(--ph-sand); --d: var(--ph-braun-dunkel); }
@@ -144,7 +144,10 @@ details.fsek summary h4 { display: inline; }
 .fsek input[type=date] { width: 128px; }
 .fsek input[type=search], .fsek input[list] { width: 100%; }
 .aktivleiste { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: #fff; border: 1px solid var(--linie); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
-.aktivchip { font: inherit; font-size: 13px; background: var(--ph-sand); border: 1px solid #d8c8a8; border-radius: 12px; padding: 1px 9px; cursor: pointer; }
+.aktivchip { font: inherit; font-size: 13px; background: var(--ph-sand); border: 1px solid #d8c8a8; border-radius: 4px; padding: 1px 9px; cursor: pointer; }
+.aktivgruppe { font: inherit; font-size: 13px; background: none; border: 1px solid transparent; border-radius: 4px; padding: 1px 4px; cursor: pointer; }
+.aktivgruppe:hover { border-color: var(--ph-braun); }
+.aktivgruppe .fchip { cursor: inherit; pointer-events: none; font-size: 12.5px; padding: 1px 7px; }
 .aktivchip:hover { border-color: var(--ph-braun); }
 .filterbox-alt { background: #fff; border: 1px solid var(--linie); border-radius: 8px; margin-bottom: 12px; }
 .fgrund { display: block; }
@@ -179,6 +182,7 @@ details.fsek summary h4 { display: inline; }
 table.liste { border-collapse: collapse; width: 100%; background: #fff; border: 1px solid var(--linie); }
 table.liste th { position: sticky; top: 56px; background: var(--ph-braun); color: #fff; font-weight: 600; text-align: left; padding: 8px 10px; font-size: 14px; white-space: nowrap; }
 table.liste td { padding: 7px 10px; border-bottom: 1px solid var(--linie); vertical-align: top; }
+table.liste tbody tr:first-child td { padding-top: 12px; }
 table.liste tr:hover td { background: #fbfbfb; }
 /* Spalten deutlich trennen: abwechselnd leicht getönt, Kopf mit hellen Trennern */
 table.liste.spalten td:nth-child(even) { background: #faf7f1; }
@@ -193,6 +197,7 @@ table.liste td.name:hover { text-decoration: underline; }
 /* Stand ohne Farbe, als Kästchen (die Farben und Pillen gehören den Praktikumsarten):
    offen = gestrichelt, gebucht = Rand, besucht = schwarz gefüllt mit weisser Schrift */
 .chip.s-offen, .chip.s-uebernommen, .chip.s-gebucht, .chip.s-besucht, .chip.s-nicht, .chip.s-abbruch { border-radius: 4px; padding: 1px 7px; }
+.chip.s-uebernommen, .chip.s-gebucht, .chip.s-besucht { min-width: 104px; text-align: center; box-sizing: border-box; }
 .s-offen { background: #fff; border: 1px dashed #a8a39a; color: #6b665e; }
 .s-uebernommen, .s-gebucht { background: #fff; border: 1.5px solid #4a4640; color: #2e2b27; }
 .s-besucht { background: #2e2b27; border: 1.5px solid #2e2b27; color: #fff; }
@@ -1387,10 +1392,12 @@ const STD = {
 };
 function fa(k) { const v = S.filter[fk(k)]; return Array.isArray(v) ? v : STD[k]; }
 function umschalten(k, wert) { const a = new Set(fa(k)); a.has(wert) ? a.delete(wert) : a.add(wert); setzeFilter(k, [...a]); }
+function filterAussehen(k, v) {
+  return k === "praktika" || k === "perioden" ? FILTERFARBE[v] || "" : k === "stand" ? "fs fs-" + v : k === "noetig" ? "fs fn-" + v : "";
+}
 function knoepfe(k, optionen) {
   const an = fa(k);
-  const farbig = k === "praktika" || k === "perioden";
-  const aussehen = (v) => farbig ? FILTERFARBE[v] || "" : k === "stand" ? "fs fs-" + v : k === "noetig" ? "fs fn-" + v : "";
+  const aussehen = (v) => filterAussehen(k, v);
   return optionen.map(([v, t]) => `<button type="button" class="fchip ${aussehen(v)} ${an.includes(v) ? "an" : ""}" onclick="umschalten('${k}','${v}')">${esc(t)}</button>`).join("");
 }
 function filterLeiste(ansicht, anzahl) {
@@ -1446,10 +1453,12 @@ function aktivLeiste(ansicht, anzahl) {
   const c = [];
   const weg = (k, t) => c.push(`<button type="button" class="aktivchip" onclick="filterWeg('${k}')" title="Filter entfernen">${esc(t)} ✕</button>`);
   const gleich = (k) => JSON.stringify([...fa(k)].sort()) === JSON.stringify([...STD[k]].sort());
-  if (ansicht === "planung" && !gleich("praktika")) weg("praktika", "Praktikum: " + (fa("praktika").join(", ") || "keins"));
-  if (ansicht === "planung" && !gleich("noetig")) weg("noetig", "Besuch nötig: " + (fa("noetig").join(", ") || "–"));
-  if (!gleich("stand")) weg("stand", "Stand: " + fa("stand").map((t) => t === "eingeteilt" ? "übernommen/gebucht" : t).join(", "));
-  if (ansicht === "halbtag" && fa("perioden").length) weg("perioden", "Periode " + fa("perioden").join(", "));
+  const TEXT = { eingeteilt: "gebucht", SK: "Einzel" };
+  const wegKaesten = (k, titel) => c.push(`<button type="button" class="aktivgruppe" onclick="filterWeg('${k}')" title="Filter entfernen"><span class="leise">${titel}</span> ${fa(k).length ? fa(k).map((v) => `<span class="fchip ${filterAussehen(k, v)} an">${esc(TEXT[v] || v)}</span>`).join(" ") : "<i>keins</i>"} ✕</button>`);
+  if (ansicht === "planung" && !gleich("praktika")) wegKaesten("praktika", "Praktikum");
+  if (ansicht === "planung" && !gleich("noetig")) wegKaesten("noetig", "Besuch nötig");
+  if (!gleich("stand")) wegKaesten("stand", "Stand");
+  if (ansicht === "halbtag" && fa("perioden").length) wegKaesten("perioden", "Periode");
   if (fw("von", "")) weg("von", "ab " + kurzDatum(fw("von", "")));
   if (fw("bis", "")) weg("bis", "bis " + kurzDatum(fw("bis", "")));
   if (ansicht === "planung") {
@@ -2179,7 +2188,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-073612";
+const STAND = "20261105-073833";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
