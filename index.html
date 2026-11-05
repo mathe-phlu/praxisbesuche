@@ -2033,6 +2033,14 @@ function kalPlan(gs) {
   }
   return { tage, heim };
 }
+/* «Route ↗»: öffnet Google Maps mit der Strecke (normaler Link, kein Schlüssel) */
+function kalRoute(von, nach) {
+  if (!von || !nach) return "";
+  const u = "https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=" + encodeURIComponent(von) + "&destination=" + encodeURIComponent(nach);
+  return ` <a class="klein" href="${esc(u)}" target="_blank" rel="noopener" title="Strecke in Google Maps anschauen">Route ↗</a>`;
+}
+const kalAdresse = (g) => [g.x.schulhaus, g.x.schulort].filter(Boolean).join(", ");
+const kalHeimText = (h) => h ? (h.label && h.label !== "Wohnort" ? h.label : `${h.lat},${h.lon}`) : "";
 function reiseplanTeil() {
   if (!REISEPLAN_FUER.includes(S.ich)) return "";
   const gs = kalGruppen(kalMeine()); if (!gs.length) return "";
@@ -2047,12 +2055,12 @@ function reiseplanTeil() {
     <button class="knopf klein" onclick="kalHeimSetzen()">übernehmen</button> ${heim ? "" : `<span class="leise">ohne Wohnort: Anreise/Rückreise 30 Min</span>`}</p>
   <table class="liste"><thead><tr><th>Tag</th><th>Reise davor</th><th>Besuch</th><th>Name</th><th>Schule</th><th>Warten</th><th>Besprechung</th><th>Termin</th><th>Rückreise</th></tr></thead><tbody>
   ${Object.entries(tage).sort().map(([d, liste]) => liste.map((g, i) => `<tr><td style="white-space:nowrap">${i ? "" : `<b>${esc(kurzDatum(d))}</b>`}</td>
-    <td style="white-space:nowrap"><span class="klein leise">${g.davorArt}</span> ${feld(g, "davor", g.davorStd)}${g.knapp ? `<div class="hinweis">⚠ zu knapp</div>` : ""}</td>
+    <td style="white-space:nowrap"><span class="klein leise">${g.davorArt}</span> ${feld(g, "davor", g.davorStd)}${kalRoute(g.vorher ? kalAdresse(g.vorher) : kalHeimText(heim), kalAdresse(g))}${g.knapp ? `<div class="hinweis">⚠ zu knapp</div>` : ""}</td>
     <td style="white-space:nowrap">${ausMin(g.von)}–${ausMin(g.bis)}</td><td>${g.xs.map((x) => esc(x.person.name)).join(" + ")}</td>
     <td>${esc(g.x.schulort || "")}<div class="leise klein">${esc(g.x.schulhaus || "")}</div></td>
     <td>${feld(g, "warten", g.wartenStd)}</td><td>${feld(g, "be", 60)}</td>
     <td style="white-space:nowrap"><b>${ausMin(g.von)}–${ausMin(g.ende)}</b></td>
-    <td>${g.letzter ? feld(g, "rueck", g.rueckStd) : ""}</td></tr>`).join("")).join("")}
+    <td style="white-space:nowrap">${g.letzter ? feld(g, "rueck", g.rueckStd) + kalRoute(kalAdresse(g), kalHeimText(heim)) : ""}</td></tr>`).join("")).join("")}
   </tbody></table>
   <p><button class="knopf haupt" onclick="reiseplanLaden()">📅 Alle Termine mit Reisen herunterladen</button></p>`;
 }
@@ -2708,7 +2716,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-212201";
+const STAND = "20261105-212351";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
