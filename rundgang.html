@@ -594,6 +594,17 @@ async function allesLaden() {
     const ziel = /Halbtag/i.test(z) ? "Halbtag" : /Quartal/i.test(z) ? "Quartal" : /Profil/i.test(z) ? "Profil" : "";
     if (ziel) S.praktika[p.idpraktikum] = { ...p, gruppe: ziel, spezialText: z };
   }
+  // Spezial → Halbtag: Periode A–D aus dem Zeitraum (gleiche Daten wie die regulären Halbtagspraktika dieses Jahres)
+  const iso = (d) => { const m = String(d || "").match(/(\d\d)\.(\d\d)\.(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : ""; };
+  const PER = { 1: "A", 10: "B", 11: "C", 12: "D" }, perZeit = {};
+  for (const p of Object.values(S.praktika)) if (p.gruppe === "Halbtag" && PER[p.art] && !p.spezialText) {
+    const k = p.jahr + PER[p.art], z = (perZeit[k] ||= { von: "9999", bis: "0000" });
+    if (iso(p.von) && iso(p.von) < z.von) z.von = iso(p.von); if (iso(p.bis) > z.bis) z.bis = iso(p.bis);
+  }
+  for (const p of Object.values(S.praktika)) if (p.gruppe === "Halbtag" && p.spezialText) {
+    const v = iso(p.von), treffer = Object.entries(perZeit).filter(([k, z]) => k.startsWith(p.jahr) && v >= z.von && v <= z.bis);
+    if (treffer.length) p.spezialPeriode = treffer.sort((a, b) => b[1].von.localeCompare(a[1].von))[0][0].slice(-1);
+  }
   // Hospitationen: steht bei der Mathe-Lektion «Hosp.»/«Hospitation» als Klasse, unterrichtet die Person dort nicht selbst.
   // Solche Lektionen sind keine Besuchstermine; wer in einer Halbtag-Periode nur hospitiert (und noch keinen Besuch hat), gehört nicht in unsere Liste.
   S.nurHosp = [];
@@ -1695,7 +1706,7 @@ function ansichtHalbtag() {
   ${zeilen.map((z) => { const x = z[0];
     return `<tr class="${farbKlasse(x)} ${z.some((y) => y.achtung.length) ? "zeile-achtung" : ""}">
     <td><div class="klein ${z.length === 2 ? "paar" : "einzeln"}">${z.length === 2 ? "Paar · Doppelbesuch" : "einzeln"}</div>${z.map(name).join("")}</td>
-    <td>${praktChip(x, x.spezialText ? "Halbtag" : periode(x))}</td><td class="klein">${zeitraum(x)}</td>
+    <td>${praktChip(x, periode(x) === "Spezial" ? "Halbtag" : periode(x))}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
     <td class="paar-stand">${z.map((y) => `<div>${standChip(y)}</div>`).join("")}</td>
     <td style="white-space:nowrap">${z.length === 2 && !z.some((y) => y.wer === S.ich) ? buchenZelle(x, z[1]) : z.map((y) => buchenZelle(y)).filter(Boolean).join("<br>")}</td></tr>`; }).join("")}
@@ -1710,7 +1721,7 @@ function farbKlasse(x) {
   if (x.gruppe === "Halbtag") { const p = periode(x); if (/^Einzel/.test(p)) return "fk-einzel"; const m = p.match(/Periode ([A-D])/); return m ? "fk-ht-" + m[1].toLowerCase() : "fk-halbtag"; }
   return { Profil: "fk-profil", Quartal: "fk-quartal", Spezial: "fk-spezial", Abschluss: "fk-spezial" }[x.gruppe] || "";
 }
-function praktKurz(x) { if (x.gruppe !== "Halbtag" || x.spezialText) return x.gruppe; const p = periode(x); return /^Einzel/.test(p) ? "Einzel" : p.replace("Periode", "Halbtag"); }
+function praktKurz(x) { if (x.gruppe !== "Halbtag" || (x.spezialText && !x.spezialPeriode)) return x.gruppe; const p = periode(x); return /^Einzel/.test(p) ? "Einzel" : p.replace("Periode", "Halbtag"); }
 /* Kategorie für Filter: Einzel (gehört technisch zum Halbtag), Spezial (inkl. Abschluss), sonst die Gruppe */
 function kategorie(x) { return x.gruppe === "Halbtag" && /^Einzel/.test(periode(x)) ? "Einzel" : x.gruppe === "Abschluss" ? "Spezial" : x.gruppe; }
 function praktChip(x, text) {
@@ -1718,7 +1729,7 @@ function praktChip(x, text) {
 }
 const FILTERFARBE = { Einzel: "fk-einzel", Halbtag: "fk-halbtag", Profil: "fk-profil", Quartal: "fk-quartal", Spezial: "fk-spezial", A: "fk-ht-a", B: "fk-ht-b", C: "fk-ht-c", D: "fk-ht-d", SK: "fk-einzel" };
 function periode(x) {
-  if (x.spezialText) return "Spezial";
+  if (x.spezialText) return x.spezialPeriode ? "Periode " + x.spezialPeriode : "Spezial";
   const n = (S.artNamen || {})[x.art] || "";
   const m = n.match(/Periode ([A-D])/); if (m) return "Periode " + m[1];
   if (/Einzelfach/.test(n)) return "Einzel " + (n.match(/(\d)\. Fach/) || [, ""])[1] + ". Fach";
@@ -2250,7 +2261,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-084152";
+const STAND = "20261105-091752";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
