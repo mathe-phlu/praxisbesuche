@@ -2243,11 +2243,11 @@ function ansichtStudierende() {
         <button class="knopf klein" title="ändern" onclick="achtungSetzen(REFS[${ref(p.id)}], REFS[${ref(x.id)}])">ändern</button>
         <button class="knopf klein" title="löschen" onclick="achtungWeg(REFS[${ref(p.id)}], REFS[${ref(x.id)}])">✕</button></div>`),
                  ...p.notizen.slice(-1).map((x) => `<div>${esc(x.text.slice(0, 80))}</div>`), ...(!p.notizen.length && p.alt && p.alt.bemerkung ? [`<div class="leise">${esc(p.alt.bemerkung.slice(0, 80))}</div>`] : [])].join("");
-    return `<tr class="${a ? "zeile-achtung" : ""}"><td>${a ? `<span class="achtung">⚠</span>` : ""}</td><td class="name" onclick="detailZeigen(REFS[${ref(p.id)}])">${esc(p.name)}</td>
+    return `<tr class="${a ? "zeile-achtung" : ""}"><td>${a ? `<span class="achtung">⚠</span>` : ""}</td><td><span class="name" onclick="detailZeigen(REFS[${ref(p.id)}])">${esc(p.name)}</span>${archiv ? `<div><button class="knopf klein haupt" title="Wieder zu den aktuellen Studierenden" onclick="archivSetzen(REFS[${ref(p.id)}], false)">zurückholen</button></div>` : ""}</td>
     <td>${esc(p.studiengang || "")}</td><td class="klein">${esc((p.faecher || []).join(", "))}</td>
     <td class="pspalte p-halbtag">${zelle(p, "Halbtag")}</td><td class="pspalte p-profil">${zelle(p, "Profil")}</td><td class="pspalte p-quartal">${zelle(p, "Quartal")}</td><td class="klein p-bem">${bem}</td>
     <td style="white-space:nowrap"><button class="knopf klein" onclick="achtungSetzen(REFS[${ref(p.id)}])">Achtung / Bemerkung</button>
-      ${archiv ? `<button class="knopf klein haupt" title="Wieder zu den aktuellen Studierenden" onclick="archivSetzen(REFS[${ref(p.id)}], false)">zurückholen</button>`
+      ${archiv ? ""
         : p.archivVonHand ? `<button class="knopf klein" title="Wieder ins Archiv" onclick="archivSetzen(REFS[${ref(p.id)}], true)">ins Archiv</button>` : ""}</td></tr>`; }).join("")}
   </tbody></table>`;
 }
@@ -2328,7 +2328,9 @@ function detailZeigen(id, oeffnen = true) {
   const a = p.alt;
   const notiz = (e) => `<div class="notiz">${esc(e.text)}<div class="wer">${esc(e.wer)}, ${datumText(e.zeit)}</div></div>`;
   s.innerHTML = `<button class="knopf zu" onclick="detailZu()">Schliessen ✕</button>
-    <h2>${esc(p.name)}</h2>
+    <h2>${esc(p.name)}${p.archiv ? ` <span class="klein leise">(im Archiv)</span>` : ""}</h2>
+    <p>${p.archiv ? `<button class="knopf klein haupt" title="Wieder zu den aktuellen Studierenden" onclick="archivSetzen(REFS[${ref(p.id)}], false)">Aus dem Archiv zurückholen</button>`
+      : `<button class="knopf klein" title="Zu den abgeschlossenen Studierenden legen (gilt für alle, jederzeit rückgängig)" onclick="archivSetzen(REFS[${ref(p.id)}], true)">ins Archiv</button>`}</p>
     <div class="leise">${esc(p.studiengang || "")}${p.faecher && p.faecher.length ? " · Fächer: " + esc(p.faecher.join(", ")) : ""}${p.nurAlt ? " · nur aus der alten Liste" : ""}</div>
     ${p.spezial.length ? `<div class="karte" style="margin-top:12px;border-color:var(--achtung)"><b class="rot">⚠ Spezialfall</b>${p.spezial.map((f) => `<div>${sjText(f.jahr)} · ${esc(f.kategorie)}: <b>${esc(f.hinweis)}</b>${f.bemerkung ? " – " + esc(f.bemerkung) : ""}</div>`).join("")}</div>` : ""}
     <h3>Verlauf</h3>
@@ -2725,7 +2727,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261105-220019";
+const STAND = "20261106-071406";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
