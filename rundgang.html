@@ -104,6 +104,18 @@ tr[class*="fk-"] > td:first-child { box-shadow: inset 5px 0 0 var(--fc); padding
 .sk-studierende { --f: #8a857c; --h: #f6f5f2; --d: #2e2b27; }
 .sk-grau { --f: #9a9a9a; --h: #f5f5f3; --d: #3a3a3a; }
 .sk table td { padding: 2px 4px; }
+.akt-reiter { display: flex; gap: 2px; flex-wrap: wrap; border-bottom: 2px solid var(--ph-braun); margin: 12px 0 16px; }
+.akt-reiter button { font: inherit; font-size: 14px; background: #fff; color: var(--leise); border: 1px solid var(--linie); border-bottom: 0; border-radius: 4px 4px 0 0; padding: 6px 12px; cursor: pointer; }
+.akt-reiter button:hover { color: var(--tinte); }
+.akt-reiter button.an { background: var(--ph-braun); color: #fff; border-color: var(--ph-braun); font-weight: 600; }
+.akt-wann { background: var(--ph-sand); border-left: 4px solid var(--ph-braun); padding: 8px 12px; margin: 0 0 12px; font-size: 14px; }
+.akt-raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; max-width: 1100px; }
+.akt-k { background: #fff; border: 1px solid var(--linie); border-radius: 6px; padding: 12px 14px; }
+.akt-k > b { color: var(--ph-braun-dunkel); font-size: 15px; display: block; margin-bottom: 4px; }
+.akt-z { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px dashed #eee; font-size: 14px; }
+.akt-z:last-child { border-bottom: 0; }
+.akt-z .ok { color: #2f7a3a; } .akt-z .off { color: var(--achtung); } .akt-z .le { color: #8a8a8a; }
+.akt-inhalt > .karte { margin-bottom: 14px; }
 .rundgang-kasten { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; background: var(--ph-sand); border: 2px solid var(--ph-braun); border-radius: 8px; padding: 14px 18px; margin: 4px 0 18px; }
 .rundgang-kasten .rk-ic { color: var(--ph-braun); flex: none; }
 .rundgang-kasten .rk-t { font-family: var(--hand); font-size: 24px; color: var(--ph-braun-dunkel); }
@@ -837,6 +849,7 @@ async function allesLaden() {
   }
   S.alt = alt.personen || [];
   S.artNamen = pr.arten || {};
+  S.geholt = pr.geholt || {}; S.stammStand = pr.stand || "";
   S.spezial = sp.faelle || [];
   if (einst) S.einst = Object.assign(S.einst, einst);
   // automatisch nach Datum, ausser unter «Einstellungen» fest gewählt
@@ -2450,57 +2463,52 @@ async function noetigSetzen(id) {
 }
 
 /* ---------- Aktualisieren: Import und Einstellungen ---------- */
+/* ---------- Aktualisieren: Unter-Reiter, Übersicht über den Stand der Daten ---------- */
+const AKT_REITER = [["uebersicht", "Übersicht"], ["team", "Team und Pensum"], ["tool", "Daten aus dem Tool"], ["zusatz", "Zusatzdateien"], ["regelnBlock", "Regeln Block"], ["regelnHalbtag", "Regeln Halbtag"], ["orte", "Orte"]];
+function aktReiter(k) { merke("aktTab", k); zeichnen(); }
+const datumKurz = (iso) => iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(2, 4)}` : "";
+function aktUebersicht() {
+  const sj = S.einst.studienjahr, pr = Object.values(S.praktika).filter((p) => p.jahr === sj);
+  const geholt = (k) => (S.geholt || {})[k] || S.stammStand || "";
+  const zeile = (name, wert, art) => `<div class="akt-z"><span>${name}</span><span class="${art}">${wert}</span></div>`;
+  // Halbtag je Periode
+  // Rot ist nur die nächste fällige Periode nach der letzten vorhandenen; frühere Lücken grau
+  const anz = ["A", "B", "C", "D"].map((b) => pr.filter((p) => p.gruppe === "Halbtag" && periode(p) === "Periode " + b).length);
+  const letzte = anz.reduce((m, n, k) => (n ? k : m), -1);
+  const fehlt = letzte < 3 ? "ABCD"[letzte + 1] : null;
+  const per = ["A", "B", "C", "D"].map((b, k) => {
+    const n = anz[k];
+    if (n) return zeile("Periode " + b, `✓ ${datumKurz(geholt(`${sj}|Halbtag|${b}`))} · ${n}`, "ok");
+    if (k < letzte) return zeile("Periode " + b, "keine Praktika", "le");
+    if (k === letzte + 1) return zeile("Periode " + b, "noch nicht im Tool", "off");
+    return zeile("Periode " + b, "später", "le");
+  }).join("");
+  const block = ["Profil", "Quartal"].map((g) => { const n = pr.filter((p) => p.gruppe === g || (p.gruppe === "Spezial" && new RegExp(g, "i").test(p.zusatz || ""))).length;
+    return zeile(g, n ? `✓ ${datumKurz(geholt(`${sj}|${g}`))} · ${n}` : "noch nicht geholt", n ? "ok" : "off"); }).join("");
+  const blockPr = pr.filter((p) => p.gruppe === "Profil" || p.gruppe === "Quartal"), mitPlan = blockPr.filter((p) => p.lektionen && p.lektionen.length).length;
+  const spezN = S.spezial.filter((f) => f.jahr === sj).length;
+  const naechstes = fehlt ? `Halbtag Periode ${fehlt} holen, sobald sie im Praktikumstool eingetragen ist.`
+    : !blockPr.length ? "Profil- und Quartalspraktika holen, sobald sie im Praktikumstool stehen."
+    : !spezN ? "Spezialfälle-Liste der Praktikumsabteilung einlesen (Zusatzdateien)."
+    : "Alles da. Vor einer Buchungsrunde lohnt sich ein neues Holen – dann sind auch die neuesten Buchungen anderer Fächer und Mentor/innen drin.";
+  return `<div class="akt-raster">
+    <div class="akt-k"><b>Halbtag ${sjText(sj)}</b>${per}</div>
+    <div class="akt-k"><b>Blockpraktika ${sjText(sj)}</b>${block}${zeile("Stundenpläne", blockPr.length ? `${mitPlan} von ${blockPr.length}` : "–", mitPlan ? "ok" : "le")}</div>
+    <div class="akt-k"><b>Zusatzdateien</b>${zeile("Spezialfälle " + sjText(sj), spezN ? `✓ ${spezN} Fälle` : "noch nicht eingelesen", spezN ? "ok" : "off")}
+      ${zeile("Checkliste", `<span id="aktCheck">…</span>`, "")}${zeile("Alte Excel-Liste", S.alt.length ? `einmalig ✓ (${S.alt.length})` : "–", "le")}</div></div>
+    <div class="einr-hinweis" style="margin-top:14px"><b>Als Nächstes:</b> ${naechstes}
+      <div style="margin-top:8px"><button class="knopf haupt" onclick="aktReiter('tool')">Daten aus dem Tool holen</button></div></div>`;
+}
 function ansichtAktualisieren() {
   const e = S.einst;
   const n = Object.keys(S.praktika).length;
   const proJahr = {};
   for (const p of Object.values(S.praktika)) proJahr[p.jahr + " " + p.gruppe] = (proJahr[p.jahr + " " + p.gruppe] || 0) + 1;
-  return `<h2>Aktualisieren</h2>
-  <p><b>In der Regel muss hier nichts gemacht werden.</b> Nur vor neuen Praktika holt eine Person für alle die Daten aus dem Praktikumstool. Alles wird hier im Browser gelesen – nichts geht an einen anderen Dienst.</p>
-  <details class="karte akk" name="akt" ${lies("aktOffen") === "1" ? "open" : ""} ontoggle="if (this.open) merke('aktOffen', '1')"><summary><h3>1 · Praktika aus dem Praktikumstool</h3></summary>
-    <p>Studienjahre <input class="eingabe" id="holJahre" value="${esc(`${jahrPlus(e.studienjahr, -4)} bis ${e.studienjahr}`)}" size="16">
-       <label class="klein"><input type="checkbox" id="holPlan" checked> mit Stundenplänen (Mathe-Lektionen) für ${sjText(e.studienjahr)}</label></p>
-    <p><button class="knopf haupt" id="toolHolen">Praktikumstool öffnen und Daten holen</button>
-       <span class="leise klein">Im Tool anmelden und dort das Lesezeichen «Praxisbesuche-Export» anklicken.</span></p>
-    <p class="klein"><b>Einzelne Person nachtragen</b> (kommt selten vor): Praktikumstool öffnen, die Seite dieser Person aufrufen
-       und dort das Lesezeichen klicken – dann kommt nur dieses Praktikum mit Stundenplan dazu.</p>
-    <details><summary class="leise klein">oder eine gespeicherte Datei einlesen</summary>
-      <input type="file" id="dateiTool" accept=".json" multiple> <button class="knopf" id="importTool">Einlesen</button></details>
-    <div class="import-ergebnis" id="ergTool"></div>
-    <p class="leise klein">Jetzt im Ordner: ${n} Praktika${n ? " · " + Object.entries(proJahr).sort().reverse().map(([k, v]) => `${sjText(k.split(" ")[0])} ${k.split(" ")[1]}: ${v}`).join(" · ") : ""}</p></details>
-  <details class="karte akk" name="akt" ${lies("aktOffen") === "2" ? "open" : ""} ontoggle="if (this.open) merke('aktOffen', '2')"><summary><h3>2 · Spezialfälle</h3></summary>
-    <p>Excel-Liste «Spezialfälle Besuchsplanung» der Praktikumsabteilung. Studienjahr:
-      <select id="spezJahr">${[...new Set([e.studienjahr, ...jahre()])].map((j) => `<option ${j === e.studienjahr ? "selected" : ""} value="${j}">${sjText(j)}</option>`).join("")}</select></p>
-    <input type="file" id="dateiSpez" accept=".xlsx,.xls"> <button class="knopf haupt" id="importSpez">Einlesen</button>
-    <div class="import-ergebnis" id="ergSpez"></div>
-    <p class="leise klein">Jetzt im Ordner: ${S.spezial.length} Spezialfälle (${S.spezial.filter((f) => !f.idstudent).length} ohne Zuordnung).</p></details>
-  <details class="karte akk" name="akt" ${lies("aktOffen") === "3" ? "open" : ""} ontoggle="if (this.open) merke('aktOffen', '3')"><summary><h3>3 · Regeln (Checkliste der Praktikumsabteilung)</h3></summary>
-    <p class="leise klein">Einmal pro Studienjahr aus der Checkliste übernehmen. Termine, die dagegen verstossen, bietet die Seite nicht an.</p>
-    <table class="regeln">
-      <tr><td>Arbeitssitzung Profil (Vormittag, keine Besuche)</td><td><input class="eingabe" type="date" id="eArbP" value="${esc(e.arbeitssitzungProfil || "")}"></td></tr>
-      <tr><td>Arbeitssitzung Quartal (Vormittag, keine Besuche)</td><td><input class="eingabe" type="date" id="eArbQ" value="${esc(e.arbeitssitzungQuartal || "")}"></td></tr>
-      <tr><td>Profil: keine Besuche an den ersten … Praktikumstagen</td><td><input class="eingabe" type="number" min="0" max="10" id="rProfil" value="${esc(regel("profilErsteTage"))}" style="width:60px"></td></tr>
-      <tr><td>Quartal: keine Besuche in den ersten … Kalendertagen (7 = erste Woche)</td><td><input class="eingabe" type="number" min="0" max="21" id="rQuartal" value="${esc(regel("quartalErsteTage"))}" style="width:60px"></td></tr>
-      <tr><td>Nicht am letzten Praktikumstag</td><td><input type="checkbox" id="rLetzter" ${regel("letzterTag") ? "checked" : ""}></td></tr>
-      <tr><td>Höchstens … Besuche pro Woche bei einer Person</td><td><input class="eingabe" type="number" min="1" max="5" id="rWoche" value="${esc(regel("maxProWoche"))}" style="width:60px"></td></tr>
-      <tr><td>«Zeit zum Besprechen»: so viele Minuten frei nach dem Mathe-Block</td><td><input class="eingabe" type="number" min="10" max="120" step="5" id="rBespr" value="${esc(regel("besprechungMin"))}" style="width:60px"></td></tr>
-    </table>
-    <p style="margin-top:10px"><b>Checkliste als PDF im Ordner ablegen</b> (damit alle die aktuelle Fassung haben):
-      <input type="file" id="dateiCheck" accept=".pdf"> <button class="knopf" id="checkAblegen">Ablegen</button></p>
-    <div id="dokumente" class="klein"></div></details>
-  <details class="karte akk" name="akt" ${lies("aktOffen") === "4" ? "open" : ""} ontoggle="if (this.open) merke('aktOffen', '4')"><summary><h3>4 · Orte für den Umkreis</h3></summary>
-    <p>Sucht die Koordinaten der Schulorte bei swisstopo (geo.admin.ch). Übermittelt werden nur Ortsnamen, keine Personen.
-       Bei mehreren gleichnamigen Orten nimmt die Seite den nächsten zu Luzern.</p>
-    <button class="knopf haupt" id="orteSuchen">Fehlende Orte suchen</button>
-    <span class="leise klein">${Object.keys(S.orte).length} Orte bekannt, ${schulorte().filter((o) => !S.orte[o]).length} fehlen.</span>
-    <div class="import-ergebnis" id="ergOrte"></div>
-    <details style="margin-top:8px"><summary class="leise">Orte ansehen und korrigieren</summary>
-      <table class="liste" style="max-width:700px;margin-top:6px"><thead><tr><th>Schulort</th><th>gefunden</th><th></th></tr></thead><tbody>
-      ${schulorte().map((o) => `<tr><td>${esc(o)}</td><td class="klein">${S.orte[o] ? esc(S.orte[o].label) : '<span class="rot">nicht gefunden</span>'}</td>
-        <td><button class="knopf klein" onclick="ortKorrigieren(REFS[${ref(o)}])">korrigieren</button></td></tr>`).join("")}
-      </tbody></table></details></details>
-  <details class="karte akk" name="akt" ${lies("aktOffen") === "5" ? "open" : ""} ontoggle="if (this.open) merke('aktOffen', '5')"><summary><h3>5 · Einstellungen</h3></summary>
-    <p>Aktuelles Studienjahr <select id="eJahr"><option value="" ${!e.studienjahrFest ? "selected" : ""}>automatisch nach Datum (${sjText(studienjahrHeute())})</option>${[...new Set([studienjahrHeute(), ...jahre()])].sort().reverse().map((j) => `<option value="${j}" ${j === e.studienjahrFest ? "selected" : ""}>fest: ${sjText(j)}</option>`).join("")}</select>
+  const tab = AKT_REITER.some(([k]) => k === lies("aktTab")) ? lies("aktTab") : "uebersicht";
+  const wann = (t) => `<p class="akt-wann">${t}</p>`;
+  const inhalt = {
+    uebersicht: () => aktUebersicht(),
+    team: () => wann("<b>Wann?</b> Zu Beginn des Studienjahres oder wenn sich das Team ändert.") + `    <p>Aktuelles Studienjahr <select id="eJahr"><option value="" ${!e.studienjahrFest ? "selected" : ""}>automatisch nach Datum (${sjText(studienjahrHeute())})</option>${[...new Set([studienjahrHeute(), ...jahre()])].sort().reverse().map((j) => `<option value="${j}" ${j === e.studienjahrFest ? "selected" : ""}>fest: ${sjText(j)}</option>`).join("")}</select>
        &nbsp; Quote Profil <input class="eingabe" id="eQuote" type="number" min="0" max="100" step="5" value="${Math.round(e.quote * 100)}" style="width:70px"> %</p>
     <p class="leise klein">Soll = Vorgabe an Besuchen im Studienjahr. Änderungen werden sofort gespeichert.</p>
     <p class="klein"><b>Wer bucht Mathe-Besuche?</b> Nur Buchungen dieser Personen zählen – Mentor/innen und andere sieht die Seite nicht als «gebucht».
@@ -2510,24 +2518,78 @@ function ansichtAktualisieren() {
         <td><input class="eingabe" type="number" min="0" value="${esc(d.sollHalbtag ?? "")}" style="width:70px"></td><td><input class="eingabe" type="number" min="0" value="${esc(d.sollPQ ?? d.soll ?? "")}" style="width:70px"></td>
         <td>${d.kuerzel ? `<button class="knopf klein" title="Person entfernen" onclick="dozWeg(this)">✕</button>` : ""}</td></tr>`).join("")}
     </tbody></table>
-    <p><button class="knopf haupt" id="einstSpeichern">Einstellungen speichern</button> <span class="leise klein" id="einstStand"></span></p></details>
-  <details class="karte akk" name="akt"><summary><b>6 · Einmalig: alte Excel-Liste</b> <span class="leise klein">(${S.alt.length} Personen eingelesen)</span></summary>
-    <p>«Buchhaltung Praxisbesuche.xlsx» – liefert den Verlauf: wer wen früher besucht hat, Bemerkungen. Ist bereits eingelesen; nur bei Bedarf erneut.</p>
+    <p><button class="knopf haupt" id="einstSpeichern">Einstellungen speichern</button> <span class="leise klein" id="einstStand"></span></p>`,
+    tool: () => wann("<b>Wann?</b> <b>Blockpraktika</b> etwa einmal pro Jahr, sobald Profil und Quartal mit Stundenplänen im Tool stehen – und kurz vor einer Buchungsrunde nochmals. <b>Halbtag</b> nach jeder Periode A–D, sobald sie im Tool eingetragen ist, und nochmals, wenn die Studierenden ihre Stundenpläne eingetragen haben. Jedes Holen ergänzt und aktualisiert – nichts geht verloren.")
+      + `    <p>Studienjahre <input class="eingabe" id="holJahre" value="${esc(`${jahrPlus(e.studienjahr, -4)} bis ${e.studienjahr}`)}" size="16">
+       <label class="klein"><input type="checkbox" id="holPlan" checked> mit Stundenplänen (Mathe-Lektionen) für ${sjText(e.studienjahr)}</label></p>
+    <p><button class="knopf haupt" id="toolHolen">Praktikumstool öffnen und Daten holen</button>
+       <span class="leise klein">Im Tool anmelden und dort das Lesezeichen «Praxisbesuche-Export» anklicken.</span></p>
+    <p class="klein"><b>Einzelne Person nachtragen</b> (kommt selten vor): Praktikumstool öffnen, die Seite dieser Person aufrufen
+       und dort das Lesezeichen klicken – dann kommt nur dieses Praktikum mit Stundenplan dazu.</p>
+    <details><summary class="leise klein">oder eine gespeicherte Datei einlesen</summary>
+      <input type="file" id="dateiTool" accept=".json" multiple> <button class="knopf" id="importTool">Einlesen</button></details>
+    <div class="import-ergebnis" id="ergTool"></div>
+      <details class="karte" style="margin-top:14px"><summary><b>Lesezeichen «Praxisbesuche-Export» einrichten</b> <span class="leise klein">(einmal pro Person und Browser)</span></summary>
+        <p class="klein">Das Lesezeichen ist ein kleines Programm, das im Praktikumstool die Seiten liest, die man auch von Hand aufrufen kann. Es schreibt nichts ins Tool. Einrichten kann es jede Person mit Zugang zum Praktikumstool.</p>
+        <ol class="klein">
+          <li><button class="knopf klein" onclick="lesezeichenKopieren()">Lesezeichen-Text kopieren</button> <span class="leise">(oder im Teams-Ordner die Datei «Werkzeuge/lesezeichen.txt» öffnen und den ganzen Text kopieren)</span></li>
+          <li>In Chrome die Lesezeichenleiste einblenden: <b>Cmd + Shift + B</b> (Mac) bzw. <b>Ctrl + Shift + B</b> (Windows).</li>
+          <li>Rechtsklick auf die Leiste → <b>«Seite hinzufügen …»</b>. Name: <b>Praxisbesuche-Export</b>. Bei «URL» den kopierten Text einfügen → Speichern.</li>
+          <li>Fertig. Danach hier «Praktikumstool öffnen und Daten holen» klicken, im Tool anmelden und das Lesezeichen anklicken.</li>
+        </ol></details>`,
+    zusatz: () => `<div class="karte"><h3>Spezialfälle</h3>` + wann("<b>Wann?</b> Einmal pro Jahr, wenn die Praktikumsabteilung die Liste für die Blockpraktika schickt. Solange der Aufbau der Liste gleich bleibt, liest die Seite sie direkt ein; was sie nicht zuordnen kann, meldet sie.") + `    <p>Excel-Liste «Spezialfälle Besuchsplanung» der Praktikumsabteilung. Studienjahr:
+      <select id="spezJahr">${[...new Set([e.studienjahr, ...jahre()])].map((j) => `<option ${j === e.studienjahr ? "selected" : ""} value="${j}">${sjText(j)}</option>`).join("")}</select></p>
+    <input type="file" id="dateiSpez" accept=".xlsx,.xls"> <button class="knopf haupt" id="importSpez">Einlesen</button>
+    <div class="import-ergebnis" id="ergSpez"></div></div>
+      <div class="karte"><h3>Checkliste der Praktikumsabteilung</h3>` + wann("<b>Wann?</b> Einmal pro Jahr – damit alle die aktuelle Fassung haben. Die Regeln daraus stehen unter «Regeln Block».") + `    <p style="margin-top:10px"><b>Checkliste als PDF im Ordner ablegen</b> (damit alle die aktuelle Fassung haben):
+      <input type="file" id="dateiCheck" accept=".pdf"> <button class="knopf" id="checkAblegen">Ablegen</button></p>
+    <div id="dokumente" class="klein"></div></div>
+      <div class="karte"><h3>Alte Excel-Liste <span class="leise klein">(einmalig, ${S.alt.length} Personen eingelesen)</span></h3>` + wann("Liefert den Verlauf früherer Jahre. Ist bereits eingelesen; nur bei Bedarf erneut.") + `    <p>«Buchhaltung Praxisbesuche.xlsx» – liefert den Verlauf: wer wen früher besucht hat, Bemerkungen. Ist bereits eingelesen; nur bei Bedarf erneut.</p>
     <input type="file" id="dateiAlt" accept=".xlsx"> <button class="knopf" id="importAlt">Einlesen</button>
-    <div class="import-ergebnis" id="ergAlt"></div></details>`;
+    <div class="import-ergebnis" id="ergAlt"></div></div>`,
+    regelnBlock: () => wann("<b>Wann?</b> Einmal pro Studienjahr aus der Checkliste übernehmen. Termine, die dagegen verstossen, bietet die Seite beim Buchen nicht an. Änderungen werden sofort gespeichert.") + `    <table class="regeln">
+      <tr><td>Arbeitssitzung Profil (Vormittag, keine Besuche)</td><td><input class="eingabe" type="date" id="eArbP" value="${esc(e.arbeitssitzungProfil || "")}"></td></tr>
+      <tr><td>Arbeitssitzung Quartal (Vormittag, keine Besuche)</td><td><input class="eingabe" type="date" id="eArbQ" value="${esc(e.arbeitssitzungQuartal || "")}"></td></tr>
+      <tr><td>Profil: keine Besuche an den ersten … Praktikumstagen</td><td><input class="eingabe" type="number" min="0" max="10" id="rProfil" value="${esc(regel("profilErsteTage"))}" style="width:60px"></td></tr>
+      <tr><td>Quartal: keine Besuche in den ersten … Kalendertagen (7 = erste Woche)</td><td><input class="eingabe" type="number" min="0" max="21" id="rQuartal" value="${esc(regel("quartalErsteTage"))}" style="width:60px"></td></tr>
+      <tr><td>Nicht am letzten Praktikumstag</td><td><input type="checkbox" id="rLetzter" ${regel("letzterTag") ? "checked" : ""}></td></tr>
+      <tr><td>Höchstens … Besuche pro Woche bei einer Person</td><td><input class="eingabe" type="number" min="1" max="5" id="rWoche" value="${esc(regel("maxProWoche"))}" style="width:60px"></td></tr>
+      <tr><td>«Zeit zum Besprechen»: so viele Minuten frei nach dem Mathe-Block</td><td><input class="eingabe" type="number" min="10" max="120" step="5" id="rBespr" value="${esc(regel("besprechungMin"))}" style="width:60px"></td></tr>
+    </table>`,
+    regelnHalbtag: () => wann("Für die Halbtagespraktika gibt es im Moment keine eigenen Regeln. Kommen welche dazu, werden sie hier eingetragen.") + `<div class="leer">Noch keine Regeln.</div>`,
+    orte: () => wann("<b>Wann?</b> Selten – nur wenn bei der Umkreissuche ein Schulort fehlt oder falsch liegt.") + `    <p>Sucht die Koordinaten der Schulorte bei swisstopo (geo.admin.ch). Übermittelt werden nur Ortsnamen, keine Personen.
+       Bei mehreren gleichnamigen Orten nimmt die Seite den nächsten zu Luzern.</p>
+    <button class="knopf haupt" id="orteSuchen">Fehlende Orte suchen</button>
+    <span class="leise klein">${Object.keys(S.orte).length} Orte bekannt, ${schulorte().filter((o) => !S.orte[o]).length} fehlen.</span>
+    <div class="import-ergebnis" id="ergOrte"></div>
+    <details style="margin-top:8px"><summary class="leise">Orte ansehen und korrigieren</summary>
+      <table class="liste" style="max-width:700px;margin-top:6px"><thead><tr><th>Schulort</th><th>gefunden</th><th></th></tr></thead><tbody>
+      ${schulorte().map((o) => `<tr><td>${esc(o)}</td><td class="klein">${S.orte[o] ? esc(S.orte[o].label) : '<span class="rot">nicht gefunden</span>'}</td>
+        <td><button class="knopf klein" onclick="ortKorrigieren(REFS[${ref(o)}])">korrigieren</button></td></tr>`).join("")}
+      </tbody></table></details>`,
+  };
+  return `<h2>Aktualisieren</h2>
+  <p class="leise">Betrifft euch beim Buchen in der Regel nicht – hier werden die Daten gepflegt. Alles wird im Browser gelesen, nichts geht an einen anderen Dienst.</p>
+  <div class="akt-reiter">${AKT_REITER.map(([k, t]) => `<button class="${k === tab ? "an" : ""}" onclick="aktReiter('${k}')">${t}</button>`).join("")}</div>
+  <div class="akt-inhalt">${inhalt[tab]()}</div>`;
+}
+async function lesezeichenKopieren() {
+  try {
+    const w = await (S.wurzel && S.wurzel !== S.ordner ? S.wurzel : S.ordner).getDirectoryHandle("Werkzeuge");
+    const t = await (await (await w.getFileHandle("lesezeichen.txt")).getFile()).text();
+    await navigator.clipboard.writeText(t.trim());
+    meldung("Lesezeichen-Text kopiert – jetzt in Chrome als neues Lesezeichen einfügen.");
+  } catch (e) { meldung("Kopieren ging nicht – bitte im Teams-Ordner «Werkzeuge/lesezeichen.txt» öffnen und den Text von Hand kopieren."); }
 }
 function aktualisierenVerbinden() {
-  $("#importTool").onclick = importTool;
-  $("#toolHolen").onclick = toolHolen;
-  $("#importSpez").onclick = importSpezial;
-  $("#importAlt").onclick = importAlt;
-  $("#einstSpeichern").onclick = () => einstellungenSpeichern(true);
+  const an = (id, f) => { const el = $(id); if (el) el.onclick = f; };
+  an("#importTool", importTool); an("#toolHolen", toolHolen); an("#importSpez", importSpezial); an("#importAlt", importAlt);
+  an("#einstSpeichern", () => einstellungenSpeichern(true)); an("#checkAblegen", checklisteAblegen); an("#orteSuchen", orteSuchen);
   // sofort speichern, sobald etwas geändert wird
   for (const el of document.querySelectorAll("#eJahr, #eQuote, #eArbP, #eArbQ, #rProfil, #rQuartal, #rLetzter, #rWoche, #rBespr, #eDoz input"))
     el.addEventListener("change", () => einstellungenSpeichern(false));
-  $("#checkAblegen").onclick = checklisteAblegen;
-  dokumenteZeigen();
-  $("#orteSuchen").onclick = orteSuchen;
+  if ($("#dokumente")) dokumenteZeigen();
+  if ($("#aktCheck")) (async () => { try { const d = await verzeichnis("dokumente"); let n = 0; for await (const [x] of d.entries()) if (/\.pdf$/i.test(x)) n++; $("#aktCheck").innerHTML = n ? `<span class="ok">✓ PDF im Ordner</span>` : `<span class="le">keine</span>`; } catch (e) { $("#aktCheck").innerHTML = `<span class="le">keine</span>`; } })();
 }
 async function importTool() {
   const dateien = [...$("#dateiTool").files];
@@ -2563,6 +2625,14 @@ async function praktikaUebernehmen(liste) {
   }
   bestand.praktika = Object.values(nach);
   bestand.stand = new Date().toISOString();
+  // für die Übersicht: wann welche Gruppe bzw. Halbtag-Periode zuletzt geholt wurde
+  bestand.geholt ||= {};
+  for (const d of liste) for (const p of d.praktika || []) {
+    if (!p.jahr) continue;
+    const g = p.gruppe === "Spezial" ? (/Quartal/i.test(p.zusatz || "") ? "Quartal" : /Profil/i.test(p.zusatz || "") ? "Profil" : "") : p.gruppe;
+    if (g === "Halbtag") { const b = ((bestand.arten || {})[p.art] || "").match(/Periode ([A-D])/); if (b) bestand.geholt[`${p.jahr}|Halbtag|${b[1]}`] = bestand.stand; }
+    else if (g === "Profil" || g === "Quartal") bestand.geholt[`${p.jahr}|${g}`] = bestand.stand;
+  }
   await schreibeJSON("stamm/praktika.json", bestand);
   const fremdeArten = Object.entries(Object.assign({}, ...liste.map((d) => d.andereArten || {})));
   const text = `${fremdeArten.length ? `<div class="karte" style="border-color:var(--achtung)"><b class="rot">⚠ Im Praktikumstool gibt es Mathe-Praktika in Arten, die hier nicht eingelesen werden:</b><ul>${fremdeArten.map(([id, t]) => `<li>${esc(t)} (Nr. ${esc(id)})</li>`).join("")}</ul>Bitte Rike melden, damit sie dazukommen.</div>` : ""}<ul><li>${neu} neu, ${geaendert} aktualisiert</li>${Object.entries(proJahr).sort().map(([k, v]) => `<li>${esc(sjText(k.split(" ")[0]))} ${esc(k.split(" ")[1])}: ${v}</li>`).join("")}</ul>`;
@@ -2775,7 +2845,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261106-095855";
+const STAND = "20261106-114237";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
