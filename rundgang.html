@@ -2201,7 +2201,7 @@ function ansichtStudierende() {
   const such = fw("ssuche", "").toLowerCase().trim(), sg = fw("sg", "alle"), archiv = fw("archiv", false), sjF = fw("sSj", "alle"), sort = fw("sSort", "name");
   const sj = S.einst.studienjahr;
   const imArchiv = Object.values(R.personen).filter((p) => p.archiv).length;
-  let liste = Object.values(R.personen).filter((p) => archiv ? p.archiv : !p.archiv);
+  let liste = Object.values(R.personen).filter((p) => archiv ? p.archiv : !p.archiv || such);   // beim Suchen auch Archivierte finden
   if (sg !== "alle") liste = liste.filter((p) => (p.studiengang || "").replace(/[\s.\d]/g, "").startsWith(sg));
   if (such) liste = liste.filter((p) => passtSuche([p.name, p.studiengang, ...(p.praktika.map((x) => x.schulort + " " + x.schulhaus))].join(" "), such));
   if (fw("nurAchtung", false)) liste = liste.filter((p) => (p.achtungen || []).length || p.praktika.some((x) => x.achtung && x.achtung.length));
@@ -2243,11 +2243,11 @@ function ansichtStudierende() {
         <button class="knopf klein" title="ändern" onclick="achtungSetzen(REFS[${ref(p.id)}], REFS[${ref(x.id)}])">ändern</button>
         <button class="knopf klein" title="löschen" onclick="achtungWeg(REFS[${ref(p.id)}], REFS[${ref(x.id)}])">✕</button></div>`),
                  ...p.notizen.slice(-1).map((x) => `<div>${esc(x.text.slice(0, 80))}</div>`), ...(!p.notizen.length && p.alt && p.alt.bemerkung ? [`<div class="leise">${esc(p.alt.bemerkung.slice(0, 80))}</div>`] : [])].join("");
-    return `<tr class="${a ? "zeile-achtung" : ""}"><td>${a ? `<span class="achtung">⚠</span>` : ""}</td><td><span class="name" onclick="detailZeigen(REFS[${ref(p.id)}])">${esc(p.name)}</span>${archiv ? `<div><button class="knopf klein haupt" title="Wieder zu den aktuellen Studierenden" onclick="archivSetzen(REFS[${ref(p.id)}], false)">zurückholen</button></div>` : ""}</td>
+    return `<tr class="${a ? "zeile-achtung" : ""}"><td>${a ? `<span class="achtung">⚠</span>` : ""}</td><td><span class="name" onclick="detailZeigen(REFS[${ref(p.id)}])">${esc(p.name)}</span>${p.archiv && !archiv ? ` <span class="klein leise">(im Archiv)</span>` : ""}${p.archiv ? `<div><button class="knopf klein haupt" title="Wieder zu den aktuellen Studierenden" onclick="archivSetzen(REFS[${ref(p.id)}], false)">zurückholen</button></div>` : ""}</td>
     <td>${esc(p.studiengang || "")}</td><td class="klein">${esc((p.faecher || []).join(", "))}</td>
     <td class="pspalte p-halbtag">${zelle(p, "Halbtag")}</td><td class="pspalte p-profil">${zelle(p, "Profil")}</td><td class="pspalte p-quartal">${zelle(p, "Quartal")}</td><td class="klein p-bem">${bem}</td>
     <td style="white-space:nowrap"><button class="knopf klein" onclick="achtungSetzen(REFS[${ref(p.id)}])">Achtung / Bemerkung</button>
-      ${archiv ? ""
+      ${p.archiv ? ""
         : p.archivVonHand ? `<button class="knopf klein" title="Wieder ins Archiv" onclick="archivSetzen(REFS[${ref(p.id)}], true)">ins Archiv</button>` : ""}</td></tr>`; }).join("")}
   </tbody></table>`;
 }
@@ -2727,7 +2727,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261106-071406";
+const STAND = "20261106-071956";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
