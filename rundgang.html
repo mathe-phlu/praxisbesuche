@@ -763,7 +763,9 @@ async function allesLaden() {
   for (const p of pr.praktika || []) {
     S.praktika[p.idpraktikum] = p;
     const alte = S.personen[p.idstudent];
-    if (!alte || p.jahr >= alte.jahr) S.personen[p.idstudent] = { id: p.idstudent, name: p.name, studiengang: p.studiengang, faecher: p.faecher, jahr: p.jahr };
+    const sg = /^studiengang$/i.test(p.studiengang || "") ? "" : p.studiengang;   // ältere Importe: Spaltenüberschrift statt Wert
+    if (!alte || p.jahr >= alte.jahr) S.personen[p.idstudent] = { id: p.idstudent, name: p.name, studiengang: sg || (alte && alte.studiengang) || "", faecher: p.faecher, jahr: p.jahr };
+    else if (!alte.studiengang && sg) alte.studiengang = sg;
   }
   // Spezialpraktika ersetzen meist ein Halbtags-, Profil- oder Quartalspraktikum. Im Tool steht das in Klammern,
   // z.B. «Spezialpraktikum 1 (Halbtagespraktikum)». «Mentorat» oder ein anderes Fach (z.B. «… EN») betrifft uns nicht.
@@ -898,7 +900,7 @@ function berechnen() {
   const personen = {};
   for (const p of Object.values(S.personen)) {
     const alt = altNach[nameSchluessel(p.name)] || null;
-    personen[p.id] = { ...p, alt, spezial: spezialNach[p.id] || [], praktika: [], notizen: [] };
+    personen[p.id] = { ...p, studiengang: p.studiengang || (alt && alt.studiengang) || "", alt, spezial: spezialNach[p.id] || [], praktika: [], notizen: [] };
   }
   // Personen nur aus der alten Liste (frühere Jahrgänge)
   const zugeordnet = new Set(Object.values(personen).map((p) => p.alt && p.alt.schluessel).filter(Boolean));
@@ -913,6 +915,11 @@ function berechnen() {
     if (e.praktikum) (proPrakt[(S.alias || {})[e.praktikum] || e.praktikum] ||= []).push(e);
     if (e.typ === "bemerkung" && e.person && personen[e.person]) personen[e.person].notizen.push(e);
     if (e.typ === "achtung" && e.person && personen[e.person]) (personen[e.person].achtungen ||= []).push(e);
+    if (e.typ === "person" && e.person && personen[e.person]) {   // Studiengang/Fächer von Hand geändert (gilt für alle)
+      if (e.studiengang != null) personen[e.person].studiengang = e.studiengang;
+      if (e.faecher) personen[e.person].faecher = e.faecher;
+      personen[e.person].angepasst = e.wer;
+    }
     if (e.typ === "achtung_weg" && e.person && personen[e.person]) personen[e.person].achtungen = (personen[e.person].achtungen || []).filter((a) => a.id !== e.bezug);
   }
 
@@ -1083,6 +1090,8 @@ function noetigBestimmen(x) {
   if (x.stand === "abgebrochen") { n = "nein"; warum = "Praktikum abgebrochen"; }
   x.noetig = n; x.warum = warum;
   if (x.stand === "offen" && n === "nein") x.stand = "nicht nötig";
+  // vergangene Studienjahre: «offen» heisst hier, es hat kein Besuch stattgefunden
+  if (x.stand === "offen" && x.jahr && x.jahr < S.einst.studienjahr) x.stand = "nicht besucht";
 }
 
 /* ---------- Zeichnen ---------- */
@@ -1154,11 +1163,11 @@ function ansichtStart() {
   const einzel = htAlle.filter((p) => /^Einzel/.test(periode(p))), ht = htAlle.filter((p) => !/^Einzel/.test(periode(p)));
   const meine = pr.filter((p) => S.ich && p.wer === S.ich);
   const offenQ = q.filter((p) => p.stand === "offen").length;
-  const ziel = Math.ceil(S.einst.quote * prof.length), eingeteilt = prof.filter((p) => p.stand !== "offen" && p.stand !== "nicht nötig").length;
+  const ziel = Math.ceil(S.einst.quote * prof.length), eingeteilt = prof.filter((p) => !["offen", "nicht nötig", "nicht besucht"].includes(p.stand)).length;
   const zahl = Object.keys(S.praktika).length;
   const balken = (wert, von) => `<div class="sk-balken"><div style="width:${von ? Math.min(100, Math.round(100 * wert / von)) : 0}%"></div></div>`;
   const naechste = meine.filter((x) => x.termin && x.stand !== "besucht").sort((a, b) => (a.termin.datum + a.termin.zeit).localeCompare(b.termin.datum + b.termin.zeit))[0];
-  const dabei = (p) => p.stand !== "offen" && p.stand !== "nicht nötig";
+  const dabei = (p) => !["offen", "nicht nötig", "nicht besucht"].includes(p.stand);
   // eigenes Soll (Aktualisieren › Einstellungen): nur anzeigen, wenn eingetragen
   const meinSoll = (S.einst.dozierende || []).find((d) => d.kuerzel === S.ich) || {};
   const sollVon = (soll) => Number(soll) ? `<span class="z-von"> / ${Number(soll)}</span>` : "";
@@ -1208,7 +1217,7 @@ function sollKarte(sj) {
 function geheZu(a, filter) { S.ansicht = a; merke("ansicht", a); if (filter) Object.assign(S.filter, filter); zeichnen(); window.scrollTo(0, 0); }
 
 function standChip(x, kurz = false, ohneWer = false) {
-  const cls = { offen: "s-offen", "übernommen": "s-uebernommen", gebucht: "s-gebucht", besucht: "s-besucht", "nicht nötig": "s-nicht", abgebrochen: "s-abbruch" }[x.stand] || "s-nicht";
+  const cls = { offen: "s-offen", "übernommen": "s-uebernommen", gebucht: "s-gebucht", besucht: "s-besucht", "nicht nötig": "s-nicht", "nicht besucht": "s-nicht", abgebrochen: "s-abbruch" }[x.stand] || "s-nicht";
   const wer = ohneWer ? "" : x.wer ? ` · ${esc(x.wer)}` : x.dozentTool ? ` · ${esc(x.dozentTool)}` : "";
   const t = "";   // der Termin steht in «Meine Termine», nicht beim Stand
   const doppelt = x.doppelt && x.doppelt.length ? ` <span class="hinweis" title="Mehrere haben übernommen – bitte absprechen">doppelt: ${esc(x.doppelt.join(", "))}</span>` : "";
@@ -2244,7 +2253,7 @@ function ansichtStudierende() {
         <button class="knopf klein" title="löschen" onclick="achtungWeg(REFS[${ref(p.id)}], REFS[${ref(x.id)}])">✕</button></div>`),
                  ...p.notizen.slice(-1).map((x) => `<div>${esc(x.text.slice(0, 80))}</div>`), ...(!p.notizen.length && p.alt && p.alt.bemerkung ? [`<div class="leise">${esc(p.alt.bemerkung.slice(0, 80))}</div>`] : [])].join("");
     return `<tr class="${a ? "zeile-achtung" : ""}"><td>${a ? `<span class="achtung">⚠</span>` : ""}</td><td><span class="name" onclick="detailZeigen(REFS[${ref(p.id)}])">${esc(p.name)}</span>${p.archiv && !archiv ? ` <span class="klein leise">(im Archiv)</span>` : ""}${p.archiv ? `<div><button class="knopf klein haupt" title="Wieder zu den aktuellen Studierenden" onclick="archivSetzen(REFS[${ref(p.id)}], false)">zurückholen</button></div>` : ""}</td>
-    <td>${esc(p.studiengang || "")}</td><td class="klein">${esc((p.faecher || []).join(", "))}</td>
+    <td class="korr" style="cursor:pointer" title="Klick: Studiengang und Fächer ändern" onclick="personAnpassen(REFS[${ref(p.id)}])">${esc(p.studiengang || "") || `<span class="leise">–</span>`}</td><td class="klein korr" style="cursor:pointer" title="Klick: Studiengang und Fächer ändern" onclick="personAnpassen(REFS[${ref(p.id)}])">${esc((p.faecher || []).join(", ")) || `<span class="leise">–</span>`}</td>
     <td class="pspalte p-halbtag">${zelle(p, "Halbtag")}</td><td class="pspalte p-profil">${zelle(p, "Profil")}</td><td class="pspalte p-quartal">${zelle(p, "Quartal")}</td><td class="klein p-bem">${bem}</td>
     <td style="white-space:nowrap"><button class="knopf klein" onclick="achtungSetzen(REFS[${ref(p.id)}])">Achtung / Bemerkung</button>
       ${p.archiv ? ""
@@ -2252,6 +2261,16 @@ function ansichtStudierende() {
   </tbody></table>`;
 }
 
+async function personAnpassen(id) {
+  const p = R.personen[id]; if (!p) return;
+  if (!S.ich) return meldung("Bitte oben rechts «Ich bin» wählen.");
+  const sg = await frage(`${p.name}\n\nStudiengang (z.B. SR24, SVA25, SK24):`, { art: "text", wert: p.studiengang || "" });
+  if (sg === null) return;
+  const f = await frage(`${p.name}\n\nFächer, mit Komma getrennt (z.B. MA, NT, DE):`, { art: "text", wert: (p.faecher || []).join(", ") });
+  if (f === null) return;
+  await eintragen({ typ: "person", person: id, studiengang: sg.trim(), faecher: f.split(/[,;\s]+/).map((t) => t.trim().toUpperCase()).filter(Boolean) });
+  meldung("Gespeichert – gilt für alle.");
+}
 async function archivSetzen(personId, wert) {
   if (!S.ich) return meldung("Bitte oben rechts «Ich bin» wählen.");
   await eintragen({ typ: "archiv", person: personId, wert });
@@ -2331,7 +2350,8 @@ function detailZeigen(id, oeffnen = true) {
     <h2>${esc(p.name)}${p.archiv ? ` <span class="klein leise">(im Archiv)</span>` : ""}</h2>
     <p>${p.archiv ? `<button class="knopf klein haupt" title="Wieder zu den aktuellen Studierenden" onclick="archivSetzen(REFS[${ref(p.id)}], false)">Aus dem Archiv zurückholen</button>`
       : `<button class="knopf klein" title="Zu den abgeschlossenen Studierenden legen (gilt für alle, jederzeit rückgängig)" onclick="archivSetzen(REFS[${ref(p.id)}], true)">ins Archiv</button>`}</p>
-    <div class="leise">${esc(p.studiengang || "")}${p.faecher && p.faecher.length ? " · Fächer: " + esc(p.faecher.join(", ")) : ""}${p.nurAlt ? " · nur aus der alten Liste" : ""}</div>
+    <div class="leise">${esc(p.studiengang || "Studiengang unbekannt")}${p.faecher && p.faecher.length ? " · Fächer: " + esc(p.faecher.join(", ")) : ""}${p.nurAlt ? " · nur aus der alten Liste" : ""}${p.angepasst ? ` · angepasst von ${esc(p.angepasst)}` : ""}
+      <button class="knopf klein" title="Studiengang und Fächer korrigieren (gilt für alle)" onclick="personAnpassen(REFS[${ref(p.id)}])">ändern</button></div>
     ${p.spezial.length ? `<div class="karte" style="margin-top:12px;border-color:var(--achtung)"><b class="rot">⚠ Spezialfall</b>${p.spezial.map((f) => `<div>${sjText(f.jahr)} · ${esc(f.kategorie)}: <b>${esc(f.hinweis)}</b>${f.bemerkung ? " – " + esc(f.bemerkung) : ""}</div>`).join("")}</div>` : ""}
     <h3>Verlauf</h3>
     <table class="liste"><thead><tr><th>Jahr</th><th>Praktikum</th><th>Schule</th><th>Besuch nötig?</th><th>Stand · Bericht</th><th></th></tr></thead><tbody>
@@ -2727,7 +2747,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261106-071956";
+const STAND = "20261106-080530";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
