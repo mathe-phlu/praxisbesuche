@@ -155,6 +155,7 @@ body.holz .sk-reihe > .sk:nth-child(3n) { transform: rotate(-.2deg); }
 body.holz .sk:hover { transform: rotate(0) translateY(-3px); box-shadow: 0 10px 22px rgba(50, 30, 10, .35); }
 body.holz .start-rechts { border-left: 0; padding-left: 0; }
 body.holz .sk-gruppe.leer-gruppe { visibility: hidden; }
+body.holz main { margin: 0 auto; padding-left: max(20px, 3vw); padding-right: max(20px, 3vw); }
 body.holz .start-kopf h2 { display: inline-block; background: #fffdf6; color: #2f3e4c; padding: 2px 16px 4px; box-shadow: 0 3px 7px rgba(60, 40, 10, .3); transform: rotate(-.8deg); }
 body.holz .rundgang-kasten { background: #fffdf8; border: 0; border-radius: 2px; box-shadow: 0 4px 12px rgba(50, 30, 10, .3); }
 body.holz main > .karte, body.holz #app > .karte { box-shadow: 0 4px 12px rgba(50, 30, 10, .3); }
@@ -2886,7 +2887,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261106-180234";
+const STAND = "20261106-180807";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
