@@ -2754,7 +2754,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261106-094908";
+const STAND = "20261106-095512";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
@@ -2771,15 +2771,25 @@ standPruefen(); setInterval(standPruefen, 5 * 60 * 1000); window.addEventListene
 </script>
 <script>window.RUNDGANG_ECHT = true;</script>
 <style>
-#tour { position: fixed; z-index: 50; max-width: 440px; max-height: 80vh; overflow: auto; background: #fff; border: 2px solid var(--ph-braun); border-radius: 10px;
-        box-shadow: 0 8px 30px rgba(0,0,0,.25); padding: 14px 16px; font-size: 15px; transition: top .35s, left .35s; }
-#tour .griff { cursor: move; user-select: none; font-size: 12px; color: var(--leise); margin: -6px 0 4px; }
-#tour ul { margin: 4px 0; padding-left: 18px; } #tour li { margin: 3px 0; }
-#tour .t-tool { margin-top: 8px; padding: 6px 8px; background: var(--ph-sand); border-left: 4px solid var(--ph-braun); border-radius: 4px; font-size: 14px; }
-#tour h4 { margin: 0 0 6px; font-family: var(--hand); font-size: 22px; color: var(--ph-braun-dunkel); font-weight: 400; }
-#tour .tk { display: flex; gap: 8px; justify-content: space-between; align-items: center; margin-top: 10px; }
-#tour .pkt { font-size: 12px; color: var(--leise); }
-.tour-licht { outline: 3px solid #e0a43a !important; outline-offset: 3px; border-radius: 4px; box-shadow: 0 0 0 9999px rgba(0,0,0,.18) !important; position: relative; z-index: 40; }
+#tour { position: fixed; z-index: 50; width: 440px; max-width: calc(100vw - 20px); max-height: 82vh; overflow: auto; background: #fff; border-radius: 10px;
+        box-shadow: 0 0 0 2px var(--ph-braun), 0 14px 40px rgba(0,0,0,.35); font-size: 15.5px; line-height: 1.5; transition: top .35s, left .35s; }
+#tour .t-kopf { background: var(--ph-braun); color: #fff; padding: 10px 14px 8px; cursor: move; user-select: none; position: sticky; top: 0; }
+#tour .t-zeile { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12.5px; color: #f3e9da; }
+#tour .t-zu { background: transparent; border: 1px solid rgba(255,255,255,.5); color: #fff; border-radius: 4px; padding: 2px 8px; font-size: 12.5px; cursor: pointer; }
+#tour .t-zu:hover { background: var(--ph-braun-dunkel); }
+#tour h4 { margin: 4px 0 6px; font-family: var(--hand); font-size: 25px; font-weight: 400; color: #fff; line-height: 1.15; }
+#tour .t-balken { height: 4px; background: rgba(255,255,255,.3); border-radius: 2px; overflow: hidden; }
+#tour .t-balken span { display: block; height: 100%; background: #fff; }
+#tour .t-inhalt { padding: 12px 16px 4px; color: var(--tinte); }
+#tour .t-inhalt p { margin: 6px 0; }
+#tour ul { margin: 2px 0; padding-left: 0; list-style: none; }
+#tour li { margin: 0 0 9px; padding-left: 18px; position: relative; }
+#tour li::before { content: ""; position: absolute; left: 3px; top: .62em; width: 7px; height: 7px; border-radius: 2px; background: var(--ph-braun); }
+#tour .t-tool { margin: 6px 0 4px; padding: 8px 10px; background: var(--ph-sand); border-left: 4px solid var(--ph-braun); font-size: 14.5px; }
+#tour .tk { display: flex; gap: 8px; justify-content: space-between; align-items: center; padding: 10px 16px 14px; border-top: 1px solid var(--linie); margin-top: 6px; }
+#tour .tk select { font-size: 12.5px; max-width: 190px; color: var(--leise); border: 1px solid var(--linie); border-radius: 4px; padding: 3px; background: #fff; }
+#tour .tk .knopf { font-size: 15px; padding: 6px 14px; }
+.tour-licht { outline: 3px solid #e0a43a !important; outline-offset: 3px; border-radius: 4px; box-shadow: 0 0 0 9999px rgba(0,0,0,.22) !important; position: relative; z-index: 40; }
 </style>
 <script>
 /* Rundgang: führt mit Beispieldaten durch die Seite. Nichts wird gespeichert. */
@@ -2866,13 +2876,14 @@ function zeige(i) {
     if (!dlg.open && t.parentElement !== document.body) document.body.appendChild(t);
     let ziel = typeof s.ziel === "function" ? s.ziel() : s.ziel ? document.querySelector(s.ziel) : null;
     const ziele = Array.isArray(ziel) ? ziel : ziel ? [ziel] : []; ziel = ziele[0] || null;
-    t.innerHTML = `<div class="griff" title="Kästchen verschieben">⠿ ziehen zum Verschieben</div><button class="knopf klein" style="position:absolute;right:8px;top:8px" title="Rundgang beenden" onclick="rundgangEnde()">✕ Beenden</button>
-      <h4 style="margin-right:80px">${s.titel}</h4><div>${sText}</div>
-      <div style="margin-top:8px"><select class="eingabe klein" onchange="zeige(Number(this.value))" title="Direkt zu einem Schritt">${SCHRITTE.map((x, i) => `<option value="${i}" ${i === schritt ? "selected" : ""}>${i + 1}. ${x.titel}</option>`).join("")}</select></div>
-      <div class="tk"><span class="pkt">${schritt + 1} / ${SCHRITTE.length}</span>
-      <span>${schritt ? '<button class="knopf klein" onclick="weiter(-1)">Zurück</button>' : ""}
-      ${s.ende ? (ECHT ? '<button class="knopf haupt klein" onclick="rundgangEnde()">Schliessen</button>' : '<a href="./" style="text-decoration:none;background:var(--ph-braun);color:#fff;padding:4px 12px;border-radius:6px;font-weight:600">Zur echten Seite ›</a>')
-               : '<button class="knopf haupt klein" onclick="weiter(1)">Weiter</button>'}</span></div>`;
+    t.innerHTML = `<div class="t-kopf griff" title="Ziehen zum Verschieben"><div class="t-zeile"><span>Rundgang · Schritt ${schritt + 1} von ${SCHRITTE.length}</span>
+        <button class="t-zu" title="Rundgang beenden (Esc)" onclick="rundgangEnde()">✕ Beenden</button></div>
+      <h4>${s.titel}</h4><div class="t-balken"><span style="width:${Math.round((schritt + 1) / SCHRITTE.length * 100)}%"></span></div></div>
+      <div class="t-inhalt">${sText}</div>
+      <div class="tk"><select onchange="zeige(Number(this.value))" title="Direkt zu einem Schritt">${SCHRITTE.map((x, i) => `<option value="${i}" ${i === schritt ? "selected" : ""}>${i + 1}. ${x.titel}</option>`).join("")}</select>
+      <span style="display:flex;gap:8px">${schritt ? '<button class="knopf" onclick="weiter(-1)">‹ Zurück</button>' : ""}
+      ${s.ende ? (ECHT ? '<button class="knopf haupt" onclick="rundgangEnde()">Schliessen</button>' : '<a href="./" class="knopf haupt" style="text-decoration:none">Zur echten Seite ›</a>')
+               : '<button class="knopf haupt" onclick="weiter(1)">Weiter ›</button>'}</span></div>`;
     if (ziel) {
       ziele.forEach((z) => z.classList.add("tour-licht")); ziel.scrollIntoView({ block: "center" });
       // Platz: unter dem Ziel, sonst darüber, sonst unten rechts in der Ecke (verdeckt das Ziel möglichst nicht)
@@ -2889,7 +2900,7 @@ function zeige(i) {
 function weiter(d) { zeige(schritt + d); }
 /* Kästchen mit der Maus verschieben (falls es etwas verdeckt) */
 document.addEventListener("mousedown", (e) => {
-  const g = e.target.closest && e.target.closest("#tour .griff"); if (!g) return;
+  const g = e.target.closest && e.target.closest("#tour .griff"); if (!g || e.target.closest("button")) return;
   const t = document.getElementById("tour"), r = t.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
   t.style.transition = "none";
   const zieh = (m) => { t.style.left = Math.max(0, m.clientX - dx) + "px"; t.style.top = Math.max(0, m.clientY - dy) + "px"; };
