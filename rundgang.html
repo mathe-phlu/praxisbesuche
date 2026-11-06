@@ -2747,7 +2747,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261106-090718";
+const STAND = "20261106-091925";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
@@ -2796,10 +2796,13 @@ const SCHRITTE = [
     vorher: () => { const b = [...document.querySelectorAll("#app table.liste button")].find((x) => x.textContent.trim().startsWith("Termine")); if (b) b.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
   { ansicht: "planung", titel: "Wichtig: im Praktikumstool eintragen", text: "<ul><li>Nach dem Klick öffnet sich rechts <b>das Praktikumstool bei dieser Person</b>.</li><li>Dort den Besuch <b>auch eintragen</b> – andere Fächer und Mentor/innen buchen dort ebenfalls.</li><li>Kurz prüfen, ob die Lektion inzwischen besetzt ist. Wenn ja: hier <b>Termin wieder abgeben</b> und einen anderen wählen. Sonst eintragen, Fenster schliessen, fertig.</li></ul>" },
   // --- Halbtag
-  { ziel: () => zeileMit("Halb Hanna"), ansicht: "halbtag", titel: "Halbtag: Doppelbesuche", text: "<ul><li>Gleiche Periode, gleiches Schulhaus, gleiche Praxislehrperson → die beiden stehen als <b>Paar</b> in einer Zeile.</li><li>Ein Klick auf einen Termin bucht <b>beide zusammen</b>.</li><li>Danach öffnet sich das Tool nicht sofort: Du bekommst <b>für jede Person einen Knopf</b> und trägst den Besuch nacheinander bei beiden ein.</li></ul>", vorher: () => geheZu("halbtag") },
-  { ziel: "#frageFeld", ansicht: "halbtag", titel: "Stundenpläne verschieden eingetragen", text: "<ul><li>Hier haben Ida und Jan ihren Stundenplan verschieden eingetragen (einmal Doppellektion, einmal zwei Einzellektionen).</li><li>Dann stehen <b>beide Pläne nebeneinander</b>: zuerst links für Person A den Termin wählen, dann rechts für Person B.</li></ul>",
-    vorher: () => { const z = zeileMit("Jost Jan"); const b = z && [...z.querySelectorAll("button")].find((x) => x.textContent.trim().startsWith("Termine")); if (b) b.click(); }, nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
-  { ziel: () => zeileMit("Kein Karl"), ansicht: "halbtag", titel: "Halbtag: aufräumen", text: "<ul><li><b>✕</b> beim Namen: Wer nicht in die Liste gehört (z.B. kein eigener Mathe-Unterricht), lässt sich entfernen – mit Sicherheitshaken. Unten bei «Entfernt» lässt er sich wieder aufnehmen.</li><li><b>⇄ Doppelbesuch</b>: zwei sind in derselben Klasse, wurden aber nicht erkannt → von Hand zusammenlegen.</li><li><b>trennen</b>: fälschlich als Paar erkannt → in zwei Einzelbesuche trennen.</li></ul>", vorher: () => geheZu("halbtag") },
+  { ziel: () => ECHT ? paarZeilen()[0] || null : zeileMit("Halb Hanna"), ansicht: "halbtag", titel: "Halbtag: Doppelbesuche", text: "<ul><li>Gleiche Periode, gleiches Schulhaus, gleiche Praxislehrperson → die beiden stehen als <b>Paar</b> in einer Zeile.</li><li>Ein Klick auf einen Termin bucht <b>beide zusammen</b>.</li><li>Danach öffnet sich das Tool nicht sofort: Du bekommst <b>für jede Person einen Knopf</b> und trägst den Besuch nacheinander bei beiden ein.</li></ul>", vorher: () => geheZu("halbtag") },
+  { ziel: () => ($("#frage").open ? $("#frageFeld") : null), ansicht: "halbtag", titel: "Stundenpläne verschieden eingetragen",
+    text: () => "<ul>" + (!ECHT ? "<li>Hier haben Ida und Jan ihren Stundenplan verschieden eingetragen (einmal Doppellektion, einmal zwei Einzellektionen).</li>"
+      : $("#frage").open ? "<li>Bei diesem Paar sind die Stundenpläne verschieden eingetragen.</li>" : "<li>Im Moment gibt es in der Liste kein solches Paar.</li>")
+      + "<li>Haben die beiden ihren Stundenplan verschieden eingetragen (andere Zeiten, einmal Doppel-, einmal Einzellektionen), stehen <b>beide Pläne nebeneinander</b>.</li><li>Zuerst links für Person A den Termin wählen, dann rechts für Person B. Jede Person wird einzeln gebucht.</li></ul>",
+    vorher: () => verschiedenesPaarOeffnen(), nachher: () => { const d = $("#frage"); if (d.open) d.close(); } },
+  { ziel: () => aufraeumKnoepfe(), ansicht: "halbtag", titel: "Halbtag: aufräumen", text: "<ul><li><b>✕</b> neben dem Namen: Wer nicht in die Liste gehört (z.B. kein eigener Mathe-Unterricht), lässt sich entfernen – mit Sicherheitshaken. Unten bei «Entfernt» lässt er sich wieder aufnehmen.</li><li><b>⇄ Doppelbesuch</b> (bei Einzelnen): zwei sind in derselben Klasse, wurden aber nicht erkannt → von Hand zusammenlegen.</li><li><b>trennen</b> (bei Paaren): fälschlich als Paar erkannt → in zwei Einzelbesuche trennen.</li></ul>", vorher: () => geheZu("halbtag") },
   // --- Meine Termine
   { ziel: "#app .filter", ansicht: "termine", titel: "Meine Termine", text: "<ul><li>Alle deine Besuche nach Tag; filtern nach Halbtag, Einzel, Profil, Quartal.</li><li><b>Liste für Excel kopieren</b>: die Liste in Excel oder eine Mail einfügen.</li><li><b>📅 Alle Termine für Outlook</b>: alle kommenden Besuche als Kalenderdatei. Einzeln geht es mit 📅 in der Zeile.</li></ul>", vorher: () => geheZu("termine") },
   { ziel: () => document.querySelector("#app table.liste tbody tr td:last-child"), ansicht: "termine", titel: "Nach dem Besuch", text: "<ul><li><b>✓ Erledigt</b> nach dem Besuch anklicken.</li><li>Vorher: <b>Anpassen ▾</b> – Termin ändern (z.B. Sporttag) oder wieder abgeben; danach öffnet sich das Praktikumstool zum Nachführen.</li><li><b>Achtung / Bemerkung</b>: z.B. «im Quartal nochmals besuchen» – dann ist der Folgebesuch dort Pflicht.</li><li><b>Kontakte</b> unter dem Namen: Praxislehrperson und Mentor/in mit E-Mail.</li></ul>" },
@@ -2808,9 +2811,28 @@ const SCHRITTE = [
   { ziel: "#app table.liste thead", ansicht: "studierende", titel: "Studierende", text: "<ul><li>Übersicht über alle: je Person Halbtag, Profil, Quartal mit Jahr · Stand · von, 📄 = Bericht.</li><li><b>Klick auf ein Praktikum</b>: Stand korrigieren (z.B. Abbruch). Klick auf Studiengang/Fächer: ändern.</li><li>Die Suche findet auch Personen im Archiv; «zurückholen» holt sie wieder zu den aktuellen.</li></ul>", vorher: () => geheZu("studierende") },
   { ziel: "#protokolle", ansicht: "studierende", titel: "Verlauf und Protokolle", text: "<ul><li>Klick auf den Namen: alle Praktika der Person, wer besucht hat, Bemerkungen.</li><li>Unter «Protokolle» alle Berichte der Person – auch die alten.</li></ul>",
     vorher: () => { const n = document.querySelector("#app table.liste tbody .name"); if (n) n.click(); }, nachher: () => detailZu() },
-  { ziel: "nav button[data-ansicht=aktualisieren]", ansicht: "start", titel: "Aktualisieren", text: "<ul><li>Braucht ihr in der Regel <b>nicht</b>.</li><li>Damit holen Rike oder Maurus neue Daten aus dem Praktikumstool, damit die Listen aktuell sind.</li></ul>", vorher: () => geheZu("start") },
+  { ziel: "nav button[data-ansicht=aktualisieren]", ansicht: "start", titel: "Aktualisieren", text: "<ul><li>Betrifft euch beim Buchen in der Regel <b>nicht</b>.</li><li>Das wird ein- bis mehrmals im Semester gepflegt, damit die aktuellsten Termine aus dem offiziellen Praktikumstool in der Seite sind.</li></ul>", vorher: () => geheZu("start") },
   { ziel: "nav button[data-ansicht=hilfe]", ansicht: "start", titel: "Fertig", text: () => "<ul><li>In der <b>Hilfe</b> steht alles nochmals zum Nachlesen; dort startet auch dieser Rundgang.</li></ul>" + (ECHT ? "" : "<p><b>Jetzt oben «Zur echten Seite»</b> – dort einmal den Ordner wählen.</p>"), ende: true },
 ];
+/* Halbtag-Liste: Zeilen mit einem Paar */
+function paarZeilen() { return [...document.querySelectorAll("#app table.liste tbody tr")].filter((r) => /Paar/.test(r.textContent)); }
+/* ein Paar mit verschieden eingetragenen Plänen suchen und dessen Terminfenster (nebeneinander) öffnen */
+function verschiedenesPaarOeffnen() {
+  const d = $("#frage");
+  const zeilen = ECHT ? paarZeilen() : [zeileMit("Jost Jan")].filter(Boolean);
+  for (const z of zeilen) {
+    const b = [...z.querySelectorAll("button")].find((x) => x.textContent.trim().startsWith("Termine")); if (!b) continue;
+    b.click();
+    if (d.open && d.classList.contains("breit")) return true;
+    if (d.open) d.close();
+  }
+  return false;
+}
+/* die Knöpfe zum Aufräumen: das erste ✕, das erste «⇄ Doppelbesuch», das erste «trennen» */
+function aufraeumKnoepfe() {
+  const k = [...document.querySelectorAll("#app table.liste tbody button")];
+  return [k.find((b) => b.textContent.trim() === "✕"), k.find((b) => b.textContent.includes("Doppelbesuch")), k.find((b) => b.textContent.trim() === "trennen")].filter(Boolean);
+}
 /* Zeile der Liste, in der ein Name vorkommt */
 function zeileMit(name) { return [...document.querySelectorAll("#app table.liste tbody tr")].find((r) => r.textContent.includes(name)) || null; }
 let schritt = 0, uhr = null;
@@ -2834,7 +2856,8 @@ function zeige(i) {
     const dlg = $("#frage");
     if (dlg.open && t.parentElement !== dlg) dlg.appendChild(t);
     if (!dlg.open && t.parentElement !== document.body) document.body.appendChild(t);
-    const ziel = typeof s.ziel === "function" ? s.ziel() : s.ziel ? document.querySelector(s.ziel) : null;
+    let ziel = typeof s.ziel === "function" ? s.ziel() : s.ziel ? document.querySelector(s.ziel) : null;
+    const ziele = Array.isArray(ziel) ? ziel : ziel ? [ziel] : []; ziel = ziele[0] || null;
     t.innerHTML = `<div class="griff" title="Kästchen verschieben">⠿ ziehen zum Verschieben</div><button class="knopf klein" style="position:absolute;right:8px;top:8px" title="Rundgang beenden" onclick="rundgangEnde()">✕ Beenden</button>
       <h4 style="margin-right:80px">${s.titel}</h4><div>${sText}</div>
       <div style="margin-top:8px"><select class="eingabe klein" onchange="zeige(Number(this.value))" title="Direkt zu einem Schritt">${SCHRITTE.map((x, i) => `<option value="${i}" ${i === schritt ? "selected" : ""}>${i + 1}. ${x.titel}</option>`).join("")}</select></div>
@@ -2843,7 +2866,7 @@ function zeige(i) {
       ${s.ende ? (ECHT ? '<button class="knopf haupt klein" onclick="rundgangEnde()">Schliessen</button>' : '<a href="./" style="text-decoration:none;background:var(--ph-braun);color:#fff;padding:4px 12px;border-radius:6px;font-weight:600">Zur echten Seite ›</a>')
                : '<button class="knopf haupt klein" onclick="weiter(1)">Weiter</button>'}</span></div>`;
     if (ziel) {
-      ziel.classList.add("tour-licht"); ziel.scrollIntoView({ block: "center" });
+      ziele.forEach((z) => z.classList.add("tour-licht")); ziel.scrollIntoView({ block: "center" });
       // Platz: unter dem Ziel, sonst darüber, sonst unten rechts in der Ecke (verdeckt das Ziel möglichst nicht)
       const r = ziel.getBoundingClientRect(), h = t.offsetHeight, b = t.offsetWidth;
       let top, left = Math.min(innerWidth - b - 10, Math.max(10, r.left));
