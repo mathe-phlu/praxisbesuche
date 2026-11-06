@@ -33,7 +33,7 @@ nav button:hover { background: rgba(255,255,255,.45); }
 nav button.aktiv { background: #fafafa; color: var(--tinte); font-weight: 600; }
 nav button.neben { color: var(--ph-braun); font-size: 14px; }
 nav button[data-ansicht=aktualisieren] { margin-left: auto; }
-.ichchip { display: flex; align-items: center; gap: 6px; background: #fff; color: #5a4325; border-radius: 16px; padding: 2px 4px 2px 12px; font-weight: 600; }
+.ichchip { display: flex; align-items: center; gap: 4px; background: #fff; color: #5a4325; border-radius: 16px; padding: 2px 4px 2px 10px; font-weight: 600; cursor: pointer; }
 .ichchip select { border: 0; background: transparent; font-weight: 600; color: #5a4325; }
 .kopf-ic { background: transparent; border: 1px solid rgba(255,255,255,.5); color: #fff; border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: 14px; }
 .kopf-ic:hover { background: var(--ph-braun-dunkel); }
@@ -335,8 +335,8 @@ dialog label input, dialog label select { margin-top: 2px; }
   <h1>Praxisbesuche Mathematik</h1>
   <div class="rechts">
     <span id="ordnerstatus"></span>
-    <label class="ichchip" title="Wer arbeitet gerade? Deine Buchungen und «Meine Termine» gehören zu diesem Kürzel.">Ich bin <select id="ich"></select></label>
-    <button class="kopf-ic" id="neuLaden" title="Einträge der anderen neu einlesen">↻</button>
+    <label class="ichchip" title="Dein Kürzel"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 21v-1a7 7 0 0 1 14 0v1"/></svg><select id="ich" aria-label="Ich bin"></select></label>
+    <button class="kopf-ic" id="neuLaden" title="Neu einlesen: holt sofort die neuesten Einträge aller (Buchungen, Besuche, Berichte) aus dem Teams-Ordner. Meist nicht nötig – sie erscheinen nach der OneDrive-Synchronisation ohnehin, spätestens beim nächsten Öffnen.">↻</button>
   </div>
   </div>
   <nav id="nav">
@@ -1092,7 +1092,9 @@ function zeichnen() {
   // nur Dozierende mit Namen (ohne Namen = frühere, nur für den Verlauf)
   const mitName = S.einst.dozierende.filter((d) => d.name);
   const doz = (mitName.length ? mitName : S.einst.dozierende);
-  ich.innerHTML = `<option value="">–</option>` + doz.map((d) => `<option value="${esc(d.kuerzel)}" ${d.kuerzel === S.ich ? "selected" : ""}>${esc(d.kuerzel)}${d.name ? " – " + esc(d.name) : ""}</option>`).join("");
+  ich.innerHTML = `<option value="">–</option>` + doz.map((d) => `<option value="${esc(d.kuerzel)}" ${d.kuerzel === S.ich ? "selected" : ""}>${esc(d.kuerzel)}</option>`).join("");
+  const wer = doz.find((d) => d.kuerzel === S.ich);
+  $(".ichchip").title = (wer ? `Du arbeitest als ${wer.kuerzel}${wer.name ? " (" + wer.name + ")" : ""}. ` : "Bitte dein Kürzel wählen. ") + "Deine Buchungen und «Meine Termine» gehören zu diesem Kürzel.";
   if (!window.showDirectoryPicker && !window.__testOrdner) $("#ordnerstatus").innerHTML = '<b style="color:#fff;background:#a33a2e;padding:2px 8px;border-radius:4px">Falscher Browser – speichert nicht</b>';
   else $("#ordnerstatus").innerHTML = S.ordner ? `<button class="kopf-ic" title="Verbundener Ordner: ${esc((S.wurzel || S.ordner).name)}${S.lademodus ? " (Lade-Modus)" : ""}" onclick="meldung(this.title)">📁</button>` : "";
   const app = $("#app");
@@ -2737,7 +2739,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261106-093231";
+const STAND = "20261106-093455";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
