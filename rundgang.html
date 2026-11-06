@@ -1866,7 +1866,9 @@ function filterLeiste(ansicht, anzahl) {
     return `<details class="fsek" ${offen ? "open" : ""} ontoggle="gruppeMerken('${titel}',this.open)"><summary><h4>${titel}</h4>${aktiv.length ? `<span class="faktiv">${esc(aktiv.join(" · "))}</span>` : ""}</summary>${inhalt}</details>`; };
   return `<details class="filterbox" ${lies("filterbox") === "zu" ? "" : "open"} ontoggle="merke('filterbox', this.open ? 'auf' : 'zu')">
     <summary class="fkopf"><b>Filter</b><button class="knopf klein" onclick="event.preventDefault();event.stopPropagation();filterLeeren()">zurücksetzen</button></summary>
-    <div class="fgitter">${gruppe("Auswahl", grund)}${gruppe("Wann", wann)}${gruppe("Wo", wo)}${gruppe("Weitere", weitere)}</div>
+    <div class="fgitter">${planung ? gruppe("Auswahl", grund) + gruppe("Wann", wann) + gruppe("Wo", wo) + gruppe("Weitere", weitere)
+      : gruppe("Auswahl", grund) + gruppe("Suchen", `<div class="fblock"><span class="ftitel">Name</span><input type="search" value="${esc(fw("name", ""))}" onchange="setzeFilter('name',this.value)" placeholder="Name, Studiengang, Fach"></div>
+        <div class="fblock haken-liste"><label class="haken"><input type="checkbox" ${fw("nurMeine", false) ? "checked" : ""} onchange="setzeFilter('nurMeine',this.checked)"> nur meine</label></div>`)}</div>
   </details>`;
 }
 /* Über der Liste: Anzahl, aktive Filter zum Wegklicken, Liste kopieren */
@@ -1883,20 +1885,21 @@ function aktivLeiste(ansicht, anzahl) {
   if (ansicht === "planung" && !gleich("noetig")) wegKaesten("noetig", "Besuch nötig");
   if (!gleich("stand")) wegKaesten("stand", "Stand");
   if (ansicht === "halbtag" && fa("perioden").length) wegKaesten("perioden", "Periode");
-  if (fw("von", "")) weg("von", "ab " + kurzDatum(fw("von", "")));
-  if (fw("bis", "")) weg("bis", "bis " + kurzDatum(fw("bis", "")));
+  const pl = ansicht === "planung";
+  if (pl && fw("von", "")) weg("von", "ab " + kurzDatum(fw("von", "")));
+  if (pl && fw("bis", "")) weg("bis", "bis " + kurzDatum(fw("bis", "")));
   if (ansicht === "planung") {
     if (fa("tage").length) weg("tage", fa("tage").join(", "));
     if (fa("tageszeit").length) weg("tageszeit", fa("tageszeit").map((t) => t === "vormittag" ? "Vormittag" : "Nachmittag").join(", "));
     if (fa("lektart").length) weg("lektart", fa("lektart").map((t) => t === "einzel" ? "Einzellektion" : "Doppellektion").join(", "));
     if (fw("bespr", false)) c.push(`<button type="button" class="aktivchip" onclick="setzeFilter('bespr',false)" title="Filter ausschalten">danach Zeit zum Besprechen ✕</button>`);
   }
-  if (fw("ort", "")) weg("ort", "Ort: " + fw("ort", ""));
-  if (fw("umOrt", "") && fw("umKm", "")) weg("umKm", `${fw("umKm", "")} km um ${fw("umOrt", "")}`);
+  if (pl && fw("ort", "")) weg("ort", "Ort: " + fw("ort", ""));
+  if (pl && fw("umOrt", "") && fw("umKm", "")) weg("umKm", `${fw("umKm", "")} km um ${fw("umOrt", "")}`);
   if (fw("name", "")) weg("name", "Name: " + fw("name", ""));
-  if (fw("nichtVonMir", true)) c.push(`<button type="button" class="aktivchip" onclick="setzeFilter('nichtVonMir',false)" title="Filter ausschalten">nicht schon von mir besucht ✕</button>`);
+  if (pl && fw("nichtVonMir", true)) c.push(`<button type="button" class="aktivchip" onclick="setzeFilter('nichtVonMir',false)" title="Filter ausschalten">nicht schon von mir besucht ✕</button>`);
   if (fw("nurMeine", false)) weg("nurMeine", "nur meine");
-  if (fw("nurAchtung", false)) weg("nurAchtung", "nur ⚠");
+  if (pl && fw("nurAchtung", false)) weg("nurAchtung", "nur ⚠");
   return `<div class="aktivleiste"><b>${anzahl}</b> ${anzahl === 1 ? "Eintrag" : "Einträge"}${c.length ? " · " + c.join(" ") : ' <span class="leise klein">· keine Einschränkung</span>'}
     <span style="margin-left:auto"></span><button class="knopf klein" onclick="listeKopieren()" title="Kopiert die Liste, so wie sie gerade gefiltert ist, in die Zwischenablage – danach in Excel oder eine Mail einfügen (Cmd+V / Ctrl+V)">Liste für Excel kopieren</button></div>`;
 }
@@ -1917,7 +1920,7 @@ function listeKopieren() {
 }
 function filtern(liste, ansicht) {
   const sj = fw("jahr", S.einst.studienjahr);
-  const von = fw("von", ""), bis = fw("bis", "");
+  const pl = ansicht === "planung", von = pl ? fw("von", "") : "", bis = pl ? fw("bis", "") : "";
   const lektFilter = fa("tage").length || fa("tageszeit").length || fa("lektart").length || fw("bespr", false) || von || bis;
   const noetig = fa("noetig"), stand = fa("stand"), perioden = fa("perioden");
   const standGruppe = (x) => x.stand === "besucht" ? "besucht" : ["übernommen", "gebucht"].includes(x.stand) ? "eingeteilt" : "offen";
@@ -1933,12 +1936,12 @@ function filtern(liste, ansicht) {
     if (von && datumAus(x.bis) && datumAus(x.bis) < von) return false;
     if (bis && datumAus(x.von) && datumAus(x.von) > bis) return false;
     if (ansicht === "planung" && lektFilter && x.lektionen && x.stand === "offen" && !lektionenIm(x).length) return false;
-    if (fw("ort", "") && !passtSuche([x.schulort, x.schulhaus].join(" "), fw("ort", "").toLowerCase().trim())) return false;
-    if (fw("umOrt", "") && fw("umKm", "")) { const d = km(fw("umOrt", ""), x.schulort); if (d == null || d > Number(fw("umKm", ""))) return false; }
+    if (pl && fw("ort", "") && !passtSuche([x.schulort, x.schulhaus].join(" "), fw("ort", "").toLowerCase().trim())) return false;
+    if (pl && fw("umOrt", "") && fw("umKm", "")) { const d = km(fw("umOrt", ""), x.schulort); if (d == null || d > Number(fw("umKm", ""))) return false; }
     if (fw("name", "") && !passtSuche([x.person.name, x.person.studiengang, (x.faecher || []).join(" ")].join(" "), fw("name", "").toLowerCase().trim())) return false;
-    if (fw("nichtVonMir", true) && S.ich && x.person.praktika.some((y) => y !== x && y.besuchtVon.includes(S.ich))) return false;
+    if (pl && fw("nichtVonMir", true) && S.ich && x.person.praktika.some((y) => y !== x && y.besuchtVon.includes(S.ich))) return false;
     if (fw("nurMeine", false) && (!S.ich || x.wer !== S.ich)) return false;
-    if (fw("nurAchtung", false) && !(x.achtung && x.achtung.length)) return false;
+    if (pl && fw("nurAchtung", false) && !(x.achtung && x.achtung.length)) return false;
     return true;
   });
 }
@@ -2889,7 +2892,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261106-141548";
+const STAND = "20261106-142905";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
