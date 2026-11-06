@@ -20,15 +20,24 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; font: 15px/1.45 -apple-system, "Segoe UI", Arial, sans-serif; color: var(--tinte); background: #fafafa; }
-header { background: var(--ph-braun); color: #fff; padding: 10px 20px; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; position: sticky; top: 0; z-index: 5; }
+header { background: var(--ph-braun); color: #fff; position: sticky; top: 0; z-index: 5; }
+.kopf1 { display: flex; gap: 18px; align-items: center; padding: 8px 20px; }
 header h1, h2, h3 { font-family: var(--hand); letter-spacing: .2px; font-weight: 400; }
 header h1 { font-size: 24px !important; }
 h2 { font-size: 28px !important; } h3 { font-size: 21px !important; }
 header h1 { font-size: 19px; margin: 0 12px 0 0; font-weight: 600; }
-nav { display: flex; gap: 4px; flex-wrap: wrap; }
-nav button { background: transparent; color: #f3ead9; border: 0; padding: 7px 12px; border-radius: 6px; font-size: 15px; cursor: pointer; }
-nav button.aktiv, nav button:hover { background: var(--ph-braun-dunkel); color: #fff; }
-header .rechts { margin-left: auto; display: flex; gap: 12px; align-items: center; font-size: 14px; color: #f3ead9; }
+/* Reiter wie Registerkarten: die aktive geht nahtlos in die Seite über */
+nav { display: flex; gap: 2px; flex-wrap: wrap; background: #e9dcc6; padding: 6px 20px 0; }
+nav button { background: transparent; color: #5a4325; border: 0; padding: 8px 14px; border-radius: 8px 8px 0 0; font-size: 15px; cursor: pointer; }
+nav button:hover { background: rgba(255,255,255,.45); }
+nav button.aktiv { background: #fafafa; color: var(--tinte); font-weight: 600; }
+nav button.neben { color: var(--ph-braun); font-size: 14px; }
+nav button[data-ansicht=aktualisieren] { margin-left: auto; }
+.ichchip { display: flex; align-items: center; gap: 6px; background: #fff; color: #5a4325; border-radius: 16px; padding: 2px 4px 2px 12px; font-weight: 600; }
+.ichchip select { border: 0; background: transparent; font-weight: 600; color: #5a4325; }
+.kopf-ic { background: transparent; border: 1px solid rgba(255,255,255,.5); color: #fff; border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: 14px; }
+.kopf-ic:hover { background: var(--ph-braun-dunkel); }
+header .rechts { margin-left: auto; display: flex; gap: 10px; align-items: center; font-size: 14px; color: #f3ead9; }
 header select { font-size: 14px; padding: 4px; }
 main { padding: 18px 20px 60px; max-width: 1500px; }
 h2 { font-size: 22px; margin: 4px 0 14px; font-weight: 600; }
@@ -322,21 +331,23 @@ dialog label input, dialog label select { margin-top: 2px; }
 </head>
 <body>
 <header>
+  <div class="kopf1">
   <h1>Praxisbesuche Mathematik</h1>
+  <div class="rechts">
+    <span id="ordnerstatus"></span>
+    <label class="ichchip" title="Wer arbeitet gerade? Deine Buchungen und «Meine Termine» gehören zu diesem Kürzel.">Ich bin <select id="ich"></select></label>
+    <button class="kopf-ic" id="neuLaden" title="Einträge der anderen neu einlesen">↻</button>
+  </div>
+  </div>
   <nav id="nav">
     <button data-ansicht="start">Start</button>
     <button data-ansicht="halbtag">Halbtag &amp; Einzel</button>
     <button data-ansicht="planung">Profil &amp; Quartal</button>
     <button data-ansicht="termine">Meine Termine</button>
     <button data-ansicht="studierende">Studierende</button>
-    <button data-ansicht="aktualisieren">Aktualisieren</button>
-    <button data-ansicht="hilfe">Hilfe</button>
+    <button data-ansicht="aktualisieren" class="neben">Aktualisieren</button>
+    <button data-ansicht="hilfe" class="neben">Hilfe</button>
   </nav>
-  <div class="rechts">
-    <span id="ordnerstatus"></span>
-    <label>Ich bin <select id="ich"></select></label>
-    <button class="knopf klein" id="neuLaden" title="Einträge der anderen neu einlesen">↻</button>
-  </div>
 </header>
 <main id="app"></main>
 <aside class="schublade" id="schublade"></aside>
@@ -1083,7 +1094,7 @@ function zeichnen() {
   const doz = (mitName.length ? mitName : S.einst.dozierende);
   ich.innerHTML = `<option value="">–</option>` + doz.map((d) => `<option value="${esc(d.kuerzel)}" ${d.kuerzel === S.ich ? "selected" : ""}>${esc(d.kuerzel)}${d.name ? " – " + esc(d.name) : ""}</option>`).join("");
   if (!window.showDirectoryPicker && !window.__testOrdner) $("#ordnerstatus").innerHTML = '<b style="color:#fff;background:#a33a2e;padding:2px 8px;border-radius:4px">Falscher Browser – speichert nicht</b>';
-  else $("#ordnerstatus").innerHTML = S.ordner ? `Ordner: ${esc((S.wurzel || S.ordner).name)}${S.lademodus ? ' <span title="Gespeichert wird per Download in Daten/eintraege/Kürzel">(Lade-Modus)</span>' : ""}` : "";
+  else $("#ordnerstatus").innerHTML = S.ordner ? `<button class="kopf-ic" title="Verbundener Ordner: ${esc((S.wurzel || S.ordner).name)}${S.lademodus ? " (Lade-Modus)" : ""}" onclick="meldung(this.title)">📁</button>` : "";
   const app = $("#app");
   if (S.ansicht === "hilfe") { app.innerHTML = ansichtHilfe(); return; }
   if (!S.ordner) { app.innerHTML = ansichtOhneOrdner(); return; }
@@ -2726,7 +2737,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261106-091925";
+const STAND = "20261106-093231";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
