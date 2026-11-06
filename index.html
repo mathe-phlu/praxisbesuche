@@ -104,6 +104,11 @@ tr[class*="fk-"] > td:first-child { box-shadow: inset 5px 0 0 var(--fc); padding
 .sk-studierende { --f: #8a857c; --h: #f6f5f2; --d: #2e2b27; }
 .sk-grau { --f: #9a9a9a; --h: #f5f5f3; --d: #3a3a3a; }
 .sk table td { padding: 2px 4px; }
+.rundgang-kasten { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; background: var(--ph-sand); border: 2px solid var(--ph-braun); border-radius: 8px; padding: 14px 18px; margin: 4px 0 18px; }
+.rundgang-kasten .rk-ic { color: var(--ph-braun); flex: none; }
+.rundgang-kasten .rk-t { font-family: var(--hand); font-size: 24px; color: var(--ph-braun-dunkel); }
+.rundgang-kasten .rk-text { flex: 1; min-width: 240px; }
+.knopf .k-ic { vertical-align: -3px; margin-right: 6px; }
 .start-kopf { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 details.akk > summary { cursor: pointer; list-style: none; }
@@ -1168,8 +1173,11 @@ function ansichtStart() {
     <div class="z">${ist}<span class="z-von"> / ${soll}</span></div><div class="sk-ziel" title="Ziel: ${was}">Ziel: ${was}</div>
     ${balken(ist, soll)}<div class="klein">${soll && ist >= soll ? "<b>Ziel erreicht ✓</b>" : `noch offen: <b>${Math.max(0, soll - ist)}</b>`}</div></div>`;
   const karte = (farbe, titel, ziel, inhalt) => `<div class="sk sk-${farbe}" onclick="${ziel}"><h3>${titel}</h3>${inhalt}</div>`;
-  return `<div class="start-kopf"><h2>Studienjahr ${sjText(sj)}</h2>
-    <button class="knopf haupt gross" onclick="typeof rundgangStart === 'function' ? rundgangStart() : window.open('rundgang.html')">▶ Rundgang: die Seite in 2 Minuten</button></div>
+  return `<div class="start-kopf"><h2>Studienjahr ${sjText(sj)}</h2></div>
+  ${lies("rundgangAus") ? "" : `<div class="rundgang-kasten"><span class="rk-ic">${KARTE_SVG(44)}</span>
+    <div class="rk-text"><div class="rk-t">Rundgang durch die Seite</div><div class="klein">In wenigen Minuten: Startseite, Planen und Buchen, Halbtag-Doppelbesuche, Meine Termine und Berichte. Der Rundgang zeigt nur – er bucht und speichert nichts.</div></div>
+    <button class="knopf haupt gross" onclick="rundgangOeffnen()">${KARTE_SVG(18, "k-ic")}Rundgang starten</button>
+    <button class="knopf klein" title="Kasten ausblenden – der Rundgang bleibt unter «Hilfe»" onclick="rundgangKasten(false)">ausblenden</button></div>`}
   ${zahl ? "" : `<div class="karte"><b>Noch keine Daten.</b> Unter «Aktualisieren» die Datei aus dem Praktikumstool einlesen.</div>`}
   <div class="start-raster"><div class="start-links">
   <div class="sk-gruppe">Während des Semesters · Halbtag und Einzel</div>
@@ -2319,14 +2327,21 @@ function legendeKurz() {
   return `<p class="leise" style="margin-top:12px">In der grossen Ansicht steht oben diese Legende:</p><div class="leg-zeile"><span class="rz">9:10</span> Einzellektion <span class="rz doppel">8:20</span> Doppellektion
       <span class="trenn">|</span> <span class="rz frei">10:15</span> danach frei zum Besprechen <span class="rz">13:35</span> danach Unterricht</div>`;
 }
+/* Rundgang: Kartensymbol, Start, Kasten auf der Startseite ein-/ausblenden (gilt nur in diesem Browser) */
+function KARTE_SVG(g, cls = "") { return `<svg class="${cls}" width="${g}" height="${g}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l6-3l6 3l6-3v13l-6 3l-6-3l-6 3z"/><path d="M9 4v13"/><path d="M15 7v13"/></svg>`; }
+function rundgangOeffnen() { if (typeof rundgangStart === "function") rundgangStart(); else window.open("rundgang.html"); }
+function rundgangKasten(zeigen) { merke("rundgangAus", zeigen ? "" : "1"); if (!zeigen) meldung("Ausgeblendet – der Rundgang bleibt unter «Hilfe»."); zeichnen(); }
 function hilfeWahl(k) { merke("hilfe", k); zeichnen(); }
 function ansichtHilfe() {
   const wahl = HILFE.find((h) => h[0] === lies("hilfe")) || HILFE[0];
   return `<h2>Hilfe</h2>
   <div class="hilfe">
-    <nav class="hilfe-nav">${HILFE.map(([k, t, u], n) => `<button class="${k === wahl[0] ? "an" : ""}" onclick="hilfeWahl('${k}')"><b>${n + 1} · ${t}</b><span>${u}</span></button>`).join("")}
-      <button class="knopf haupt" style="margin-top:10px" onclick="typeof rundgangStart === 'function' ? rundgangStart() : window.open('rundgang.html')">▶ Rundgang (2 Min)</button>
-      <a class="leise klein" style="text-align:center" href="rundgang.html" target="_blank">oder mit Beispieldaten ansehen</a></nav>
+    <nav class="hilfe-nav">
+      <button class="knopf haupt gross" onclick="rundgangOeffnen()">${KARTE_SVG(18, "k-ic")}Rundgang starten</button>
+      <a class="leise klein" style="text-align:center" href="rundgang.html" target="_blank">oder mit Beispieldaten ansehen</a>
+      ${lies("rundgangAus") ? `<a class="leise klein" style="text-align:center" href="#" onclick="rundgangKasten(true);return false">Rundgang-Kasten auf der Startseite wieder zeigen</a>` : ""}
+      <div style="height:6px"></div>
+      ${HILFE.map(([k, t, u], n) => `<button class="${k === wahl[0] ? "an" : ""}" onclick="hilfeWahl('${k}')"><b>${n + 1} · ${t}</b><span>${u}</span></button>`).join("")}</nav>
     <div class="karte hilfe-text"><h3>${wahl[1]}</h3>${wahl[3]}</div>
   </div>`;
 }
@@ -2739,7 +2754,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261106-094407";
+const STAND = "20261106-094908";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
