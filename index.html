@@ -2754,7 +2754,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261106-095512";
+const STAND = "20261106-095730";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
@@ -2778,8 +2778,9 @@ standPruefen(); setInterval(standPruefen, 5 * 60 * 1000); window.addEventListene
 #tour .t-zu { background: transparent; border: 1px solid rgba(255,255,255,.5); color: #fff; border-radius: 4px; padding: 2px 8px; font-size: 12.5px; cursor: pointer; }
 #tour .t-zu:hover { background: var(--ph-braun-dunkel); }
 #tour h4 { margin: 4px 0 6px; font-family: var(--hand); font-size: 25px; font-weight: 400; color: #fff; line-height: 1.15; }
-#tour .t-balken { height: 4px; background: rgba(255,255,255,.3); border-radius: 2px; overflow: hidden; }
-#tour .t-balken span { display: block; height: 100%; background: #fff; }
+#tour .t-balken { display: flex; gap: 4px; height: 5px; }
+#tour .t-balken span { background: rgba(255,255,255,.3); border-radius: 2px; overflow: hidden; }
+#tour .t-balken i { display: block; height: 100%; background: #fff; }
 #tour .t-inhalt { padding: 12px 16px 4px; color: var(--tinte); }
 #tour .t-inhalt p { margin: 6px 0; }
 #tour ul { margin: 2px 0; padding-left: 0; list-style: none; }
@@ -2798,7 +2799,7 @@ const ECHT = !!window.RUNDGANG_ECHT;
 if (!ECHT) window.addEventListener("load", () => setTimeout(rundgangStart, 900));
 const SCHRITTE = [
   // --- Startseite
-  { ansicht: "start", titel: "Willkommen", text: () => (ECHT ? "Der Rundgang zeigt nur – er bucht und speichert nichts." : "Mit erfundenen Beispieldaten – nichts wird gespeichert.") + "<ul><li>Startseite: was man ablesen kann</li><li>Planen und Buchen (Profil &amp; Quartal, Halbtag)</li><li>Halbtag: Doppelbesuche und aufräumen</li><li>Meine Termine, Berichte, Studierende</li></ul>", vorher: () => { if (!ECHT && !S.ich) { S.ich = "clu"; merke("ich", "clu"); } geheZu("start"); } },
+  { ansicht: "start", titel: "Willkommen", text: () => (ECHT ? "Der Rundgang zeigt nur – er bucht und speichert nichts." : "Mit erfundenen Beispieldaten – nichts wird gespeichert.") + "<p>Fünf Teile – jeder lässt sich unten auch einzeln anwählen:</p><ul><li><b>Startseite</b>: was man ablesen kann</li><li><b>Planen und Buchen</b>: Filter, Termine, Praktikumstool</li><li><b>Halbtag</b>: Doppelbesuche und aufräumen</li><li><b>Meine Termine und Berichte</b></li><li><b>Studierende und Abschluss</b></li></ul>", vorher: () => { if (!ECHT && !S.ich) { S.ich = "clu"; merke("ich", "clu"); } geheZu("start"); } },
   { ziel: "#ich", ansicht: "start", titel: "Wer bin ich?", text: () => (ECHT ? "Hier steht dein Kürzel." : "Hier das eigene Kürzel wählen (im Beispiel: clu).") + "<ul><li>Dann gehören deine Buchungen und «Meine Termine» dir.</li><li>Rundgang jederzeit mit «✕ Beenden» abbrechen; das Kästchen lässt sich oben am Griff verschieben.</li></ul>", vorher: () => { if (!ECHT) { S.ich = "clu"; merke("ich", "clu"); zeichnen(); } } },
   { ziel: ".start-links", ansicht: "start", titel: "Startseite: die Praktika", text: "<ul><li>Links je Praktikum eine Karte, gruppiert nach <b>Semester</b> (Halbtag, Einzel) und <b>Block</b> (Profil, Quartal).</li><li>Je Karte: wie viele schon eingeteilt sind und was noch fehlt.</li><li>Halbtag: je Periode A–D eine Zeile. Profil: Quote und Pflichtbesuche.</li></ul>" },
   { ziel: ".start-links .sk", ansicht: "start", titel: "Karten anklicken", text: "<ul><li>Jede Karte und jede Zeile darin ist ein Knopf: Sie führt direkt in die passende Liste, schon gefiltert (z.B. Halbtag Periode C, offen).</li><li>Das ist meist der schnellste Weg zum Planen.</li></ul>" },
@@ -2853,6 +2854,9 @@ function aufraeumKnoepfe() {
 }
 /* Zeile der Liste, in der ein Name vorkommt */
 function zeileMit(name) { return [...document.querySelectorAll("#app table.liste tbody tr")].find((r) => r.textContent.includes(name)) || null; }
+/* Teile des Rundgangs: Name und erster Schritt (Index); ein Teil reicht bis vor den nächsten */
+const TEILE = [["Startseite", 0], ["Planen und Buchen", 6], ["Halbtag", 11], ["Meine Termine und Berichte", 14], ["Studierende und Abschluss", 17]];
+function teilVon(i) { let t = 0; TEILE.forEach(([, ab], n) => { if (i >= ab) t = n; }); const von = TEILE[t][1], bis = t + 1 < TEILE.length ? TEILE[t + 1][1] : SCHRITTE.length; return { t, name: TEILE[t][0], von, bis }; }
 let schritt = 0, uhr = null;
 function rundgangStart() {
   const t = document.createElement("div"); t.id = "tour"; document.body.appendChild(t);
@@ -2876,11 +2880,15 @@ function zeige(i) {
     if (!dlg.open && t.parentElement !== document.body) document.body.appendChild(t);
     let ziel = typeof s.ziel === "function" ? s.ziel() : s.ziel ? document.querySelector(s.ziel) : null;
     const ziele = Array.isArray(ziel) ? ziel : ziel ? [ziel] : []; ziel = ziele[0] || null;
-    t.innerHTML = `<div class="t-kopf griff" title="Ziehen zum Verschieben"><div class="t-zeile"><span>Rundgang · Schritt ${schritt + 1} von ${SCHRITTE.length}</span>
+    const tl = teilVon(schritt);
+    const balken = TEILE.map(([name, ab], n) => { const bis = n + 1 < TEILE.length ? TEILE[n + 1][1] : SCHRITTE.length, anteil = n < tl.t ? 1 : n > tl.t ? 0 : (schritt - ab + 1) / (bis - ab);
+      return `<span title="Teil ${n + 1}: ${name}" style="flex:${bis - ab}"><i style="width:${Math.round(anteil * 100)}%"></i></span>`; }).join("");
+    t.innerHTML = `<div class="t-kopf griff" title="Ziehen zum Verschieben"><div class="t-zeile"><span>Teil ${tl.t + 1} von ${TEILE.length} · <b style="color:#fff">${tl.name}</b> · Schritt ${schritt - tl.von + 1} von ${tl.bis - tl.von}</span>
         <button class="t-zu" title="Rundgang beenden (Esc)" onclick="rundgangEnde()">✕ Beenden</button></div>
-      <h4>${s.titel}</h4><div class="t-balken"><span style="width:${Math.round((schritt + 1) / SCHRITTE.length * 100)}%"></span></div></div>
+      <h4>${s.titel}</h4><div class="t-balken">${balken}</div></div>
       <div class="t-inhalt">${sText}</div>
-      <div class="tk"><select onchange="zeige(Number(this.value))" title="Direkt zu einem Schritt">${SCHRITTE.map((x, i) => `<option value="${i}" ${i === schritt ? "selected" : ""}>${i + 1}. ${x.titel}</option>`).join("")}</select>
+      <div class="tk"><select onchange="zeige(Number(this.value))" title="Direkt zu einem Teil oder Schritt">${TEILE.map(([name, ab], n) => { const bis = n + 1 < TEILE.length ? TEILE[n + 1][1] : SCHRITTE.length;
+        return `<optgroup label="${n + 1}. ${name}">${SCHRITTE.slice(ab, bis).map((x, k) => `<option value="${ab + k}" ${ab + k === schritt ? "selected" : ""}>${x.titel}</option>`).join("")}</optgroup>`; }).join("")}</select>
       <span style="display:flex;gap:8px">${schritt ? '<button class="knopf" onclick="weiter(-1)">‹ Zurück</button>' : ""}
       ${s.ende ? (ECHT ? '<button class="knopf haupt" onclick="rundgangEnde()">Schliessen</button>' : '<a href="./" class="knopf haupt" style="text-decoration:none">Zur echten Seite ›</a>')
                : '<button class="knopf haupt" onclick="weiter(1)">Weiter ›</button>'}</span></div>`;
