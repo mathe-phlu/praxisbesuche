@@ -144,6 +144,20 @@ tr[class*="fk-"] > td:first-child { box-shadow: inset 5px 0 0 var(--fc); padding
 .rundgang-kasten .rk-t { font-family: var(--hand); font-size: 24px; color: var(--ph-braun-dunkel); }
 .rundgang-kasten .rk-text { flex: 1; min-width: 240px; }
 .knopf .k-ic { vertical-align: -3px; margin-right: 6px; }
+/* Startseite auf dem Holztisch (Rike, 6.11.): Gruppen-Überschriften als Zettel aus Karopapier, Kacheln als Notizzettel. Nur die Startseite. */
+body.holz { background: linear-gradient(rgba(70, 45, 20, .10), rgba(70, 45, 20, .10)), url(bilder/tisch.jpg) center / cover fixed, #b98d5a; }
+body.holz .sk-gruppe { display: inline-block; justify-self: start; background-color: #fffdf6; background-image: linear-gradient(#cfdeea 1px, transparent 1px), linear-gradient(90deg, #cfdeea 1px, transparent 1px); background-size: 11px 11px;
+  color: #2f3e4c; font-family: var(--hand); font-size: 21px; letter-spacing: 0; padding: 3px 16px 5px; margin: 6px 0 14px; box-shadow: 0 3px 7px rgba(60, 40, 10, .3); transform: rotate(-1.2deg); }
+body.holz .sk-reihe > .sk:nth-child(2n) + .sk-gruppe, body.holz .start-rechts .sk-gruppe { transform: rotate(1deg); }
+body.holz .sk { border-radius: 2px; border: 0; border-top: 6px solid var(--f); box-shadow: 0 4px 10px rgba(50, 30, 10, .28), 0 1px 2px rgba(50, 30, 10, .2); transform: rotate(-.5deg); }
+body.holz .sk-reihe > .sk:nth-child(2n), body.holz .start-rechts > .sk:nth-of-type(2n) { transform: rotate(.6deg); }
+body.holz .sk-reihe > .sk:nth-child(3n) { transform: rotate(-.2deg); }
+body.holz .sk:hover { transform: rotate(0) translateY(-3px); box-shadow: 0 10px 22px rgba(50, 30, 10, .35); }
+body.holz .start-rechts { border-left: 0; padding-left: 0; }
+body.holz .sk-gruppe.leer-gruppe { visibility: hidden; }
+body.holz .start-kopf h2 { display: inline-block; background: #fffdf6; color: #2f3e4c; padding: 2px 16px 4px; box-shadow: 0 3px 7px rgba(60, 40, 10, .3); transform: rotate(-.8deg); }
+body.holz .rundgang-kasten { background: #fffdf8; border: 0; border-radius: 2px; box-shadow: 0 4px 12px rgba(50, 30, 10, .3); }
+body.holz main > .karte, body.holz #app > .karte { box-shadow: 0 4px 12px rgba(50, 30, 10, .3); }
 .start-kopf { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 details.akk > summary { cursor: pointer; list-style: none; }
@@ -1138,6 +1152,7 @@ function zeichnen() {
   $(".ichchip").title = (wer ? `Du arbeitest als ${wer.kuerzel}${wer.name ? " (" + wer.name + ")" : ""}. ` : "Bitte dein Kürzel wählen. ") + "Deine Buchungen und «Meine Termine» gehören zu diesem Kürzel.";
   if (!window.showDirectoryPicker && !window.__testOrdner) $("#ordnerstatus").innerHTML = '<b style="color:#fff;background:#a33a2e;padding:2px 8px;border-radius:4px">Falscher Browser – speichert nicht</b>';
   else $("#ordnerstatus").innerHTML = S.ordner ? `<button class="kopf-ic" title="Verbundener Ordner: ${esc((S.wurzel || S.ordner).name)}${S.lademodus ? " (Lade-Modus)" : ""}" onclick="meldung(this.title)">📁</button>` : "";
+  document.body.classList.toggle("holz", S.ansicht === "start" && !!S.ordner);
   const app = $("#app");
   if (S.ansicht === "hilfe") { app.innerHTML = ansichtHilfe(); return; }
   if (!S.ordner) { app.innerHTML = ansichtOhneOrdner(); return; }
@@ -2871,7 +2886,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261106-142905";
+const STAND = "20261106-175622";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
