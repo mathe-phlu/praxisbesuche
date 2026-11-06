@@ -1259,7 +1259,7 @@ function ansichtStart() {
       return `<div class="sk-per" onclick="event.stopPropagation();geheZu('halbtag', { 'h.perioden': ['${b}'] })" title="Periode ${b} anzeigen"><b>${b}</b>${l.length ? `<span class="sk-mini">${balken(e, l.length)}</span><span>${e} / ${l.length}${e >= l.length ? " ✓" : ""}</span>` : `<span class="leise">noch niemand eingetragen</span>`}</div>`; }).join("")}</div></div>`)}
     ${zielKarte("einzel", "Einzelpraktikum", "geheZu('halbtag', { 'h.perioden': ['SK'] })", einzel.filter(dabei).length, einzel.length, "alle besuchen")}
   </div>
-  <div class="sk-gruppe">Blockpraktika (Januar, Februar) · Profil und Quartal</div>
+  <div class="sk-gruppe">Blockpraktika · Profil und Quartal</div>
   <div class="sk-reihe drei">
     ${zielKarte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", eingeteilt, ziel, `Quote ${Math.round(S.einst.quote * 100)} % von ${prof.length}`).replace(/<\/div>$/, (() => {
       const pf = prof.filter((x) => x.noetig === "ja"), e = pf.filter(dabei).length;
@@ -2907,7 +2907,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261106-175622";
+const STAND = "20261106-180234";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
