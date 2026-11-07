@@ -1104,12 +1104,21 @@ function standBestimmen(x, altBesuch) {
   // eigene Einträge, der Reihe nach
   // Eine Buchung im Praktikumstool, die erst nach einer Korrektur hier eingelesen wurde, gilt: die Korrektur ist dann veraltet.
   const toolBuchung = termin && termin.imTool ? { wer, termin, stand } : null;
-  let doppelt = [];
+  let doppelt = [], imToolNoch = "";
+  const perBuchst = x.gruppe === "Halbtag" ? (periode(x).match(/Periode ([A-D])/) || [])[1] : "";
+  const toolGeholt = (S.geholt || {})[x.gruppe === "Halbtag" ? `${x.jahr}|Halbtag|${perBuchst}` : `${x.jahr}|${x.gruppe}`] || S.stammStand || "";
   for (const e of x.eintraege) {
     if (e.typ === "uebernehmen") { if (wer && wer !== e.wer && stand !== "besucht") doppelt.push(e.wer); else { wer = e.wer; termin = e.termin || termin; if (stand !== "besucht" && stand !== "gebucht") stand = "übernommen"; } }
     if (e.typ === "termin" && e.wer === wer) termin = e.termin || null;
     if (e.typ === "abgeben") doppelt = doppelt.filter((w) => w !== e.wer);
-    if (e.typ === "abgeben" && e.wer === wer) { wer = ""; termin = null; if (stand === "übernommen") stand = ""; }
+    if (e.typ === "abgeben" && e.wer === wer) {
+      // Abgegeben, die Buchung steht aber (noch) im Praktikumstool: bis zum nächsten Holen gilt das Abgeben (Stand offen,
+      // Hinweis «im Tool noch gebucht»). Ist sie nach dem nächsten Holen immer noch im Tool, gilt wieder das Tool.
+      if (toolBuchung && toolBuchung.wer === e.wer && toolGeholt && e.zeit < toolGeholt) continue;
+      if (toolBuchung && toolBuchung.wer === e.wer) imToolNoch = e.wer;
+      wer = ""; termin = null; if (stand === "übernommen" || stand === "gebucht") stand = "";
+    }
+    if (e.typ === "uebernehmen" && e.wer === imToolNoch) imToolNoch = "";
     if (e.typ === "erledigt") { stand = "besucht"; datum = e.datum || e.zeit; if (!wer) wer = e.wer; if (e.art) art = e.art; }
     if (e.typ === "korrektur" && toolBuchung && e.stand === "offen" && S.stammStand && e.zeit < S.stammStand) continue;
     if (e.typ === "korrektur") {   // von Hand korrigiert (Studierende): gilt ab hier
@@ -1122,6 +1131,7 @@ function standBestimmen(x, altBesuch) {
   if (!stand && wer) stand = "übernommen";
   x.wer = wer; x.stand = stand || "offen"; x.besuchsart = art; x.datum = datum; x.termin = termin;
   x.doppelt = doppelt.filter((w) => w !== wer);
+  x.imToolNoch = !wer && x.stand === "offen" ? imToolNoch : "";
   x.besuchtVon = wer && (x.stand === "besucht" || x.stand === "übernommen" || x.stand === "gebucht") ? [wer] : [];
   x.notizen = x.eintraege.filter((e) => e.typ === "notiz");
   // Berichte: je Dateiname der neueste Eintrag; «bericht_weg» entfernt ihn
@@ -1297,10 +1307,11 @@ function standChip(x, kurz = false, ohneWer = false) {
   const wer = ohneWer ? "" : x.wer ? ` · ${esc(x.wer)}` : x.dozentTool ? ` · ${esc(x.dozentTool)}` : "";
   const t = "";   // der Termin steht in «Meine Termine», nicht beim Stand
   const doppelt = x.doppelt && x.doppelt.length ? ` <span class="hinweis" title="In dieser Seite hat auch ${esc(x.doppelt.join(", "))} «Ich übernehme» geklickt, gebucht ist aber ${esc(x.wer || "jemand anderes")} – bitte absprechen; wer es nicht macht, klickt «Wieder abgeben».">⚠ auch übernommen von ${esc(x.doppelt.join(", "))}</span>` : "";
+  const imTool = x.imToolNoch ? ` <span class="hinweis" title="${esc(x.imToolNoch)} hat den Termin wieder abgegeben. Beim letzten Holen stand die Buchung noch im Praktikumstool – ist sie dort gelöscht, verschwindet dieser Hinweis beim nächsten Holen; steht sie dann noch im Tool, gilt sie wieder.">⚠ beim letzten Holen noch im Tool: ${esc(x.imToolNoch)}</span>` : "";
   // Wer übernimmt, bucht gleichzeitig im Praktikumstool – darum gibt es nur «gebucht»
   const text = { "übernommen": "gebucht" }[x.stand] || x.stand;
   const titel = { "übernommen": "gebucht", gebucht: "gebucht (im Praktikumstool)", besucht: "Besuch hat stattgefunden", offen: "Noch niemand eingeteilt" }[x.stand] || "";
-  return `<span class="chip ${cls}${ohneWer ? " s-kurz" : ""}" title="${esc(titel)}">${esc(text)}${wer}${t}</span>${doppelt}`;
+  return `<span class="chip ${cls}${ohneWer ? " s-kurz" : ""}" title="${esc(titel)}">${esc(text)}${wer}${t}</span>${doppelt}${imTool}`;
 }
 function achtungZeichen(x) {
   if (!x.achtung || !x.achtung.length) return "";
@@ -2939,7 +2950,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261107-164923";
+const STAND = "20261107-205727";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
