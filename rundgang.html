@@ -1003,12 +1003,18 @@ function berechnen() {
   }
 
   // Praktika aus dem Praktikumstool
-  const liste = [], ausgeblendet = [], fremdBesucht = [];
+  const liste = [], ausgeblendet = [], fremdBesucht = [], wegGebucht = [];
   for (const pr of Object.values(S.praktika)) {
     const person = personen[pr.idstudent];
     const ein = [...(proPrakt[pr.idpraktikum] || [])].reverse().find((e) => e.typ === "ausblenden" || e.typ === "einblenden");
     if (ein && ein.typ === "ausblenden") { ausgeblendet.push({ ...pr, person, grund: ein.text || "" }); continue; }
     if (!ein) {   // automatisch weggelassen – lässt sich unten bei «Entfernt» wieder aufnehmen
+      if (pr.weg) {   // im Praktikumstool gelöscht: aus den Listen, aber wer gebucht hatte, sieht es unter «Meine Termine» mit Vermerk
+        const x = { ...pr, person, eintraege: proPrakt[pr.idpraktikum] || [], quelle: "tool" };
+        standBestimmen(x);
+        if (x.wer && !x.eintraege.some((e) => e.typ === "weg_gesehen" && e.wer === x.wer)) wegGebucht.push(x);
+        ausgeblendet.push({ ...x, grund: pr.ausblendGrund }); continue;
+      }
       if (pr.ausblendGrund) { ausgeblendet.push({ ...pr, person, grund: pr.ausblendGrund }); continue; }
       // Mathe-Fachbesuch durch jemanden ausserhalb des Teams (im Tool: mehr «Fach-besuche», als das Team gebucht hat) – nicht unsere Sache
       const teamTage = new Set((pr.besuche || []).filter((b) => /^MA\b/i.test(b.fach || "") && teamKuerzel(b.dozent)).map((b) => b.datum));
@@ -1068,7 +1074,7 @@ function berechnen() {
   }
   for (const x of liste) noetigBestimmen(x);
   for (const person of Object.values(personen)) for (const x of person.praktika) if (x.quelle === "alt") noetigBestimmen(x);
-  R = { praktika: liste, personen, ausgeblendet };
+  R = { praktika: liste, personen, ausgeblendet, wegGebucht };
 }
 
 function standBestimmen(x, altBesuch) {
@@ -2039,6 +2045,7 @@ function ansichtTermine() {
       `<button type="button" class="fchip ${FILTERFARBE[v]} ${tPrakt.includes(v) ? "an" : ""}" onclick="terminPraktikum('${v}')">${t}</button>`).join("")}
     <button class="knopf klein" onclick="listeKopieren()" title="Kopiert die Liste in die Zwischenablage – danach in Excel oder eine Mail einfügen (Cmd+V / Ctrl+V)">Liste für Excel kopieren</button>
     <button class="knopf klein" onclick="kalAlleLaden()" title="Alle kommenden gebuchten Besuche als Kalenderdatei – doppelklicken, dann übernimmt Outlook sie">📅 Alle Termine für Outlook</button></div>
+  ${wegKasten(sj)}
   ${meine.length ? `<table class="liste"><thead><tr><th>Tag</th><th>Zeit</th><th>Name</th><th>Prakt.</th><th>Schule</th><th>Stand</th><th>Hinweise</th><th></th></tr></thead><tbody>
   ${Object.entries(tage).map(([d, xs]) => xs.map((x, i) => { const w = x.termin ? terminWarnungen(x, x.termin.datum, x.termin.zeit) : [];
     return `<tr class="${farbKlasse(x)}"><td style="white-space:nowrap">${i === 0 ? `<b>${esc(tagText(d))}</b>` : ""}</td><td>${esc(x.termin ? x.termin.zeit : "")}</td>
@@ -2048,6 +2055,19 @@ function ansichtTermine() {
   </tbody></table>` : `<div class="leer">Noch keine Besuche übernommen.</div>`}
   ${reiseplanTeil()}`;
 }
+
+/* Im Praktikumstool gelöschte Praktika, bei denen ich gebucht hatte: Vermerk, bis ich ihn wegklicke */
+function wegKasten(sj) {
+  const w = (R.wegGebucht || []).filter((x) => x.wer === S.ich && x.jahr === sj);
+  if (!w.length) return "";
+  return `<div class="karte" style="border:2px solid var(--achtung);margin-bottom:14px"><b class="rot">⚠ Im Praktikumstool gelöscht</b>
+    <p class="klein" style="margin:4px 0 8px">Diese Praktika gibt es im Praktikumstool nicht mehr (abgemeldet, verschoben o.ä.) – damit auch deine Buchung. Den Termin aus dem eigenen Kalender nehmen; danach hier «erledigt» klicken.</p>
+    <table class="liste"><tbody>${w.map((x) => `<tr><td>${x.termin ? esc(kurzDatum(x.termin.datum) + " " + (x.termin.zeit || "")) : "ohne Termin"}</td>
+      <td><span class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</span></td><td>${esc(praktKurz(x))} ${esc(sjText(x.jahr))}</td>
+      <td class="klein leise">beim Holen am ${esc(datumText(x.weg))} nicht mehr gefunden</td>
+      <td><button class="knopf klein" title="Vermerk aus meiner Liste nehmen – bleibt bei «Entfernt» und im Verlauf sichtbar" onclick="wegGesehen(${ref(x.idpraktikum)})">erledigt ✕</button></td></tr>`).join("")}</tbody></table></div>`;
+}
+async function wegGesehen(i) { if (await eintragen({ typ: "weg_gesehen", praktikum: REFS[i] })) meldung("Vermerk entfernt – bleibt unter «Entfernt» sichtbar."); }
 
 /* ---------- Kalender (Outlook) ----------
    Für alle: kommende eigene Besuche als .ics, je Besuch ein Eintrag genau über die Unterrichtszeit
@@ -2940,7 +2960,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261107-163655";
+const STAND = "20261107-164923";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
