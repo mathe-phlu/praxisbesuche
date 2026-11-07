@@ -846,6 +846,7 @@ async function allesLaden() {
   }
   // Spezialpraktika ersetzen meist ein Halbtags-, Profil- oder Quartalspraktikum. Im Tool steht das in Klammern,
   // z.B. «Spezialpraktikum 1 (Halbtagespraktikum)». «Mentorat» oder ein anderes Fach (z.B. «… EN») betrifft uns nicht.
+  for (const p of Object.values(S.praktika)) if (p.weg) S.praktika[p.idpraktikum] = { ...p, ausblendGrund: `nicht mehr im Praktikumstool (beim Holen am ${datumText(p.weg)} nicht mehr gefunden)` };
   const faecherAlle = new Set(Object.values(S.praktika).flatMap((p) => p.faecher || []));
   S.spezialRaus = [];
   for (const p of Object.values(S.praktika)) {
@@ -2704,8 +2705,20 @@ async function praktikaUebernehmen(liste) {
       proJahr[p.jahr + " " + p.gruppe] = (proJahr[p.jahr + " " + p.gruppe] || 0) + 1;
     }
   }
-  bestand.praktika = Object.values(nach);
   bestand.stand = new Date().toISOString();
+  // Was im Tool verschwunden ist (gelöscht, verschoben, anderes Fach), bleibt hier sonst stehen: beim vollständigen Holen
+  // eines Jahres alles dieses Jahres und dieser Arten, das nicht mehr kam, als «weg» markieren – nicht löschen (Verlauf bleibt)
+  const wegNeu = [];
+  for (const d of liste) {
+    if (d.einzeln || !Array.isArray(d.jahre) || !d.jahre.length) continue;
+    const da = new Set((d.praktika || []).map((p) => String(p.idpraktikum))), arten = new Set(Object.keys(d.arten || {}).map(String));
+    for (const p of Object.values(nach)) {
+      if (!d.jahre.includes(p.jahr) || !arten.has(String(p.art))) continue;
+      if (da.has(String(p.idpraktikum))) delete p.weg;
+      else if (!p.weg) { p.weg = bestand.stand; wegNeu.push(p); }
+    }
+  }
+  bestand.praktika = Object.values(nach);
   // für die Übersicht: wann welche Gruppe bzw. Halbtag-Periode zuletzt geholt wurde
   bestand.geholt ||= {};
   for (const d of liste) for (const p of d.praktika || []) {
@@ -2716,7 +2729,8 @@ async function praktikaUebernehmen(liste) {
   }
   await schreibeJSON("stamm/praktika.json", bestand);
   const fremdeArten = Object.entries(Object.assign({}, ...liste.map((d) => d.andereArten || {})));
-  const text = `${fremdeArten.length ? `<div class="karte" style="border-color:var(--achtung)"><b class="rot">⚠ Im Praktikumstool gibt es Mathe-Praktika in Arten, die hier nicht eingelesen werden:</b><ul>${fremdeArten.map(([id, t]) => `<li>${esc(t)} (Nr. ${esc(id)})</li>`).join("")}</ul>Bitte Rike melden, damit sie dazukommen.</div>` : ""}<ul><li>${neu} neu, ${geaendert} aktualisiert</li>${Object.entries(proJahr).sort().map(([k, v]) => `<li>${esc(sjText(k.split(" ")[0]))} ${esc(k.split(" ")[1])}: ${v}</li>`).join("")}</ul>`;
+  const wegText = wegNeu.length ? `<div class="karte" style="border-color:var(--achtung)"><b class="rot">⚠ ${wegNeu.length} Praktika sind im Praktikumstool nicht mehr zu finden</b> (gelöscht, verschoben oder anderes Fach). Sie stehen jetzt unten bei «Entfernt»:<ul>${wegNeu.map((p) => `<li>${esc(p.name)} · ${esc(p.gruppe)} ${esc(sjText(p.jahr))}${(p.besuche || []).filter((v) => v.fach === "MA").length ? " – <b>hatte einen Mathe-Besuch: " + esc([...new Set(p.besuche.filter((v) => v.fach === "MA").map((v) => v.dozent))].join(", ")) + "</b>" : ""}</li>`).join("")}</ul></div>` : "";
+  const text = wegText + `${fremdeArten.length ? `<div class="karte" style="border-color:var(--achtung)"><b class="rot">⚠ Im Praktikumstool gibt es Mathe-Praktika in Arten, die hier nicht eingelesen werden:</b><ul>${fremdeArten.map(([id, t]) => `<li>${esc(t)} (Nr. ${esc(id)})</li>`).join("")}</ul>Bitte Rike melden, damit sie dazukommen.</div>` : ""}<ul><li>${neu} neu, ${geaendert} aktualisiert</li>${Object.entries(proJahr).sort().map(([k, v]) => `<li>${esc(sjText(k.split(" ")[0]))} ${esc(k.split(" ")[1])}: ${v}</li>`).join("")}</ul>`;
   await allesLaden();
   if ($("#ergTool")) $("#ergTool").innerHTML = text;
   meldung(`Praktika eingelesen: ${neu} neu, ${geaendert} aktualisiert.`);
@@ -2926,7 +2940,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261107-162933";
+const STAND = "20261107-163655";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
