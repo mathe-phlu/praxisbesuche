@@ -1104,7 +1104,7 @@ function standBestimmen(x, altBesuch) {
   // eigene Einträge, der Reihe nach
   // Eine Buchung im Praktikumstool, die erst nach einer Korrektur hier eingelesen wurde, gilt: die Korrektur ist dann veraltet.
   const toolBuchung = termin && termin.imTool ? { wer, termin, stand } : null;
-  let doppelt = [], imToolNoch = "";
+  let doppelt = [];
   const perBuchst = x.gruppe === "Halbtag" ? (periode(x).match(/Periode ([A-D])/) || [])[1] : "";
   const toolGeholt = (S.geholt || {})[x.gruppe === "Halbtag" ? `${x.jahr}|Halbtag|${perBuchst}` : `${x.jahr}|${x.gruppe}`] || S.stammStand || "";
   for (const e of x.eintraege) {
@@ -1112,13 +1112,12 @@ function standBestimmen(x, altBesuch) {
     if (e.typ === "termin" && e.wer === wer) termin = e.termin || null;
     if (e.typ === "abgeben") doppelt = doppelt.filter((w) => w !== e.wer);
     if (e.typ === "abgeben" && e.wer === wer) {
-      // Abgegeben, die Buchung steht aber (noch) im Praktikumstool: bis zum nächsten Holen gilt das Abgeben (Stand offen,
-      // Hinweis «im Tool noch gebucht»). Ist sie nach dem nächsten Holen immer noch im Tool, gilt wieder das Tool.
+      // Abgegeben (und im Praktikumstool gleich gelöscht, bestätigt mit «OK»): gilt sofort, auch wenn das letzte Holen
+      // die Buchung noch zeigt. Steht sie nach dem nächsten Holen immer noch im Tool, gilt wieder das Tool.
       if (toolBuchung && toolBuchung.wer === e.wer && toolGeholt && e.zeit < toolGeholt) continue;
-      if (toolBuchung && toolBuchung.wer === e.wer) imToolNoch = e.wer;
       wer = ""; termin = null; if (stand === "übernommen" || stand === "gebucht") stand = "";
     }
-    if (e.typ === "uebernehmen" && e.wer === imToolNoch) imToolNoch = "";
+
     if (e.typ === "erledigt") { stand = "besucht"; datum = e.datum || e.zeit; if (!wer) wer = e.wer; if (e.art) art = e.art; }
     if (e.typ === "korrektur" && toolBuchung && e.stand === "offen" && S.stammStand && e.zeit < S.stammStand) continue;
     if (e.typ === "korrektur") {   // von Hand korrigiert (Studierende): gilt ab hier
@@ -1131,7 +1130,6 @@ function standBestimmen(x, altBesuch) {
   if (!stand && wer) stand = "übernommen";
   x.wer = wer; x.stand = stand || "offen"; x.besuchsart = art; x.datum = datum; x.termin = termin;
   x.doppelt = doppelt.filter((w) => w !== wer);
-  x.imToolNoch = !wer && x.stand === "offen" ? imToolNoch : "";
   x.besuchtVon = wer && (x.stand === "besucht" || x.stand === "übernommen" || x.stand === "gebucht") ? [wer] : [];
   x.notizen = x.eintraege.filter((e) => e.typ === "notiz");
   // Berichte: je Dateiname der neueste Eintrag; «bericht_weg» entfernt ihn
@@ -1307,11 +1305,10 @@ function standChip(x, kurz = false, ohneWer = false) {
   const wer = ohneWer ? "" : x.wer ? ` · ${esc(x.wer)}` : x.dozentTool ? ` · ${esc(x.dozentTool)}` : "";
   const t = "";   // der Termin steht in «Meine Termine», nicht beim Stand
   const doppelt = x.doppelt && x.doppelt.length ? ` <span class="hinweis" title="In dieser Seite hat auch ${esc(x.doppelt.join(", "))} «Ich übernehme» geklickt, gebucht ist aber ${esc(x.wer || "jemand anderes")} – bitte absprechen; wer es nicht macht, klickt «Wieder abgeben».">⚠ auch übernommen von ${esc(x.doppelt.join(", "))}</span>` : "";
-  const imTool = x.imToolNoch ? ` <span class="hinweis" title="${esc(x.imToolNoch)} hat den Termin wieder abgegeben. Beim letzten Holen stand die Buchung noch im Praktikumstool – ist sie dort gelöscht, verschwindet dieser Hinweis beim nächsten Holen; steht sie dann noch im Tool, gilt sie wieder.">⚠ beim letzten Holen noch im Tool: ${esc(x.imToolNoch)}</span>` : "";
   // Wer übernimmt, bucht gleichzeitig im Praktikumstool – darum gibt es nur «gebucht»
   const text = { "übernommen": "gebucht" }[x.stand] || x.stand;
   const titel = { "übernommen": "gebucht", gebucht: "gebucht (im Praktikumstool)", besucht: "Besuch hat stattgefunden", offen: "Noch niemand eingeteilt" }[x.stand] || "";
-  return `<span class="chip ${cls}${ohneWer ? " s-kurz" : ""}" title="${esc(titel)}">${esc(text)}${wer}${t}</span>${doppelt}${imTool}`;
+  return `<span class="chip ${cls}${ohneWer ? " s-kurz" : ""}" title="${esc(titel)}">${esc(text)}${wer}${t}</span>${doppelt}`;
 }
 function achtungZeichen(x) {
   if (!x.achtung || !x.achtung.length) return "";
@@ -1431,15 +1428,17 @@ async function terminGewaehlt(ip, il, ipartner, platz = "haupt") {
     const termin = { datum: l.datum, zeit: l.zeit, bis: l.bis, lektion: l.id };
     if (!(await eintragen(y.wer === S.ich ? { typ: "termin", praktikum: y.idpraktikum, termin } : { typ: "uebernehmen", praktikum: y.idpraktikum, termin }))) { if (vorab && !vorab.closed && vorab.location.href === "about:blank") { try { vorab.close(); } catch (e) {} } return; }
   }
-  meldung(meinesSchon ? "Termin geändert." : partner ? "Doppelbesuch gebucht – unten bei beiden im Tool eintragen." : "Gebucht – jetzt sofort im Praktikumstool eintragen (öffnet sich als Fenster).");
   // Einzelbesuch: Tool sofort öffnen. Doppelbesuch: zwei Knöpfe, einer pro Person – man öffnet sie selbst nacheinander.
-  if (!partner || meinesSchon) { if (x.link) { REFS.push(toolLink(x, a.id)); toolOeffnen(REFS.length - 1, platz, vorab); } }
-  else doppelToolZeigen(alle.map((y) => { const l = y === x ? a : (y.lektionen || []).find((b) => b.datum === a.datum && b.zeit === a.zeit) || a; REFS.push(toolLink(y, l.id)); return [y.person.name, REFS.length - 1]; }), blockText(a));
+  // In beiden Fällen geht es erst nach «OK» weiter.
+  if (!partner || meinesSchon) {
+    if (x.link) { REFS.push(toolLink(x, a.id)); const ti = REFS.length - 1; toolOeffnen(ti, platz, vorab); await toolBestaetigen(meinesSchon ? "aendern" : "eintragen", [[x.person.name, ti, platz]]); }
+  } else await toolBestaetigen("eintragen", alle.map((y, n) => { const l = y === x ? a : (y.lektionen || []).find((b) => b.datum === a.datum && b.zeit === a.zeit) || a; REFS.push(toolLink(y, l.id)); return [y.person.name, REFS.length - 1, "doppel" + (n + 1)]; }), { offen: false, wann: blockText(a) });
+  meldung(meinesSchon ? "Termin geändert." : "Gebucht.");
   // Doppelbesuch mit unterschiedlichen Stundenplänen: nach der ersten Person das Fenster für die zweite wieder zeigen
   if (S.nachBuchen) {
     const [ia, ib] = S.nachBuchen; S.nachBuchen = null;
     const pa = R.praktika.find((p) => p.idpraktikum === ia), pb = R.praktika.find((p) => p.idpraktikum === ib);
-    if (pa && pb && !(pa.wer === S.ich && pb.wer === S.ich)) setTimeout(() => termineZeigen(ref(ia), ref(ib)), 700);
+    if (pa && pb && !(pa.wer === S.ich && pb.wer === S.ich)) setTimeout(() => termineZeigen(ref(ia), ref(ib)), 200);
   }
 }
 /* Halbtag: Doppelbesuch von Hand verbinden oder trennen (gilt für alle) */
@@ -1491,14 +1490,32 @@ function termineNebeneinander(x, y) {
   d.returnValue = ""; d.showModal();
   d.onclose = () => { $("#frageOk").style.display = ""; d.classList.remove("breit"); };
 }
-function doppelToolZeigen(personen, wann) {
-  const alt = document.getElementById("zweitesTool"); if (alt) alt.remove();
-  const k = document.createElement("div"); k.id = "zweitesTool";
-  k.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:70;background:#fff;border:2px solid var(--ph-braun);border-radius:10px;padding:14px 18px;box-shadow:0 8px 30px rgba(0,0,0,.25);max-width:560px";
-  k.innerHTML = `<div style="margin-bottom:8px"><b>Doppelbesuch gebucht</b> (${esc(wann)}). Jetzt bei beiden im Praktikumstool «Besuch eintragen»:</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${personen.map(([name, i], n) => `<button class="knopf haupt" onclick="toolOeffnen(${i}, 'doppel${n + 1}'); this.textContent = '✓ ${esc(name.replace(/'/g, ""))}'; this.classList.remove('haupt')">${n + 1}. ${esc(name)} im Tool ↗</button>`).join("")}
-    <button class="knopf klein" style="margin-left:auto" onclick="document.getElementById('zweitesTool').remove()">Fertig ✕</button></div>`;
-  document.body.appendChild(k);
+/* Sicherheitsanker: Nach Buchen, Termin ändern oder Abgeben öffnet sich das Praktikumstool; danach muss man hier
+   bestätigen, dass es dort auch gemacht ist – sonst geht es nicht weiter. So bleiben App und Tool im Gleichschritt,
+   auch zwischen zwei Holen. personen: [[Name, REFS-Index des Tool-Links, Fensterplatz]]; offen: Tool schon geöffnet. */
+function toolBestaetigen(was, personen, { offen = true, wann = "" } = {}) {
+  return new Promise((fertig) => {
+    let d = document.getElementById("toolOk");
+    if (!d) { d = document.createElement("dialog"); d.id = "toolOk"; document.body.appendChild(d); }
+    const frage = { eintragen: "Im Praktikumstool eingetragen?", aendern: "Im Praktikumstool geändert?", loeschen: "Im Praktikumstool gelöscht?" }[was];
+    const tun = { eintragen: "«Besuch eintragen»", aendern: "den Besuch auf den neuen Termin ändern", loeschen: "die Buchung löschen" }[was];
+    const zwei = personen.length > 1;
+    d.innerHTML = `<p style="font-size:1.15em;margin:0 0 8px"><b>${esc(frage)}</b></p>
+      <p class="klein" style="margin:0 0 14px">${zwei ? `Doppelbesuch${wann ? " (" + esc(wann) + ")" : ""}: bei <b>beiden</b> im Praktikumstool ${tun}.`
+        : `Im Praktikumstool-Fenster ${tun}, Fenster schliessen – dann hier bestätigen.`}${offen ? "" : " Die Knöpfe öffnen das Tool."}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${personen.map(([name, i, platz], n) =>
+        `<button type="button" class="knopf ${offen ? "klein" : "haupt"}" data-i="${i}" data-platz="${esc(platz)}">${zwei ? n + 1 + ". " + esc(name) + " im Tool ↗" : offen ? "Tool nochmal öffnen ↗" : esc(name) + " im Tool ↗"}</button>`).join("")}
+      <button type="button" class="knopf ${offen ? "haupt" : ""}" style="margin-left:auto" id="toolOkJa">OK, ${was === "loeschen" ? "gelöscht" : was === "aendern" ? "geändert" : "eingetragen"}</button></div>`;
+    d.querySelectorAll("[data-i]").forEach((b) => (b.onclick = () => {
+      toolOeffnen(Number(b.dataset.i), b.dataset.platz);
+      if (zwei || !offen) { b.textContent = "✓ " + b.textContent.replace(/^✓ /, ""); b.classList.remove("haupt"); b.classList.add("klein"); }
+      const ja = d.querySelector("#toolOkJa"); if (!offen && [...d.querySelectorAll("[data-i]")].every((k) => k.textContent.startsWith("✓"))) ja.classList.add("haupt");
+    }));
+    d.oncancel = (e) => e.preventDefault();   // Esc schliesst nicht
+    d.querySelector("#toolOkJa").onclick = () => d.close();
+    d.onclose = () => fertig();
+    d.showModal();
+  });
 }
 /* Praktikumstool als Pop-up-Fenster mittig über der Seite: eintragen, Fenster schliessen, weiter hier */
 /* Tool-Fenster rechts neben diesem Fenster, volle Höhe: hat es rechts Platz, dort; sonst die rechte Bildschirmhälfte */
@@ -1562,8 +1579,8 @@ async function uebernehmen(i, nurTermin = false) {
   const termin = datum ? { datum, zeit, lektion: lekt } : null;
   const ok = await eintragen(nurTermin ? { typ: "termin", praktikum: id, termin } : { typ: "uebernehmen", praktikum: id, termin });
   if (!ok) { if (vorab && !vorab.closed && vorab.location.href === "about:blank") { try { vorab.close(); } catch (e) {} } return; }
-  meldung(nurTermin ? "Termin geändert." : "Übernommen – bitte im Praktikumstool eintragen.");
-  if (vorab) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1, "haupt", vorab); }
+  if (vorab) { REFS.push(toolLink(x, lekt)); const ti = REFS.length - 1; toolOeffnen(ti, "haupt", vorab); await toolBestaetigen(nurTermin ? "aendern" : "eintragen", [[x.person.name, ti, "haupt"]]); }
+  meldung(nurTermin ? "Termin geändert." : "Übernommen.");
 }
 /* Termine, die nach der Checkliste nie gehen – sie werden gar nicht angeboten */
 function terminGesperrt(x, datum, zeit) {
@@ -1633,8 +1650,8 @@ async function handlung(typ, i) {
   const vorab = typ === "abgeben" && x && x.link ? toolFensterVorab() : null;
   if (!(await eintragen({ typ, praktikum: id }))) { if (vorab && !vorab.closed && vorab.location.href === "about:blank") { try { vorab.close(); } catch (e) {} } return; }
   if (typ === "abgeben") {
-    meldung("Abgegeben – bitte im Praktikumstool die Buchung löschen (öffnet sich als Fenster).");
-    if (vorab) { REFS.push(toolLink(x, lekt)); toolOeffnen(REFS.length - 1, "haupt", vorab); }
+    if (vorab) { REFS.push(toolLink(x, lekt)); const ti = REFS.length - 1; toolOeffnen(ti, "haupt", vorab); await toolBestaetigen("loeschen", [[x.person.name, ti, "haupt"]]); }
+    meldung("Abgegeben.");
   } else meldung("Übernommen – bitte im Praktikumstool buchen.");
 }
 /* Berichte (Protokolle) liegen im gemeinsamen Ordner unter «Protokolle/<Nachname Vorname Studiengang>/»
@@ -2402,7 +2419,8 @@ const HILFE = [
     <li>In der Spalte <b>Buchen</b> auf <b>Termine ▸</b> klicken. Die grosse Ansicht zeigt alle möglichen Termine, Woche für Woche – was gegen die Regeln verstösst, ist schon weg.</li>
     <li>Grün = danach frei zum Besprechen. Weiss = danach Unterricht; darunter steht, wie viel noch kommt (z.B. «+4 L. bis 15:30»).</li>
     <li>Termin anklicken → <b>Übernehmen</b>. Jetzt ist er hier als <span class="chip s-gebucht">gebucht</span> erfasst.</li>
-    <li>Das Praktikumstool öffnet sich rechts daneben bei dieser Woche: dort <b>«Besuch eintragen»</b>.</li></ol>
+    <li>Das Praktikumstool öffnet sich rechts daneben bei dieser Woche: dort <b>«Besuch eintragen»</b>, Fenster schliessen.</li>
+    <li>Hier fragt die App <b>«Im Praktikumstool eingetragen?»</b> → <b>OK</b>. Erst dann geht es weiter (falls nötig: «Tool nochmal öffnen»). So bleiben App und Tool auch zwischen zwei Mal Holen gleich.</li></ol>
     <p class="leise">Klappt es im Tool nicht? → Meine Termine → «Anpassen».</p>`],
   ["halbtag", "Halbtag &amp; Einzel", "Paare und Doppelbesuche", `<ol class="schritte">
     <li>Reiter <b>Halbtag &amp; Einzel</b>. Filter: Periode A–D oder Einzel, Stand, Name und «nur meine».</li>
@@ -2412,7 +2430,7 @@ const HILFE = [
     <p class="leise">Die Regeln von Profil und Quartal (erste Tage, letzter Tag, zwei pro Woche) gelten hier nicht.</p>`],
   ["termine", "Meine Termine", "Erledigt, ändern, Bericht", `<ol class="schritte">
     <li>Reiter <b>Meine Termine</b>: alle deine Besuche nach Tag. Unter dem Namen: <b>Kontakte</b> (Mathe-PxL, zuständige PxL, Mentor/in mit E-Mail).</li>
-    <li>Nach dem Besuch: <b>✓ Erledigt</b>. Termin passt nicht mehr: <b>Anpassen</b> → «Termin ändern» oder «Wieder abgeben» – danach im Tool auch anpassen.</li>
+    <li>Nach dem Besuch: <b>✓ Erledigt</b>. Termin passt nicht mehr: <b>Anpassen</b> → «Termin ändern» oder «Wieder abgeben» – das Tool öffnet sich, dort auch ändern bzw. löschen, dann hier <b>OK</b>.</li>
     <li><b>Achtung / Bemerkung</b>: z.B. «muss im Quartal besucht werden» oder nur eine Bemerkung.</li>
     <li><b>Bericht ↑</b>: PDF oder Word hochladen. Er landet unter <b>Protokolle/Name der Person</b> (der Ordner wird bei Bedarf angelegt), benannt «UB Nachname PK03 kürzel JJMMTT». Gleich danach <b>✉ E-Mail öffnen</b>: Entwurf an Studierende, Mathe-PxL und Mentor/in – Bericht hineinziehen, senden. Später: 📄 öffnen · ✉ E-Mail · ✕ löschen.</li>
     <li><b>Outlook:</b> 📅 bei einem Termin oder «📅 Alle Termine für Outlook» lädt eine Kalenderdatei. In Outlook im Web: Kalender hinzufügen → Aus Datei hochladen.</li></ol>
@@ -2950,7 +2968,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261107-205727";
+const STAND = "20261107-210542";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
