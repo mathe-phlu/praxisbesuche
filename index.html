@@ -1389,6 +1389,9 @@ function buchenZelle(x, partner, imPaar = null) {
     return `<button class="knopf klein haupt" title="Der Partner ist schon gebucht – nur dieser Termin" onclick="termineZeigen(${ref(x.idpraktikum)}, undefined, ${ref(imPaar.idpraktikum)})">Termin ${esc(x.person.name.split(" ")[0])} ▸</button>
       <div class="leise klein" style="margin-top:2px">wie ${esc(imPaar.person.name.split(" ")[0])}: ${esc(kurzDatum(imPaar.termin.datum))} ${esc(imPaar.termin.zeit || "")}</div>`;
   if (x.stand === "besucht") return "";
+  // Besuch? nein (oder später): keine Termine anbieten – nur «doch besuchen …» (stellt auf «nötig», mit Grund)
+  if (!x.wer && (x.noetig === "nein" || x.noetig === "später"))
+    return `<button class="knopf mini" style="color:var(--leise)" title="Wird nicht besucht (${esc(x.warum || "")}). Nur in Ausnahmefällen: stellt «Besuch?» auf «nötig» (mit Grund) und zeigt dann die Termine." onclick="dochBesuchen(${ref(x.idpraktikum)})">doch besuchen …</button>`;
   if (!x.lektionen) return (x.stand === "offen" || x.stand === "nicht nötig")
     ? `<button class="knopf klein" title="Kein Stundenplan eingelesen – Termin von Hand eingeben" onclick="uebernehmen(${ref(x.idpraktikum)})">Ich übernehme</button>` : "";
   if (x.wer && x.wer !== S.ich) return "";
@@ -2544,7 +2547,7 @@ const HILFE = [
     <li><b>Meine Termine:</b> deine Besuche im Semester und im Block, dazu der nächste Termin. <b>Studierende:</b> alle Personen, auch das Archiv.</li></ul>`],
   ["suchen", "Profil &amp; Quartal", "Wen kann ich wann besuchen?", `<ol class="schritte">
     <li>Reiter <b>Profil &amp; Quartal</b> öffnen. Standardmässig ausgeblendet: Personen, die du schon besucht hast («nicht schon von mir besucht» – mit ✕ ausschalten).</li>
-    <li><b>Filter</b>: Praktikum, Besuch? (nötig / optional / nein – Standard: nötig + optional), Stand; bei Bedarf <b>Wann</b> (Zeitraum, Tag, Tageszeit, Einzel/Doppel, Zeit zum Besprechen), <b>Wo</b> (Ort, Umkreis) und <b>Weitere</b> (Name, nur meine, nur ⚠). Aktive Filter stehen über der Liste – mit ✕ wieder weg.</li>
+    <li><b>Filter</b>: Praktikum, Besuch? (nötig / optional / nein – Standard: nötig + optional; bei «nein» gibt es keine Termine, nur «doch besuchen …» mit Grund), Stand; bei Bedarf <b>Wann</b> (Zeitraum, Tag, Tageszeit, Einzel/Doppel, Zeit zum Besprechen), <b>Wo</b> (Ort, Umkreis) und <b>Weitere</b> (Name, nur meine, nur ⚠). Aktive Filter stehen über der Liste – mit ✕ wieder weg.</li>
     <li>In der Spalte <b>Buchen</b> steht unter «Termine ▸», an welchen Tagen Mathe ist und wie viele Termine möglich sind. «Liste für Excel kopieren» nimmt die Liste so, wie sie gefiltert ist.</li></ol>
     ${legendeKurz()}`],
   ["uebernehmen", "Termin buchen", "Hier und im Praktikumstool", `<ol class="schritte">
@@ -2673,6 +2676,18 @@ async function bemerkungSpeichern(id) {
 async function notizZu(id) {
   const t = await frage("Notiz zu diesem Praktikum", { art: "lang" }); if (!t) return;
   await eintragen({ typ: "notiz", praktikum: id, text: t });
+}
+/* Ausnahme: jemand mit «Besuch? nein» soll doch besucht werden – erst «nötig» setzen (mit Grund), dann Termine */
+async function dochBesuchen(i) {
+  const id = REFS[i];
+  if (!S.ich) return meldung("Bitte oben rechts «Ich bin» wählen.");
+  const x = R.praktika.find((p) => p.idpraktikum === id); if (!x) return;
+  const grund = await frage(`${x.person.name} · ${praktKurz(x)}\nBesuch? jetzt: ${x.noetig} – ${x.warum || ""}\n\nDoch besuchen – warum? (z.B. «im Profil auffällig», «braucht 2 Fachbesuche»)\nDanach steht «Besuch?» auf «nötig» und die Termine erscheinen.`);
+  if (grund === null) return;
+  if (!(await eintragen({ typ: "noetig", praktikum: id, wert: "ja", text: grund.trim() || "doch besuchen" }))) return;
+  meldung("Besuch? steht jetzt auf «nötig».");
+  const neu = R.praktika.find((p) => p.idpraktikum === id);
+  if (neu) uebernehmen(ref(neu.idpraktikum));
 }
 async function noetigSetzen(id) {
   if (!S.ich) return meldung("Bitte oben rechts «Ich bin» wählen.");
@@ -3102,7 +3117,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261107-214654";
+const STAND = "20261107-215112";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
