@@ -320,6 +320,8 @@ input.eingabe { font-size: 14px; padding: 4px 6px; border: 1px solid #ccc; borde
 .rz { display: inline-block; box-sizing: border-box; font-size: 11px; letter-spacing: -.2px; background: #fff; border: 1px solid #cfcfcf; border-radius: 3px; padding: 1px 2px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: clip; font-variant-numeric: tabular-nums; line-height: 1.35; }
 .raster .rz { display: block; width: 100%; }
 .rz.doppel { padding: 7px 2px; border-color: #9a9a9a; font-weight: 600; }
+.leg-zeile .rz:has(.rz-danach) { width: auto; padding: 1px 5px; }
+.rz-danach { display: block; font-size: 10.5px; font-weight: 400; color: #8a4b12; letter-spacing: 0; }
 .rz.frei { background: #dcefd8; border-color: #8cc084; color: #1f4d1a; }
 th.pspalte, td.pspalte { width: 200px; min-width: 200px; border-left: 3px solid var(--ph-braun) !important; }
 td.p-halbtag { background: #f1f6fc; } td.p-profil { background: #fdf8e6; } td.p-quartal { background: #f0f8ee; }
@@ -354,7 +356,7 @@ details.karte summary { cursor: pointer; }
 .leg-schritte { display: flex; flex-wrap: wrap; gap: 6px 14px; padding-top: 8px; border-top: 1px dashed var(--linie); }
 .hilfe { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 760px) { .hilfe { grid-template-columns: 1fr; } }
-.hilfe-nav { display: flex; flex-direction: column; gap: 6px; }
+.hilfe-nav { display: flex; flex-direction: column; gap: 6px; background: var(--ph-sand); border: 1px solid #e3d6bf; border-radius: 8px; padding: 14px; margin: 0; position: static; }
 .hilfe-nav button { text-align: left; font: inherit; background: #fff; border: 1px solid var(--linie); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
 .hilfe-nav button { color: var(--tinte); }
 .hilfe-nav button b { color: var(--ph-braun-dunkel); font-size: 15px; }
@@ -556,9 +558,15 @@ function umkreisText(x) {
   const d = km(um, x.schulort);
   return d == null ? "" : ` <span class="leise klein">· ${d < 1 ? "<1" : Math.round(d)} km</span>`;
 }
+/* kurz auf dem Termin-Knopf: bei Terminen ohne Zeit zum Besprechen, wie viel Unterricht danach noch kommt */
+function danachKurz(l) {
+  if (besprechung(l) || !l.rest) return "";
+  return `<span class="rz-danach" title="danach noch ${l.rest} ${l.rest === 1 ? "Lektion" : "Lektionen"} bis ${esc(l.schluss)}">+${l.rest} L. bis ${esc(l.schluss.replace(/^0/, ""))}</span>`;
+}
 function blockText(l) {
   const art = (l.anzahl || 1) > 1 ? `${l.anzahl}er-Lektion` : "Einzellektion";
-  const danach = l.frei === null ? "danach kein Unterricht" : l.frei === undefined ? "" : l.frei >= BESPRECHUNG_MIN ? `danach ${l.frei} Min frei` : `danach ${l.frei} Min Pause`;
+  const danach = l.frei === null ? "danach kein Unterricht" : l.frei === undefined ? "" : (l.frei >= BESPRECHUNG_MIN ? `danach ${l.frei} Min frei` : `danach ${l.frei} Min Pause`)
+    + (l.rest ? `, dann noch ${l.rest} ${l.rest === 1 ? "Lektion" : "Lektionen"} bis ${l.schluss}` : "");
   return `${kurzDatum(l.datum)} ${l.zeit}–${l.bis || ""} · ${art}${l.klasse ? " · Kl. " + l.klasse : ""}${danach ? " · " + danach : ""}`;
 }
 /* Sprung ins Tool: zur Woche der Lektion (dann steht die Datumszeile oben), sonst zur Lektion selbst */
@@ -1247,7 +1255,9 @@ function ansichtStart() {
     ${zielKarte("profil", "Profilpraktikum", "geheZu('planung', { praktika: ['Profil'] })", eingeteilt, ziel, `Quote ${Math.round(S.einst.quote * 100)} % von ${prof.length}`).replace(/<\/div>$/, (() => {
       const pf = prof.filter((x) => x.noetig === "ja"), e = pf.filter(dabei).length;
       return `<div class="sk-perioden"><div class="sk-per" onclick="event.stopPropagation();geheZu('planung', { praktika: ['Profil'], noetig: ['ja'] })" title="Profilpraktika, bei denen ein Besuch Pflicht ist (Spezialfall, Achtung)"><b style="grid-column:1/2">!</b>${pf.length ? `<span class="sk-mini">${balken(e, pf.length)}</span><span>Pflicht ${e} / ${pf.length}${e >= pf.length ? " ✓" : ""}</span>` : `<span class="leise">keine Pflichtbesuche</span>`}</div></div></div>`; })())}
-    ${zielKarte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", q.filter(dabei).length, q.length, "alle mit Besuch nötig")}
+    ${zielKarte("quartal", "Quartalspraktikum", "geheZu('planung', { praktika: ['Quartal'] })", q.filter(dabei).length, q.length, "alle mit Besuch nötig").replace(/<\/div>$/, (() => {
+      const o = q.filter((x) => !dabei(x)).length;
+      return `<div class="sk-perioden"><div class="sk-per" onclick="event.stopPropagation();geheZu('planung', { praktika: ['Quartal'], noetig: ['ja'], stand: ['offen'] })" title="Quartalspraktika mit Besuch nötig, die noch niemand gebucht hat"><b>▸</b><span>${o ? "noch offen anzeigen" : "keine offenen"}</span><span>${o}</span></div></div></div>`; })())}
   </div></div>
   <div class="start-rechts"><div class="sk-gruppe">Für dich und das Team</div>
     ${karte("termine", `Meine Termine ${S.ich ? "· " + esc(S.ich) : ""}`, "geheZu('termine')", S.ich ? `<div class="mt-zwei"><div><div class="z">${meine.filter((x) => x.gruppe === "Halbtag").length}${sollVon(meinSoll.sollHalbtag)}</div><div><b>Semester</b><div class="klein">Halbtag, Einzel</div></div></div>
@@ -1364,15 +1374,15 @@ function termineZeigen(i, ip) {
   const d = $("#frage");
   $("#frageText").textContent = `${x.person.name}${partner ? " + " + partner.person.name + " (Doppelbesuch)" : ""} · ${x.gruppe} · ${x.schulort || ""} ${x.schulhaus ? "(" + x.schulhaus + ")" : ""}`;
   $("#frageFeld").innerHTML = `<p class="klein leise" style="margin-top:0">Freie Mathe-Lektionen, die nach der Checkliste möglich sind${gesperrt ? ` (${gesperrt} ausgeblendet: erste Tage, letzter Tag, Arbeitssitzung, oder die Person hat an diesem Tag bzw. in dieser Woche schon genug Besuche – gemäss «Angemeldete Besuche» im Tool beim letzten Einlesen. Andere Fächer können seither gebucht haben: im Tool kurz prüfen)` : ""}.
-      Mit der Maus über einen Termin: Klasse und Zeit danach.</p>
+      Mit der Maus über einen Termin: Klasse und Zeit danach. Bei weissen Terminen steht darunter, wie viel Unterricht danach noch kommt.</p>
     ${ohneBesprechungTrotzdem(x, l) ? `<p class="einr-hinweis" style="margin:0 0 8px;border-color:#c0392b"><b>Muss besucht werden</b>, hat aber keinen Termin mit Zeit zum Besprechen direkt danach – darum hier alle Termine (Besprechung z. B. später oder online).</p>` : ""}
     <p class="einr-hinweis" style="margin:0 0 8px"><b>Termin anklicken = übernehmen.</b> Das Praktikumstool öffnet sich danach sofort in einem eigenen Fenster rechts daneben, bei dieser Woche – dort «Besuch eintragen».</p>
     <div class="leg-zeile"><span class="rz">9:10</span> Einzellektion <span class="rz doppel">8:20</span> Doppellektion
-      <span class="trenn">|</span> <span class="rz frei">10:15</span> danach frei zum Besprechen <span class="rz">13:35</span> danach Unterricht</div>
+      <span class="trenn">|</span> <span class="rz frei">10:15</span> danach frei zum Besprechen <span class="rz">13:35<span class="rz-danach">+3 L. bis 15:10</span></span> danach noch 3 Lektionen bis 15:10</div>
     <div class="wochen">${Object.entries(wochen).sort().map(([mo, tage]) => `<div class="woche"><div class="wk">Woche ab ${esc(kurzDatum(mo))}</div>
       ${Object.entries(tage).map(([tag, ls]) => `<div class="wt"><div class="rk">${tag}${ls.length ? " " + esc(ls[0].datum.slice(8, 10) + "." + ls[0].datum.slice(5, 7) + ".") : ""}</div>
         ${ls.map((a) => `<button type="button" class="rz knopfz ${(a.anzahl || 1) > 1 ? "doppel" : ""} ${besprechung(a) ? "frei" : ""}" title="${esc(blockText(a))}"
-          onclick="terminGewaehlt(${ref(x.idpraktikum)}, ${ref(a)}${partner ? ", " + ref(partner.idpraktikum) : ""})">${esc(a.zeit)}–${esc(a.bis || "")}<span class="klein leise"> ${(a.anzahl || 1) > 1 ? "Doppel" : "Einzel"}</span></button>`).join("") || '<div class="rleer">–</div>'}</div>`).join("")}</div>`).join("") || '<p>Keine freien Mathe-Lektionen.</p>'}</div>`;
+          onclick="terminGewaehlt(${ref(x.idpraktikum)}, ${ref(a)}${partner ? ", " + ref(partner.idpraktikum) : ""})">${esc(a.zeit)}–${esc(a.bis || "")}<span class="klein leise"> ${(a.anzahl || 1) > 1 ? "Doppel" : "Einzel"}</span>${danachKurz(a)}</button>`).join("") || '<div class="rleer">–</div>'}</div>`).join("")}</div>`).join("") || '<p>Keine freien Mathe-Lektionen.</p>'}</div>`;
   $("#frageOk").style.display = "none";
   d.returnValue = ""; d.showModal();
   d.onclose = () => { $("#frageOk").style.display = ""; };
@@ -1448,7 +1458,7 @@ function termineNebeneinander(x, y) {
     return `<div class="nb-spalte"><h4>${n}. ${esc(p.person.name)} ${p.wer ? standChip(p) : ""}</h4>
       ${Object.entries(tage).sort().map(([dt, ls]) => `<div class="nb-tag"><span class="nb-dat">${esc(kurzDatum(dt))}</span>
         ${ls.map((a) => `<button type="button" class="rz knopfz ${(a.anzahl || 1) > 1 ? "doppel" : ""} ${besprechung(a) ? "frei" : ""}" title="${esc(blockText(a))}"
-          onclick="paarMerken(${ref(x.idpraktikum)}, ${ref(y.idpraktikum)}); terminGewaehlt(${ref(p.idpraktikum)}, ${ref(a)}, undefined, 'doppel${n}')">${esc(a.zeit)}–${esc(a.bis || "")}</button>`).join("")}</div>`).join("") || '<p class="leise klein">Keine freien Mathe-Lektionen.</p>'}</div>`;
+          onclick="paarMerken(${ref(x.idpraktikum)}, ${ref(y.idpraktikum)}); terminGewaehlt(${ref(p.idpraktikum)}, ${ref(a)}, undefined, 'doppel${n}')">${esc(a.zeit)}–${esc(a.bis || "")}${danachKurz(a)}</button>`).join("")}</div>`).join("") || '<p class="leise klein">Keine freien Mathe-Lektionen.</p>'}</div>`;
   };
   $("#frageText").textContent = `${x.person.name} + ${y.person.name} (Doppelbesuch) · ${x.gruppe} · ${x.schulort || ""} ${x.schulhaus ? "(" + x.schulhaus + ")" : ""}`;
   $("#frageFeld").innerHTML = `<p class="einr-hinweis" style="margin:0 0 8px">Die beiden sind bei derselben Praxislehrperson, haben ihre Stundenpläne aber <b>unterschiedlich</b> eingetragen.
@@ -2336,54 +2346,55 @@ async function archivSetzen(personId, wert) {
 }
 /* ---------- Hilfe ---------- */
 const HILFE = [
-  ["einrichten", "Einrichten", "Einmal pro Computer", `<ol class="schritte">
-    <li>Die Seite in <b>Chrome oder Edge</b> öffnen (nicht Safari, Firefox oder Teams).</li>
-    <li>In Teams: Kanal <b>Praktika</b> → Dateien → «In SharePoint öffnen» → beim Ordner <b>Praxisbesuche</b> «Verknüpfung zu OneDrive hinzufügen».</li>
-    <li>Hier auf <b>Ordner wählen …</b> → OneDrive – Hochschule Luzern → <b>Mathematik Sek1 - TM - Praxisbesuche</b> → «Bearbeiten erlauben» → bei der nächsten Frage <b>«Bei jedem Besuch erlauben»</b>.</li>
-    <li>Oben rechts bei <b>Ich bin</b> dein Kürzel wählen. Fertig.</li></ol>
-    <div class="einr-hinweis">Das ist <b>einmal pro Browser</b> nötig: Am selben Rechner im selben Browser merkt sich die Seite den Ordner. Anderer Rechner oder anderer Browser: Schritt 3–4 nochmals (neuer Rechner: auch Schritt 2).</div>`],
-  ["suchen", "Besuche suchen", "Wen kann ich wann besuchen?", `<ol class="schritte">
-    <li>Reiter <b>Profil &amp; Quartal</b> öffnen.</li>
-    <li>Standardmässig ausgeblendet: Personen, die du schon besucht hast («nicht schon von mir besucht» – mit ✕ ausschalten).</li>
-    <li>Oben den <b>Filter</b> aufklappen: Praktikum, Besuch nötig, Stand. Bei Bedarf <b>Wann</b> (Tag, Vormittag, Doppellektion), <b>Wo</b> (Ort, Umkreis) und <b>Weitere</b>.</li>
-    <li>In der Spalte <b>Buchen</b> steht unter «Termine ▸», an welchen Tagen Mathe ist und wie viele Termine möglich sind.</li>
-    <li>Aktive Filter stehen über der Liste – mit ✕ sind sie wieder weg.</li></ol>
+  ["einrichten", "Einrichten", "Einmal pro Browser", `<ol class="schritte">
+    <li>Die Seite <b>mathe-phlu.github.io/praxisbesuche</b> in <b>Chrome oder Edge</b> öffnen (nicht Safari, Firefox oder Teams). Im Teams-Ordner liegt dafür «Praxisbesuche öffnen».</li>
+    <li>Neuer Rechner: In Teams beim Ordner <b>Mathematik Sek1 - TM - Praxisbesuche</b> «Verknüpfung zu OneDrive hinzufügen» (oder «Synchronisieren»).</li>
+    <li>Auf <b>Ordner wählen …</b> → OneDrive – Hochschule Luzern → <b>Mathematik Sek1 - TM - Praxisbesuche</b> → «Bearbeiten erlauben» → bei der nächsten Frage <b>«Bei jedem Besuch erlauben»</b>.</li>
+    <li>Oben rechts beim Personen-Knopf dein <b>Kürzel</b> wählen. Fertig.</li></ol>
+    <div class="einr-hinweis">Die Seite selbst enthält keine Daten. Alles liegt im gemeinsamen Ordner; die Seite liest und schreibt dort. Anderer Rechner oder Browser: Schritt 3–4 nochmals. Den Rundgang gibt es links oben.</div>`],
+  ["start", "Startseite", "Was man ablesen kann", `<ul class="schritte">
+    <li>Jede Kachel zeigt: so viele gebucht oder besucht / so viele nötig, mit Balken. Klick auf die Kachel → die passende Liste.</li>
+    <li><b>Halbtag:</b> Klick auf eine Periode A–D springt direkt zu dieser Periode.</li>
+    <li><b>Profil:</b> «!» springt zu den Pflichtbesuchen (Spezialfall, ⚠ Achtung). <b>Quartal:</b> «▸ noch offen» springt zu den Quartalspraktika, die noch niemand gebucht hat.</li>
+    <li><b>Meine Termine:</b> deine Besuche im Semester und im Block, dazu der nächste Termin. <b>Studierende:</b> alle Personen, auch das Archiv.</li></ul>`],
+  ["suchen", "Profil &amp; Quartal", "Wen kann ich wann besuchen?", `<ol class="schritte">
+    <li>Reiter <b>Profil &amp; Quartal</b> öffnen. Standardmässig ausgeblendet: Personen, die du schon besucht hast («nicht schon von mir besucht» – mit ✕ ausschalten).</li>
+    <li><b>Filter</b>: Praktikum, Besuch nötig, Stand; bei Bedarf <b>Wann</b> (Zeitraum, Tag, Tageszeit, Einzel/Doppel, Zeit zum Besprechen), <b>Wo</b> (Ort, Umkreis) und <b>Weitere</b> (Name, nur meine, nur ⚠). Aktive Filter stehen über der Liste – mit ✕ wieder weg.</li>
+    <li>In der Spalte <b>Buchen</b> steht unter «Termine ▸», an welchen Tagen Mathe ist und wie viele Termine möglich sind. «Liste für Excel kopieren» nimmt die Liste so, wie sie gefiltert ist.</li></ol>
     ${legendeKurz()}`],
-  ["uebernehmen", "Termin übernehmen", "Buchen – hier und im Tool", `<ol class="schritte">
-    <li>In der Spalte <b>Buchen</b> auf <b>Termine ▸</b> klicken.</li>
-    <li>Die grosse Ansicht zeigt alle möglichen Termine, Woche für Woche. Termine, die gegen die Regeln verstossen, sind schon weg.</li>
+  ["uebernehmen", "Termin buchen", "Hier und im Praktikumstool", `<ol class="schritte">
+    <li>In der Spalte <b>Buchen</b> auf <b>Termine ▸</b> klicken. Die grosse Ansicht zeigt alle möglichen Termine, Woche für Woche – was gegen die Regeln verstösst, ist schon weg.</li>
+    <li>Grün = danach frei zum Besprechen. Weiss = danach Unterricht; darunter steht, wie viel noch kommt (z.B. «+4 L. bis 15:30»).</li>
     <li>Termin anklicken → <b>Übernehmen</b>. Jetzt ist er hier als <span class="chip s-gebucht">gebucht</span> erfasst.</li>
-    <li>Das Praktikumstool öffnet sich bei dieser Woche: dort <b>«Besuch eintragen»</b>.</li></ol>
+    <li>Das Praktikumstool öffnet sich rechts daneben bei dieser Woche: dort <b>«Besuch eintragen»</b>.</li></ol>
     <p class="leise">Klappt es im Tool nicht? → Meine Termine → «Anpassen».</p>`],
-  ["termine", "Meine Termine", "Erledigt, ändern, abgeben", `<ol class="schritte">
-    <li>Reiter <b>Meine Termine</b>: alle deine Besuche nach Tag.</li>
-    <li>Nach dem Besuch: <b>✓ Erledigt</b>.</li>
-    <li>Termin passt nicht mehr: <b>Anpassen</b> → «Termin ändern» oder «Wieder abgeben». Danach öffnet sich das Tool – dort auch anpassen.</li>
-    <li>Unter dem Namen: <b>Kontakte</b> (Mathe-PxL, zuständige PxL, Mentor/in mit E-Mail).</li>
+  ["halbtag", "Halbtag &amp; Einzel", "Paare und Doppelbesuche", `<ol class="schritte">
+    <li>Reiter <b>Halbtag &amp; Einzel</b>. Filter: Periode A–D oder Einzel, Stand, Name und «nur meine».</li>
+    <li>Gleiche Periode, gleiches Schulhaus, gleiche Praxislehrperson → die beiden stehen als <b>Paar · Doppelbesuch</b> in einer Zeile. Ein Termin bucht für beide; im Tool bei <b>beiden</b> eintragen.</li>
+    <li>Haben die beiden ihre Stundenpläne verschieden eingetragen, zeigt «Termine ▸» beide Pläne nebeneinander.</li>
+    <li>Aufräumen: <b>trennen</b> (kein Paar), <b>⇄ Doppelbesuch</b> (zwei Einzelne zusammenlegen), <b>✕</b> neben dem Namen (gehört nicht in die Liste – unten unter «Entfernt» wieder aufnehmen).</li></ol>
+    <p class="leise">Die Regeln von Profil und Quartal (erste Tage, letzter Tag, zwei pro Woche) gelten hier nicht.</p>`],
+  ["termine", "Meine Termine", "Erledigt, ändern, Bericht", `<ol class="schritte">
+    <li>Reiter <b>Meine Termine</b>: alle deine Besuche nach Tag. Unter dem Namen: <b>Kontakte</b> (Mathe-PxL, zuständige PxL, Mentor/in mit E-Mail).</li>
+    <li>Nach dem Besuch: <b>✓ Erledigt</b>. Termin passt nicht mehr: <b>Anpassen</b> → «Termin ändern» oder «Wieder abgeben» – danach im Tool auch anpassen.</li>
     <li><b>Achtung / Bemerkung</b>: z.B. «muss im Quartal besucht werden» oder nur eine Bemerkung.</li>
-    <li><b>Bericht ↑</b>: Bericht (PDF oder Word) hochladen. Er landet im gemeinsamen Ordner unter <b>Protokolle/Name der Person</b> (fehlt der Ordner, wird er angelegt), benannt wie gewohnt «UB Nachname PK03 kürzel JJMMTT». Bei den Studierenden erscheint dann 📄. Gleich danach: <b>✉ E-Mail öffnen</b> – eine neue Nachricht an Studierende, Mathe-PxL und Mentor/in mit Betreff und Text. Den Bericht hineinziehen, Text anpassen, senden. Danach stehen beim Termin <b>📄 öffnen</b> · <b>✉ E-Mail</b> (Entwurf nochmals erstellen) · <b>✕</b> (falsch hochgeladen? löschen).</li></ol>
+    <li><b>Bericht ↑</b>: PDF oder Word hochladen. Er landet unter <b>Protokolle/Name der Person</b> (der Ordner wird bei Bedarf angelegt), benannt «UB Nachname PK03 kürzel JJMMTT». Gleich danach <b>✉ E-Mail öffnen</b>: Entwurf an Studierende, Mathe-PxL und Mentor/in – Bericht hineinziehen, senden. Später: 📄 öffnen · ✉ E-Mail · ✕ löschen.</li>
+    <li><b>Outlook:</b> 📅 bei einem Termin oder «📅 Alle Termine für Outlook» lädt eine Kalenderdatei. In Outlook im Web: Kalender hinzufügen → Aus Datei hochladen.</li></ol>
     <p class="leise">⚠ rechts = Regel verletzt (z.B. Buchung ausserhalb dieser Seite). Ein Doppelbesuch zur selben Zeit ist kein Problem.</p>`],
-  ["halbtag", "Halbtagespraktikum", "Was ist anders?", `<ol class="schritte">
-    <li>Reiter <b>Halbtagespraktikum</b>. Filter nach <b>Periode</b> (A–D) statt nach Tag.</li>
-    <li>Zwei Studierende im selben Schulhaus mit denselben Mathe-Lektionen stehen als <b>Paar</b> untereinander.</li>
-    <li><b>Termine (beide) ▸</b> beim Paar bucht den <b>Doppelbesuch</b> für beide.</li>
-    <li>Im Tool bei <b>beiden</b> den Besuch eintragen.</li></ol>
-    <p class="leise">Die Regeln von Profil und Quartal (erste Tage, letzter Tag, ein Besuch pro Vormittag, zwei pro Woche) gelten hier nicht.</p>`],
   ["studierende", "Studierende", "Alle Praktika einer Person", `<ol class="schritte">
-    <li>Reiter <b>Studierende</b>: eine Zeile pro Person, Halbtag · Profil · Quartal.</li>
-    <li>Suchen beim Tippen, filtern nach Studienjahr. Abgeschlossene sind im <b>Archiv</b>.</li>
-    <li>Klick auf den Namen: Verlauf, wer schon besucht hat, Bemerkungen, ⚠ Achtung.</li>
-    <li>📄 neben einem Praktikum = Bericht. Im Verlauf (Klick auf den Namen) stehen unter «Protokolle» alle Berichte der Person, auch die alten – vor einem Besuch z.B. kurz den Halbtagsbericht anschauen.</li></ol>`],
-  ["anhang", "Anhang", "Aktualisieren, Regeln, Stand", `<ul class="schritte">
-    <li><b>Normalerweise ist nichts zu tun.</b> Änderungen der anderen erscheinen nach der Synchronisation (sofort: ↻ oben rechts).</li>
-    <li>Vor neuen Praktika (eine Person für alle): Reiter <b>Aktualisieren</b> → «Praktikumstool öffnen und Daten holen» → im Tool das Lesezeichen klicken.</li>
-    <li>Neue Person: im Tool ihre Seite öffnen und das Lesezeichen klicken – nur sie wird nachgetragen.</li>
-    <li>Stand: <span class="chip s-offen">offen</span> noch niemand · <span class="chip s-gebucht">gebucht</span> hier und im Tool eingetragen · <span class="chip s-besucht">besucht</span> hat stattgefunden.</li>
-    <li>Regeln aus der Checkliste, Spezialfälle und Soll stehen unter <b>Aktualisieren</b>.</li></ul>`],
+    <li>Reiter <b>Studierende</b>: eine Zeile pro Person, Halbtag · Profil · Quartal. Suchen beim Tippen – findet auch Personen im Archiv.</li>
+    <li>Klick auf den Namen: Verlauf (wer hat wann besucht), Berichte unter «Protokolle», Bemerkungen, ⚠ Achtung.</li>
+    <li>Studiengang und Fächer korrigieren: «ändern». Abgeschlossene: «ins Archiv» – jederzeit «zurückholen».</li>
+    <li>📄 neben einem Praktikum = Bericht, z.B. vor einem Besuch kurz den Halbtagsbericht anschauen.</li></ol>`],
+  ["anhang", "Aktualisieren", "Daten und Regeln pflegen", `<ul class="schritte">
+    <li><b>Beim Buchen ist hier nichts zu tun.</b> Änderungen der anderen erscheinen nach der Synchronisation (sofort: ↻ oben rechts).</li>
+    <li><b>Daten:</b> oben der Stand (was da ist, was fehlt), darunter «Daten aus dem Praktikumstool holen» in drei Schritten mit dem Lesezeichen «Praxisbesuche-Export».</li>
+    <li><b>Team und Pensum</b> (Kürzel, Soll), <b>Regeln Block</b> (Checkliste, Regeln, Quote, Spezialfälle), <b>Orte</b> für die Umkreissuche.</li>
+    <li>Stand: <span class="chip s-offen">offen</span> noch niemand · <span class="chip s-gebucht">gebucht</span> hier und im Tool eingetragen · <span class="chip s-besucht">besucht</span> hat stattgefunden.</li></ul>`],
 ];
 function legendeKurz() {
   return `<p class="leise" style="margin-top:12px">In der grossen Ansicht steht oben diese Legende:</p><div class="leg-zeile"><span class="rz">9:10</span> Einzellektion <span class="rz doppel">8:20</span> Doppellektion
-      <span class="trenn">|</span> <span class="rz frei">10:15</span> danach frei zum Besprechen <span class="rz">13:35</span> danach Unterricht</div>`;
+      <span class="trenn">|</span> <span class="rz frei">10:15</span> danach frei zum Besprechen <span class="rz">13:35<span class="rz-danach">+3 L. bis 15:10</span></span> danach noch 3 Lektionen bis 15:10</div>`;
 }
 /* Rundgang: Kartensymbol, Start, Kasten auf der Startseite ein-/ausblenden (gilt nur in diesem Browser) */
 function KARTE_SVG(g, cls = "") { return `<svg class="${cls}" width="${g}" height="${g}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l6-3l6 3l6-3v13l-6 3l-6-3l-6 3z"/><path d="M9 4v13"/><path d="M15 7v13"/></svg>`; }
@@ -2890,7 +2901,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261106-181502";
+const STAND = "20261107-161344";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {

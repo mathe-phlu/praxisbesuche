@@ -43,6 +43,7 @@
 
   const praktika = [];
   const artNamen = {};
+  const andereArten = {};
   let n = 0;
   const gesamt = jahre.length * Object.keys(ARTEN).length;
   for (const jahr of jahre) {
@@ -53,6 +54,11 @@
       const doc = new DOMParser().parseFromString(html, "text/html");
       const opt = doc.querySelector(`select[name=prakt_art] option[value="${art}"]`);
       if (opt) artNamen[art] = opt.textContent.replace(/\s*\(\d+\)\s*$/, "").trim();
+      // alle Arten, die das Tool für Mathe in diesem Jahr kennt: welche mit Praktika fehlen in ARTEN?
+      for (const o of doc.querySelectorAll("select[name=prakt_art] option[value]")) {
+        const m = o.textContent.match(/\((\d+)\)\s*$/);
+        if (/^[1-9]\d*$/.test(o.value) && !ARTEN[o.value] && (!m || Number(m[1]) > 0)) andereArten[o.value] = o.textContent.trim() + " · " + jahr;
+      }
       const tab = [...doc.querySelectorAll("table")].find(
         (t) => t.rows[0] && t.rows[0].cells[0] && t.rows[0].cells[0].innerText.includes("StudentIn"));
       if (!tab) continue;
@@ -83,6 +89,16 @@
     if (!eins.length) { hinweis.textContent = "Dieses Praktikum hat kein Mathe – es gibt nichts nachzutragen."; setTimeout(() => hinweis.remove(), 8000); return; }
     praktika.length = 0; praktika.push(...eins);
   }
+  // Spezialpraktika: auf der Seite der Person steht, wofür es ist, z.B. «Spezialpraktikum 1 (Halbtagespraktikum)»
+  const spezial = praktika.filter((p) => (p.gruppe === "Spezial" || p.gruppe === "Abschluss") && p.link);
+  for (let i = 0; i < spezial.length; i++) {
+    hinweis.textContent = `Spezialpraktika ${i + 1} / ${spezial.length} …`;
+    const doc = new DOMParser().parseFromString(await (await fetch(spezial[i].link, { credentials: "include" })).text(), "text/html");
+    const h3 = [...doc.querySelectorAll("h3")].map((h) => h.textContent.replace(/\s+/g, " ").trim()).find((t) => /praktikum/i.test(t)) || "";
+    const m = h3.match(/\((.*)\)\s*$/);
+    spezial[i].zusatz = m ? m[1].trim() : h3;
+    await new Promise((r) => setTimeout(r, 150));
+  }
   if (mitPlan) {
     const planJahr = jahre[jahre.length - 1];
     const liste = praktika.filter((p) => p.jahr === planJahr && p.link);
@@ -97,7 +113,7 @@
     }
   }
   const daten = { quelle: "praktikumstool.phlu.ch, Fächerliste", fach: FACH.kurz, jahre, einzeln: !!einzeln,
-                  erstellt: new Date().toISOString(), arten: artNamen, praktika };
+                  erstellt: new Date().toISOString(), arten: artNamen, andereArten, praktika };
   if (seite) {
     hinweis.textContent = "Übergebe an die Praxisbesuche-Seite …";
     const ok = await new Promise((fertig) => {
@@ -169,11 +185,14 @@
         let j = i;   // direkt anschliessende Mathe-Lektion derselben Klasse = Doppellektion
         while (j + 1 < l.length && l[j + 1].ma && l[j + 1].von - l[j].bis <= 15 && l[j + 1].klasse === l[i].klasse) j++;
         const naechste = l.slice(j + 1).find((x) => x.von >= l[j].bis);
+        const spaeter = l.slice(j + 1).filter((x) => x.von >= l[j].bis);
         bloecke.push({ datum, zeit: hhmm(l[i].von), bis: hhmm(l[j].bis), anzahl: j - i + 1, klasse: l[i].klasse,
                        id: l[i].id, ids: l.slice(i, j + 1).map((x) => x.id), lehrer: l[i].lehrer, woche: l[i].woche,
                        gebucht: l.slice(i, j + 1).flatMap((x) => x.gebucht),
                        frei: naechste ? naechste.von - l[j].bis : null,          // Minuten bis zur nächsten Lektion
-                       naechste: naechste ? hhmm(naechste.von) : "" });           // null = danach kein Unterricht mehr
+                       naechste: naechste ? hhmm(naechste.von) : "",           // null = danach kein Unterricht mehr
+                       rest: spaeter.length,                                    // Lektionen danach am selben Tag (alle Fächer)
+                       schluss: spaeter.length ? hhmm(Math.max(...spaeter.map((x) => x.bis))) : "" });   // Ende des Unterrichts
         i = j;
       }
     }
