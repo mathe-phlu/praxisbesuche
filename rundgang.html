@@ -1894,15 +1894,33 @@ async function erledigt(i) {
 /* ---------- Filter: Grundauswahl · Wann · Wo · Weitere ---------- */
 const STD = {
   praktika: ["Profil", "Quartal", "Spezial"], noetig: ["ja", "optional"], stand: ["offen", "eingeteilt", "besucht"],
-  tage: [], tageszeit: [], lektart: [], perioden: [],
+  tage: [], tageszeit: [], lektart: [], perioden: ["A", "B", "C", "D", "SK"],
 };
-function fa(k) { const v = S.filter[fk(k)]; return Array.isArray(v) ? v : STD[k]; }
-function umschalten(k, wert) { const a = new Set(fa(k)); a.has(wert) ? a.delete(wert) : a.add(wert); setzeFilter(k, [...a]); }
+/* Regel für alle Mehrfach-Filter (Rike, 7.11.): alle Werte gewählt = «alle» (steht nicht in der Leiste über der Liste);
+   einen abwählen → die übrigen bleiben; den letzten abwählen → wieder «alle». Bei Tag, Tageszeit, Lektion (ohne «alle»-Knopf) heisst «alle» = leer. */
+const LEER_IST_ALLE = new Set(["tage", "tageszeit", "lektart"]);
+function optionen(k) {
+  return { praktika: ["Profil", "Quartal", ...(spezialUebrig(fw("jahr", S.einst.studienjahr)) ? ["Spezial"] : [])], noetig: ["ja", "optional", "nein"],
+    stand: ["offen", "eingeteilt", "besucht"], perioden: ["A", "B", "C", "D", "SK"], tage: ["Mo", "Di", "Mi", "Do", "Fr"],
+    tageszeit: ["vormittag", "nachmittag"], lektart: ["einzel", "doppel"] }[k] || [];
+}
+function fa(k) {
+  const v = S.filter[fk(k)];
+  if (!Array.isArray(v)) return STD[k];
+  if (!v.length && !LEER_IST_ALLE.has(k)) return optionen(k);   // früher gespeichertes «keins» = alle
+  return v;
+}
+function alleGewaehlt(k) { const a = fa(k), o = optionen(k); return (LEER_IST_ALLE.has(k) && !a.length) || o.every((v) => a.includes(v)); }
+function umschalten(k, wert) {
+  const o = optionen(k), a = new Set(fa(k).filter((v) => o.includes(v)));
+  a.has(wert) ? a.delete(wert) : a.add(wert);
+  setzeFilter(k, !a.size || o.every((v) => a.has(v)) ? (LEER_IST_ALLE.has(k) ? [] : o) : o.filter((v) => a.has(v)));
+}
 function filterAussehen(k, v) {
   return k === "praktika" || k === "perioden" ? FILTERFARBE[v] || "" : k === "stand" ? "fs fs-" + v : k === "noetig" ? "fs fn-" + v : "";
 }
-function alleKnopf(k, werte, leerIstAlle = false) {
-  const an = (leerIstAlle && !fa(k).length) || werte.every((v) => fa(k).includes(v));
+function alleKnopf(k, werte) {
+  const an = alleGewaehlt(k);
   return `<button type="button" class="fchip ${an ? "an" : ""}" onclick="setzeFilter('${k}',${esc(JSON.stringify(werte))})">alle</button>`;
 }
 function knoepfe(k, optionen) {
@@ -1918,11 +1936,10 @@ function filterLeiste(ansicht, anzahl) {
   // Grundauswahl
   let grund = `<div class="fzeile"><span class="ftitel">Studienjahr</span><select onchange="setzeFilter('jahr',this.value)">${opt(jahre().map((j) => [j, sjText(j)]), sj)}</select></div>`;
   if (planung) {
-    const alle = fa("praktika").length === 3;
-    grund += `<div class="fzeile"><span class="ftitel">Praktikum</span><button type="button" class="fchip ${alle ? "an" : ""}" onclick="setzeFilter('praktika',${esc(JSON.stringify(STD.praktika))})">alle</button>${knoepfe("praktika", [["Profil", "Profil"], ["Quartal", "Quartal"], ...(spezialUebrig(sj) ? [["Spezial", "Spezial (nicht zugeordnet)"]] : [])])}</div>`;
+    grund += `<div class="fzeile"><span class="ftitel">Praktikum</span>${alleKnopf("praktika", optionen("praktika"))}${knoepfe("praktika", [["Profil", "Profil"], ["Quartal", "Quartal"], ...(spezialUebrig(sj) ? [["Spezial", "Spezial (nicht zugeordnet)"]] : [])])}</div>`;
     grund += `<div class="fzeile"><span class="ftitel">Besuch nötig</span>${alleKnopf("noetig", ["ja", "optional", "nein"])}${knoepfe("noetig", [["ja", "ja"], ["optional", "optional"], ["nein", "nein"]])}</div>`;
   } else {
-    grund += `<div class="fzeile"><span class="ftitel">Periode</span>${alleKnopf("perioden", ["A", "B", "C", "D", "SK"], true)}${knoepfe("perioden", [["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"], ["SK", "Einzel"]])}</div>`;
+    grund += `<div class="fzeile"><span class="ftitel">Periode</span>${alleKnopf("perioden", optionen("perioden"))}${knoepfe("perioden", [["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"], ["SK", "Einzel"]])}</div>`;
   }
   grund += `<div class="fzeile"><span class="ftitel">Stand</span>${alleKnopf("stand", ["offen", "eingeteilt", "besucht"])}${knoepfe("stand", [["offen", "offen"], ["eingeteilt", "gebucht"], ["besucht", "besucht"]])}</div>`;
   // Wann
@@ -1964,23 +1981,22 @@ function filterLeiste(ansicht, anzahl) {
 function aktivLeiste(ansicht, anzahl) {
   const c = [];
   const weg = (k, t) => c.push(`<button type="button" class="aktivchip" onclick="filterWeg('${k}')" title="Filter entfernen">${esc(t)} ✕</button>`);
-  const gleich = (k) => JSON.stringify([...fa(k)].sort()) === JSON.stringify([...STD[k]].sort());
-  const TEXT = { eingeteilt: "gebucht", SK: "Einzel" };
+  const TEXT = { eingeteilt: "gebucht", SK: "Einzel", vormittag: "Vormittag", nachmittag: "Nachmittag", einzel: "Einzellektion", doppel: "Doppellektion" };
   // jeder gewählte Wert ist ein eigenes Kästchen (wie im Filter) und lässt sich einzeln abwählen
   const wegKaesten = (k, titel) => c.push(`<span class="aktivgruppe"><span class="leise">${titel}</span> ${fa(k).length
-    ? fa(k).map((v) => `<button type="button" class="fchip ${filterAussehen(k, v)} an" onclick="umschalten('${k}','${v}')" title="${esc(TEXT[v] || v)} abwählen">${esc(TEXT[v] || v)} ✕</button>`).join(" ")
+    ? fa(k).filter((v) => optionen(k).includes(v)).map((v) => `<button type="button" class="fchip ${filterAussehen(k, v)} an" onclick="umschalten('${k}','${v}')" title="${esc(TEXT[v] || v)} abwählen">${esc(TEXT[v] || v)} ✕</button>`).join(" ")
     : `<button type="button" class="aktivchip" onclick="filterWeg('${k}')" title="Filter zurücksetzen">keins ✕</button>`}</span>`);
-  if (ansicht === "planung" && !gleich("praktika")) wegKaesten("praktika", "Praktikum");
-  if (ansicht === "planung" && !gleich("noetig")) wegKaesten("noetig", "Besuch nötig");
-  if (!gleich("stand")) wegKaesten("stand", "Stand");
-  if (ansicht === "halbtag" && fa("perioden").length) wegKaesten("perioden", "Periode");
+  if (ansicht === "planung" && !alleGewaehlt("praktika")) wegKaesten("praktika", "Praktikum");
+  if (ansicht === "planung" && !alleGewaehlt("noetig")) wegKaesten("noetig", "Besuch nötig");
+  if (!alleGewaehlt("stand")) wegKaesten("stand", "Stand");
+  if (ansicht === "halbtag" && !alleGewaehlt("perioden")) wegKaesten("perioden", "Periode");
   const pl = ansicht === "planung";
   if (pl && fw("von", "")) weg("von", "ab " + kurzDatum(fw("von", "")));
   if (pl && fw("bis", "")) weg("bis", "bis " + kurzDatum(fw("bis", "")));
   if (ansicht === "planung") {
-    if (fa("tage").length) weg("tage", fa("tage").join(", "));
-    if (fa("tageszeit").length) weg("tageszeit", fa("tageszeit").map((t) => t === "vormittag" ? "Vormittag" : "Nachmittag").join(", "));
-    if (fa("lektart").length) weg("lektart", fa("lektart").map((t) => t === "einzel" ? "Einzellektion" : "Doppellektion").join(", "));
+    if (!alleGewaehlt("tage")) wegKaesten("tage", "Tag");
+    if (!alleGewaehlt("tageszeit")) wegKaesten("tageszeit", "Tageszeit");
+    if (!alleGewaehlt("lektart")) wegKaesten("lektart", "Lektion");
     if (fw("bespr", false)) c.push(`<button type="button" class="aktivchip" onclick="setzeFilter('bespr',false)" title="Filter ausschalten">danach Zeit zum Besprechen ✕</button>`);
   }
   if (pl && fw("ort", "")) weg("ort", "Ort: " + fw("ort", ""));
@@ -2316,7 +2332,9 @@ function spezialUebrig(sj) { return R.praktika.some((p) => (p.gruppe === "Spezia
 const TERMIN_KAT = ["Halbtag", "Einzel", "Profil", "Quartal", "Spezial"];
 function terminPraktikum(v) {
   const a = new Set(Array.isArray(S.filter["t.prakt"]) ? S.filter["t.prakt"] : TERMIN_KAT);
-  a.has(v) ? a.delete(v) : a.add(v); S.filter["t.prakt"] = [...a]; merke("filter", JSON.stringify(S.filter)); zeichnen();
+  a.has(v) ? a.delete(v) : a.add(v);
+  const sichtbar = TERMIN_KAT.filter((k) => k !== "Spezial" || spezialUebrig(fw("jahr", S.einst.studienjahr)));
+  S.filter["t.prakt"] = sichtbar.some((k) => a.has(k)) && !sichtbar.every((k) => a.has(k)) ? TERMIN_KAT.filter((k) => a.has(k)) : TERMIN_KAT; merke("filter", JSON.stringify(S.filter)); zeichnen();
 }
 function ansichtHalbtag() {
   const sj = fw("jahr", S.einst.studienjahr);
@@ -3010,7 +3028,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261107-211254";
+const STAND = "20261107-213613";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
