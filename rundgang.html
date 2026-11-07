@@ -1310,7 +1310,7 @@ function standChip(x, kurz = false, ohneWer = false) {
   const cls = { offen: "s-offen", "übernommen": "s-uebernommen", gebucht: "s-gebucht", besucht: "s-besucht", "nicht nötig": "s-nicht", "nicht besucht": "s-nicht", abgebrochen: "s-abbruch" }[x.stand] || "s-nicht";
   const wer = ohneWer ? "" : x.wer ? ` · ${esc(x.wer)}` : x.dozentTool ? ` · ${esc(x.dozentTool)}` : "";
   const t = "";   // der Termin steht in «Meine Termine», nicht beim Stand
-  const doppelt = x.doppelt && x.doppelt.length ? ` <span class="hinweis" title="Mehrere haben übernommen – bitte absprechen">doppelt: ${esc(x.doppelt.join(", "))}</span>` : "";
+  const doppelt = x.doppelt && x.doppelt.length ? ` <span class="hinweis" title="In dieser Seite hat auch ${esc(x.doppelt.join(", "))} «Ich übernehme» geklickt, gebucht ist aber ${esc(x.wer || "jemand anderes")} – bitte absprechen; wer es nicht macht, klickt «Wieder abgeben».">⚠ auch übernommen von ${esc(x.doppelt.join(", "))}</span>` : "";
   // Wer übernimmt, bucht gleichzeitig im Praktikumstool – darum gibt es nur «gebucht»
   const text = { "übernommen": "gebucht" }[x.stand] || x.stand;
   const titel = { "übernommen": "gebucht", gebucht: "gebucht (im Praktikumstool)", besucht: "Besuch hat stattgefunden", offen: "Noch niemand eingeteilt" }[x.stand] || "";
@@ -2926,7 +2926,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261107-162851";
+const STAND = "20261107-162933";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
