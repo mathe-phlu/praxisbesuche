@@ -1116,12 +1116,16 @@ function standBestimmen(x, altBesuch) {
     }
   }
   // eigene Einträge, der Reihe nach
+  // Eine Buchung im Praktikumstool, die erst nach einer Korrektur hier eingelesen wurde, gilt: die Korrektur ist dann veraltet.
+  const toolBuchung = termin && termin.imTool ? { wer, termin, stand } : null;
   let doppelt = [];
   for (const e of x.eintraege) {
     if (e.typ === "uebernehmen") { if (wer && wer !== e.wer && stand !== "besucht") doppelt.push(e.wer); else { wer = e.wer; termin = e.termin || termin; if (stand !== "besucht" && stand !== "gebucht") stand = "übernommen"; } }
     if (e.typ === "termin" && e.wer === wer) termin = e.termin || null;
+    if (e.typ === "abgeben") doppelt = doppelt.filter((w) => w !== e.wer);
     if (e.typ === "abgeben" && e.wer === wer) { wer = ""; termin = null; if (stand === "übernommen") stand = ""; }
     if (e.typ === "erledigt") { stand = "besucht"; datum = e.datum || e.zeit; if (!wer) wer = e.wer; if (e.art) art = e.art; }
+    if (e.typ === "korrektur" && toolBuchung && e.stand === "offen" && S.stammStand && e.zeit < S.stammStand) continue;
     if (e.typ === "korrektur") {   // von Hand korrigiert (Studierende): gilt ab hier
       stand = e.stand; wer = e.wer || ""; if (e.datum) datum = e.datum;
       if (stand === "offen" || stand === "abgebrochen" || stand === "nicht nötig") termin = null;
@@ -2922,7 +2926,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261107-161344";
+const STAND = "20261107-162851";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
