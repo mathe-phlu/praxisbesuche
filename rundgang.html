@@ -964,8 +964,11 @@ async function eintragen(e) {
   await schreibeJSON(`eintraege/${S.ich}/${id}.json`, eintrag);
   S.eintraege.push(eintrag);
   berechnen(); zeichnen();
-  return true;
+  return eintrag;
 }
+/* «Nein, doch nicht»: Einträge zurücknehmen – nichts wird gelöscht, ein Eintrag «storno» hebt sie auf */
+async function zuruecknehmen(liste) { for (const e of liste) if (e && e.id) await eintragen({ typ: "storno", bezug: e.id, praktikum: e.praktikum }); }
+const storniert = () => new Set(S.eintraege.filter((e) => e.typ === "storno").map((e) => e.bezug));
 
 /* ---------- Rechnen: Stand, Besuch nötig, Verlauf ---------- */
 let R = { praktika: [], personen: {} };
@@ -989,8 +992,9 @@ function berechnen() {
   }
 
   // Einträge je Praktikum
-  const proPrakt = {};
+  const proPrakt = {}, weg = storniert();
   for (const e of S.eintraege) {
+    if (weg.has(e.id) || e.typ === "storno") continue;
     if (e.praktikum) (proPrakt[(S.alias || {})[e.praktikum] || e.praktikum] ||= []).push(e);
     if (e.typ === "bemerkung" && e.person && personen[e.person]) personen[e.person].notizen.push(e);
     if (e.typ === "achtung" && e.person && personen[e.person]) (personen[e.person].achtungen ||= []).push(e);
@@ -1443,17 +1447,22 @@ async function terminGewaehlt(ip, il, ipartner, platz = "haupt") {
   // Fenster gleich jetzt (direkt nach dem Klick) öffnen, sonst macht der Browser evtl. einen Reiter daraus
   const vorab = (!partner || meinesSchon) && x.link ? toolFensterVorab(platz) : null;
   if (vorab) try { if (vorab.location.href === "about:blank") vorab.document.title = "Praktikumstool …"; vorab.document.body.innerHTML = "<p style='font:16px sans-serif;padding:20px'>Praktikumstool wird geöffnet …</p>"; } catch (e) {}
+  const neu = [];
   for (const y of alle) {
     // beim Partner dieselbe Lektion (gleicher Tag, gleiche Zeit) suchen
     const l = y === x ? a : (y.lektionen || []).find((b) => b.datum === a.datum && b.zeit === a.zeit) || a;
     const termin = { datum: l.datum, zeit: l.zeit, bis: l.bis, lektion: l.id };
-    if (!(await eintragen(y.wer === S.ich ? { typ: "termin", praktikum: y.idpraktikum, termin } : { typ: "uebernehmen", praktikum: y.idpraktikum, termin }))) { if (vorab && !vorab.closed && vorab.location.href === "about:blank") { try { vorab.close(); } catch (e) {} } return; }
+    const e = await eintragen(y.wer === S.ich ? { typ: "termin", praktikum: y.idpraktikum, termin } : { typ: "uebernehmen", praktikum: y.idpraktikum, termin });
+    if (!e) { if (vorab && !vorab.closed && vorab.location.href === "about:blank") { try { vorab.close(); } catch (e) {} } return; }
+    neu.push(e);
   }
   // Einzelbesuch: Tool sofort öffnen. Doppelbesuch: zwei Knöpfe, einer pro Person – man öffnet sie selbst nacheinander.
   // In beiden Fällen geht es erst nach «OK» weiter.
+  let antwort = "ja";
   if (!partner || meinesSchon) {
-    if (x.link) { REFS.push(toolLink(x, a.id)); const ti = REFS.length - 1; toolOeffnen(ti, platz, vorab); await toolBestaetigen(meinesSchon ? "aendern" : "eintragen", [[x.person.name, ti, platz]]); }
-  } else await toolBestaetigen("eintragen", alle.map((y, n) => { const l = y === x ? a : (y.lektionen || []).find((b) => b.datum === a.datum && b.zeit === a.zeit) || a; REFS.push(toolLink(y, l.id)); return [y.person.name, REFS.length - 1, "doppel" + (n + 1)]; }), { offen: false, wann: blockText(a) });
+    if (x.link) { REFS.push(toolLink(x, a.id)); const ti = REFS.length - 1; toolOeffnen(ti, platz, vorab); antwort = await toolBestaetigen(meinesSchon ? "aendern" : "eintragen", [[x.person.name, ti, platz]]); }
+  } else antwort = await toolBestaetigen("eintragen", alle.map((y, n) => { const l = y === x ? a : (y.lektionen || []).find((b) => b.datum === a.datum && b.zeit === a.zeit) || a; REFS.push(toolLink(y, l.id)); return [y.person.name, REFS.length - 1, "doppel" + (n + 1)]; }), { offen: false, wann: blockText(a) });
+  if (antwort === "nein") { await zuruecknehmen(neu); S.nachBuchen = null; meldung(meinesSchon ? "Nicht geändert – der alte Termin gilt." : "Nicht gebucht – wieder offen."); return; }
   meldung(meinesSchon ? "Termin geändert." : "Gebucht.");
   // Doppelbesuch mit unterschiedlichen Stundenplänen: nach der ersten Person das Fenster für die zweite wieder zeigen
   if (S.nachBuchen) {
@@ -1515,26 +1524,31 @@ function termineNebeneinander(x, y) {
    bestätigen, dass es dort auch gemacht ist – sonst geht es nicht weiter. So bleiben App und Tool im Gleichschritt,
    auch zwischen zwei Holen. personen: [[Name, REFS-Index des Tool-Links, Fensterplatz]]; offen: Tool schon geöffnet. */
 function toolBestaetigen(was, personen, { offen = true, wann = "" } = {}) {
+  // Antwort: "ja" (im Tool gemacht) oder "nein" (doch nicht – die App nimmt es zurück)
   return new Promise((fertig) => {
     let d = document.getElementById("toolOk");
     if (!d) { d = document.createElement("dialog"); d.id = "toolOk"; document.body.appendChild(d); }
-    const frage = { eintragen: "Im Praktikumstool eingetragen?", aendern: "Im Praktikumstool geändert?", loeschen: "Im Praktikumstool gelöscht?" }[was];
-    const tun = { eintragen: "«Besuch eintragen»", aendern: "den Besuch auf den neuen Termin ändern", loeschen: "die Buchung löschen" }[was];
     const zwei = personen.length > 1;
-    d.innerHTML = `<p style="font-size:1.15em;margin:0 0 8px"><b>${esc(frage)}</b></p>
-      <p class="klein" style="margin:0 0 14px">${zwei ? `Doppelbesuch${wann ? " (" + esc(wann) + ")" : ""}: bei <b>beiden</b> im Praktikumstool ${tun}.`
-        : `Im Praktikumstool-Fenster ${tun}, Fenster schliessen – dann hier bestätigen.`}${offen ? "" : " Die Knöpfe öffnen das Tool."}</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${personen.map(([name, i, platz], n) =>
-        `<button type="button" class="knopf ${offen ? "klein" : "haupt"}" data-i="${i}" data-platz="${esc(platz)}">${zwei ? n + 1 + ". " + esc(name) + " im Tool ↗" : offen ? "Tool nochmal öffnen ↗" : esc(name) + " im Tool ↗"}</button>`).join("")}
-      <button type="button" class="knopf ${offen ? "haupt" : ""}" style="margin-left:auto" id="toolOkJa">OK, ${was === "loeschen" ? "gelöscht" : was === "aendern" ? "geändert" : "eingetragen"}</button></div>`;
+    const frage = { eintragen: "Im Praktikumstool eingetragen?", aendern: "Im Praktikumstool geändert?", loeschen: "Im Praktikumstool ausgetragen?" }[was];
+    const ja = { eintragen: "Ja, eingetragen", aendern: "Ja, geändert", loeschen: "Ja, ausgetragen" }[was] + (zwei ? " (beide)" : "");
+    const nein = { eintragen: "Nein, doch nicht", aendern: "Nein, doch nicht", loeschen: "Nein, ich behalte den Termin" }[was];
+    const neinText = { eintragen: "Die Buchung wird hier wieder gelöscht.", aendern: "Es gilt wieder der alte Termin.", loeschen: "Der Termin bleibt bei dir." }[was];
+    d.innerHTML = `<p style="font-size:1.15em;margin:0 0 8px"><b>${esc(frage)}</b>${zwei && wann ? ` <span class="klein leise">Doppelbesuch · ${esc(wann)}</span>` : ""}</p>
+      <p class="klein leise" style="margin:0 0 14px">${zwei ? "Bei beiden im Praktikumstool eintragen – die Knöpfe unten öffnen das Tool. " : ""}«${esc(nein)}»: ${esc(neinText)}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button type="button" class="knopf haupt" id="toolOkJa">${esc(ja)}</button>
+        <button type="button" class="knopf" id="toolOkNein">${esc(nein)}</button>
+        <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">${personen.map(([name, i, platz], n) =>
+          `<button type="button" class="knopf klein" data-i="${i}" data-platz="${esc(platz)}">${zwei ? n + 1 + ". " + esc(name) + " im Tool ↗" : offen ? "Mache ich noch – Tool ↗" : "Tool öffnen ↗"}</button>`).join("")}</span></div>`;
+    let antwort = "ja";
     d.querySelectorAll("[data-i]").forEach((b) => (b.onclick = () => {
       toolOeffnen(Number(b.dataset.i), b.dataset.platz);
-      if (zwei || !offen) { b.textContent = "✓ " + b.textContent.replace(/^✓ /, ""); b.classList.remove("haupt"); b.classList.add("klein"); }
-      const ja = d.querySelector("#toolOkJa"); if (!offen && [...d.querySelectorAll("[data-i]")].every((k) => k.textContent.startsWith("✓"))) ja.classList.add("haupt");
+      if (zwei) b.textContent = "✓ " + b.textContent.replace(/^✓ /, "");
     }));
     d.oncancel = (e) => e.preventDefault();   // Esc schliesst nicht
-    d.querySelector("#toolOkJa").onclick = () => d.close();
-    d.onclose = () => fertig();
+    d.querySelector("#toolOkJa").onclick = () => { antwort = "ja"; d.close(); };
+    d.querySelector("#toolOkNein").onclick = () => { antwort = "nein"; d.close(); };
+    d.onclose = () => fertig(antwort);
     d.showModal();
   });
 }
@@ -1600,7 +1614,10 @@ async function uebernehmen(i, nurTermin = false) {
   const termin = datum ? { datum, zeit, lektion: lekt } : null;
   const ok = await eintragen(nurTermin ? { typ: "termin", praktikum: id, termin } : { typ: "uebernehmen", praktikum: id, termin });
   if (!ok) { if (vorab && !vorab.closed && vorab.location.href === "about:blank") { try { vorab.close(); } catch (e) {} } return; }
-  if (vorab) { REFS.push(toolLink(x, lekt)); const ti = REFS.length - 1; toolOeffnen(ti, "haupt", vorab); await toolBestaetigen(nurTermin ? "aendern" : "eintragen", [[x.person.name, ti, "haupt"]]); }
+  if (vorab) {
+    REFS.push(toolLink(x, lekt)); const ti = REFS.length - 1; toolOeffnen(ti, "haupt", vorab);
+    if ((await toolBestaetigen(nurTermin ? "aendern" : "eintragen", [[x.person.name, ti, "haupt"]])) === "nein") { await zuruecknehmen([ok]); meldung(nurTermin ? "Nicht geändert – der alte Termin gilt." : "Nicht gebucht – wieder offen."); return; }
+  }
   meldung(nurTermin ? "Termin geändert." : "Übernommen.");
 }
 /* Termine, die nach der Checkliste nie gehen – sie werden gar nicht angeboten */
@@ -1669,9 +1686,13 @@ async function handlung(typ, i) {
   const x = R.praktika.find((p) => p.idpraktikum === id);
   const lekt = x && x.termin ? x.termin.lektion : "";
   const vorab = typ === "abgeben" && x && x.link ? toolFensterVorab() : null;
-  if (!(await eintragen({ typ, praktikum: id }))) { if (vorab && !vorab.closed && vorab.location.href === "about:blank") { try { vorab.close(); } catch (e) {} } return; }
+  const neu = await eintragen({ typ, praktikum: id });
+  if (!neu) { if (vorab && !vorab.closed && vorab.location.href === "about:blank") { try { vorab.close(); } catch (e) {} } return; }
   if (typ === "abgeben") {
-    if (vorab) { REFS.push(toolLink(x, lekt)); const ti = REFS.length - 1; toolOeffnen(ti, "haupt", vorab); await toolBestaetigen("loeschen", [[x.person.name, ti, "haupt"]]); }
+    if (vorab) {
+      REFS.push(toolLink(x, lekt)); const ti = REFS.length - 1; toolOeffnen(ti, "haupt", vorab);
+      if ((await toolBestaetigen("loeschen", [[x.person.name, ti, "haupt"]])) === "nein") { await zuruecknehmen([neu]); meldung("Nicht abgegeben – der Termin bleibt bei dir."); return; }
+    }
     meldung("Abgegeben.");
   } else meldung("Übernommen – bitte im Praktikumstool buchen.");
 }
@@ -2441,7 +2462,7 @@ const HILFE = [
     <li>Grün = danach frei zum Besprechen. Weiss = danach Unterricht; darunter steht, wie viel noch kommt (z.B. «+4 L. bis 15:30»).</li>
     <li>Termin anklicken → <b>Übernehmen</b>. Jetzt ist er hier als <span class="chip s-gebucht">gebucht</span> erfasst.</li>
     <li>Das Praktikumstool öffnet sich rechts daneben bei dieser Woche: dort <b>«Besuch eintragen»</b>, Fenster schliessen.</li>
-    <li>Hier fragt die App <b>«Im Praktikumstool eingetragen?»</b> → <b>OK</b>. Erst dann geht es weiter (falls nötig: «Tool nochmal öffnen»). So bleiben App und Tool auch zwischen zwei Mal Holen gleich.</li></ol>
+    <li>Tool-Fenster schliessen. Hier fragt die App <b>«Im Praktikumstool eingetragen?»</b>: <b>Ja</b> · <b>Nein, doch nicht</b> (passt im Tool doch nicht – die Buchung wird hier wieder gelöscht) · <b>Mache ich noch – Tool ↗</b>. Gleich beim Ändern und Abgeben. So bleiben App und Tool auch zwischen zwei Mal Holen gleich.</li></ol>
     <p class="leise">Klappt es im Tool nicht? → Meine Termine → «Anpassen».</p>`],
   ["halbtag", "Halbtag &amp; Einzel", "Paare und Doppelbesuche", `<ol class="schritte">
     <li>Reiter <b>Halbtag &amp; Einzel</b>. Filter: Periode A–D oder Einzel, Stand, Name und «nur meine».</li>
@@ -2451,7 +2472,7 @@ const HILFE = [
     <p class="leise">Die Regeln von Profil und Quartal (erste Tage, letzter Tag, zwei pro Woche) gelten hier nicht.</p>`],
   ["termine", "Meine Termine", "Erledigt, ändern, Bericht", `<ol class="schritte">
     <li>Reiter <b>Meine Termine</b>: alle deine Besuche nach Tag. Unter dem Namen: <b>Kontakte</b> (Mathe-PxL, zuständige PxL, Mentor/in mit E-Mail).</li>
-    <li>Nach dem Besuch: <b>✓ Erledigt</b>. Termin passt nicht mehr: <b>Anpassen</b> → «Termin ändern» oder «Wieder abgeben» – das Tool öffnet sich, dort auch ändern bzw. löschen, dann hier <b>OK</b>.</li>
+    <li>Nach dem Besuch: <b>✓ Erledigt</b>. Termin passt nicht mehr: <b>Anpassen</b> → «Termin ändern» oder «Wieder abgeben» – das Tool öffnet sich, dort auch ändern bzw. austragen, dann hier <b>Ja</b> – oder <b>Nein, doch nicht</b>, dann bleibt alles, wie es war.</li>
     <li><b>Achtung / Bemerkung</b>: z.B. «muss im Quartal besucht werden» oder nur eine Bemerkung.</li>
     <li><b>Bericht ↑</b>: PDF oder Word hochladen. Er landet unter <b>Protokolle/Name der Person</b> (der Ordner wird bei Bedarf angelegt), benannt «UB Nachname PK03 kürzel JJMMTT». Gleich danach <b>✉ E-Mail öffnen</b>: Entwurf an Studierende, Mathe-PxL und Mentor/in – Bericht hineinziehen, senden. Später: 📄 öffnen · ✉ E-Mail · ✕ löschen.</li>
     <li><b>Outlook:</b> 📅 bei einem Termin oder «📅 Alle Termine für Outlook» lädt eine Kalenderdatei. In Outlook im Web: Kalender hinzufügen → Aus Datei hochladen.</li></ol>
@@ -2989,7 +3010,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261107-210542";
+const STAND = "20261107-211254";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
