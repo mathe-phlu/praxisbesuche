@@ -241,10 +241,10 @@ dialog.breit { width: min(1100px, 96vw); max-width: 96vw; }
 .fchip.fs-eingeteilt, .fchip.fs-eingeteilt.an { border: 1.5px solid #4a4640; color: #2e2b27; }
 .fchip.fs-besucht, .fchip.fs-besucht.an { background: #2e2b27; border: 1.5px solid #2e2b27; color: #fff; }
 .fchip.fs-besucht::before { content: "✓ "; }
-/* Besuch? wie eine Ampel: nötig grün · optional gelb · nein rot */
-.fchip.fn-ja, .fchip.fn-ja.an { background: #e2f0dd; border: 1.5px solid #3d8b3d; color: #24622a; font-weight: 700; }
-.fchip.fn-optional, .fchip.fn-optional.an { background: #fbf0c8; border: 1.5px solid #c9a227; color: #7a5f00; }
-.fchip.fn-nein, .fchip.fn-nein.an { background: #f7dfda; border: 1.5px solid #c0392b; color: #9b2c22; }
+/* Besuch?: nötig rot (wie ⚠) · optional schwarz · nein grau */
+.fchip.fn-ja, .fchip.fn-ja.an { border: 1.5px solid var(--achtung); color: var(--achtung); font-weight: 700; }
+.fchip.fn-optional, .fchip.fn-optional.an { border: 1.5px solid #2e2b27; color: #2e2b27; }
+.fchip.fn-nein, .fchip.fn-nein.an { border: 1px solid #d8d4cc; color: #a8a39a; }
 .fchip[class*="fk-"]:not(.an) { opacity: .4; }
 /* Stand / nötig: an = brauner Rahmen rundherum + fett, aus = ganz blass */
 .fchip.fs.an { box-shadow: 0 0 0 2px var(--ph-braun); font-weight: 700; }
@@ -291,8 +291,7 @@ table.liste td.name:hover { text-decoration: underline; }
 .ue .chip { text-align: left !important; }
 .paar-stand > div + div { margin-top: 5px; }
 .s-nicht { background: transparent; border: 1px solid transparent; color: #9a958c; }
-.n-ja, .n-optional, .n-nein { display: inline-block; padding: 1px 7px; border-radius: 9px; font-size: 12.5px; }
-.n-ja { font-weight: 700; background: #e2f0dd; color: #24622a; } .n-optional { background: #fbf0c8; color: #7a5f00; } .n-nein { background: #f7dfda; color: #9b2c22; } .n-spaeter { color: #aaa; }
+.n-ja { font-weight: 700; color: var(--achtung); } .n-optional { color: #2e2b27; } .n-nein { color: #aaa; } .n-spaeter { color: #aaa; }
 .achtung { color: var(--achtung); font-weight: 700; cursor: help; }
 .zeile-achtung td:first-child { box-shadow: inset 4px 0 0 var(--achtung); }
 .hinweis { background: var(--achtung-hell); color: var(--achtung); padding: 1px 6px; border-radius: 4px; font-size: 13px; }
@@ -3103,7 +3102,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261107-214558";
+const STAND = "20261107-214654";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
