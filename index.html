@@ -1821,7 +1821,10 @@ async function personOrdner(person, anlegen) {
   const best = treffer.find(([name]) => sg && name.replace(/\s+/g, "").endsWith(sg)) || treffer[0];
   if (best) return { name: best[0], h: best[1] };
   if (!anlegen) return null;
-  const neuName = `${person.name} ${sg || "__"}`.replace(/[\/\\:*?"<>|]+/g, "-").trim();
+  // Das Praktikumstool liefert nur «SR» ohne Jahrgang: Jahrgang = Studienbeginn = ein Jahr vor dem ersten Halbtagespraktikum (wie bei den bisherigen Ordnern, z.B. Halbtag 26/27 → SR25)
+  let sgNeu = sg;
+  if (sg && !/\d/.test(sg)) { const ht = (person.praktika || []).filter((y) => y.gruppe === "Halbtag" && y.jahr).map((y) => y.jahr).sort()[0]; if (ht) sgNeu = sg + String(Number(ht.slice(0, 2)) - 1).padStart(2, "0"); }
+  const neuName = `${person.name} ${sgNeu || "__"}`.replace(/[\/\\:*?"<>|]+/g, "-").trim();
   return { name: neuName, h: await basis.getDirectoryHandle(neuName, { create: true }) };
 }
 async function berichtHochladen(i) {
@@ -3786,7 +3789,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261111-144053";
+const STAND = "20261111-164645";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
