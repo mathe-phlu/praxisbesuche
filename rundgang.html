@@ -3568,14 +3568,14 @@ const mirZugeteilt = (x) => { const z = zuteilungFuer(x.idpraktikum); return !!(
 /* ---------- Reiter Zuteilung (nur Luzia) ---------- */
 function htReiter() {
   const t = lies("htTab") || "liste";
-  return `<div class="akt-reiter">${[["liste", "Liste"], ["planung", "Zuteilung"]].map(([k, n]) => `<button class="${t === k ? "an" : ""}" onclick="htTab('${k}')">${n}</button>`).join("")}
-    <span class="leise klein" style="margin:auto 0 4px 10px">nur für Luzia (und Rike zum Testen)</span></div>`;
+  return `<div class="akt-reiter">${[["liste", "Liste"], ["planung", "Zuteilung"]].map(([k, n]) => `<button class="${t === k ? "an" : ""}" onclick="htTab('${k}')">${n}</button>`).join("")}</div>`;
 }
 function ansichtHtPlanung() {
   const sem = htSemester(), fest = planFest(sem);
   return `<div class="start-kopf"><h2>Halbtagespraktikum – Zuteilung</h2>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="knopf haupt" title="E-Mail ans Team mit Link direkt aufs Eintragen" onclick="vfAnfrageZeigen()">✉ Verfügbarkeit einholen</button></div></div>
     ${htReiter()}
+    <p class="einr-hinweis klein" style="margin:0 0 12px">Das ist ein <b>erster Entwurf</b> der Zuteilung. Wir können gerne zusammen besprechen, was passt, was fehlt und was anders sein soll.</p>
     <div class="ht-sem">${["H", "F"].map((h) => `<button class="knopf ${sem.h === h ? "haupt" : ""}" onclick="htSemWahl('${h}')">${SEM_NAME[h]}</button>`).join("")}<span class="leise">Studienjahr ${sjText(sem.sj)} · ${fest ? `festgesetzt ${esc(datumText(fest.zeit))} von ${esc(fest.wer)}${fest.quelle ? " (" + esc(fest.quelle) + ")" : ""}` : "noch nicht festgesetzt"}</span></div>
     <div class="ht-sem"><span class="klein">Zuteilen für:</span>${[["", "beide Perioden"], ...semPerioden(sem.h).map((p) => [p, "nur Periode " + p])].map(([p, n]) => `<button class="knopf klein ${htPer(sem) === p ? "haupt" : ""}" onclick="htPerWahl('${p}')">${n}</button>`).join("")}
       <span class="leise klein">Eine Periode wählen, um sie für sich zu planen und festzusetzen – die andere bleibt, wie sie ist.</span></div>
@@ -3771,7 +3771,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261111-120710";
+const STAND = "20261111-121100";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
