@@ -126,6 +126,7 @@ tr[class*="fk-"] > td:first-child { box-shadow: inset 5px 0 0 var(--fc); padding
 .abschn-s { margin-left: auto; font-size: 13px; color: #f1e6d2; }
 .abschn-s .ok { color: #c9ecc9; } .abschn-s .off { color: #ffd2c2; font-weight: 600; } .abschn-s .le { color: #e0d4bf; }
 .abschn-i { padding: 12px 14px; }
+.abschn[data-k^="zt"] { max-width: none; }
 .abschn-i > .akt-wann:first-child { margin-top: 0; }
 .abschn-kopf { background: var(--ph-braun-dunkel); color: #fff; font-weight: 600; font-size: 15px; padding: 9px 14px; border-radius: 6px 6px 0 0; max-width: 1100px; box-sizing: border-box; }
 .abschn-kopf + .akt-raster { border: 1px solid var(--ph-braun-dunkel); border-top: 0; border-radius: 0 0 6px 6px; padding: 12px; background: var(--grau); box-sizing: border-box; }
@@ -2791,7 +2792,7 @@ function aktUebersicht() {
 /* Abschnitt mit dunkler Kopfleiste, einklappbar; offen/zu merkt sich der Browser */
 function abschnitt(k, titel, status, inhalt, offen) {
   const o = lies("auf." + k), auf = o === "1" || (o !== "0" && offen);
-  return `<details class="abschn" data-k="${k}" ${auf ? "open" : ""}><summary><span class="abschn-t">${titel}</span><span class="abschn-s">${status || ""}</span></summary><div class="abschn-i">${inhalt}</div></details>`;
+  return `<details class="abschn" data-k="${k}" ${auf ? "open" : ""} ontoggle="merke('auf.${k}', this.open ? '1' : '0')"><summary><span class="abschn-t">${titel}</span><span class="abschn-s">${status || ""}</span></summary><div class="abschn-i">${inhalt}</div></details>`;
 }
 function lesezeichenErledigt(ja) { merke("lzOk", ja ? "1" : ""); zeichnen(); }
 function ansichtAktualisieren() {
@@ -3239,6 +3240,14 @@ function htTab(k) { merke("htTab", k); zeichnen(); }
 /* Zuteilung je Periode (Luzia macht A und B nacheinander): "" = beide */
 function htPer(sem) { const p = lies("htPer") || ""; return semPerioden(sem.h).includes(p) ? p : ""; }
 function htPerWahl(p) { merke("htPer", p); zeichnen(); }
+/* Knöpfe A B C D: andere Semesterhälfte = wechseln; in derselben ein- und ausschalten (mindestens eine bleibt) */
+function htPerKnopf(p) {
+  const h = ["A", "B"].includes(p) ? "H" : "F", sem = htSemester();
+  if (sem.h !== h) { merke("htSem", h); merke("htPer", p); S.vf = null; zeichnen(); return; }
+  const an = htPer(sem) ? [htPer(sem)] : semPerioden(h);
+  if (an.includes(p)) { if (an.length === 2) htPerWahl(semPerioden(h).find((x) => x !== p)); }
+  else htPerWahl("");
+}
 function semHaelfte(x) { const d = datumAus(x.von); if (!d) return "F"; const m = +d.slice(5, 7); return m >= 8 || m === 1 ? "H" : "F"; }
 function semPraktika(sem) {
   const per = semPerioden(sem.h);
@@ -3347,10 +3356,13 @@ function planFest(sem) {
 }
 function planEntwurf(sem) {
   let e = null; try { e = JSON.parse(lies("htplan." + sem.key) || "null"); } catch (err) {}
-  if (!e) { const f = planFest(sem); e = f ? { ohne: f.ohne || [], besuchen: f.besuchen || null, regeln: f.regeln, bloecke: (f.bloecke || []).map((b) => ({ key: [...b.praktika].sort().join("+"), wer: b.wer, datum: b.datum, pin: !!b.pin })) } : { ohne: [], besuchen: null, bloecke: [] }; }
+  if (!e) { const f = planFest(sem); e = f ? { ohne: f.ohne || [], besuchen: f.besuchen || null, regeln: f.regeln, bloecke: (f.bloecke || []).map((b) => ({ key: [...b.praktika].sort().join("+"), wer: b.wer, datum: b.datum, pin: !!b.pin, vb: b.vb && b.vb !== vbAuto(b.wer, verfuegbarkeiten(sem), f) ? b.vb : "" })) } : { ohne: [], besuchen: null, bloecke: [] }; }
   e.ohne ||= []; e.bloecke ||= [];
   return e;
 }
+/* Vorbesprechung: wer sie selbst macht, sonst der Standard (Luzia); je Besuch änderbar (b.vb, leer = automatisch) */
+function vbAuto(wer, verf, entw) { return !wer ? "" : verf[wer] && verf[wer].selbst ? wer : rh("vbStandard", entw); }
+function vbText(vb, wer) { return !vb ? "" : vb === wer ? "selbst" : vorname(vb); }
 function planMerken(sem, e) { merke("htplan." + sem.key, JSON.stringify(e)); zeichnen(); }
 function kmZwischen(a, o) {
   if (!a || a.lat == null || !o) return null;
@@ -3443,7 +3455,7 @@ function planRechnen(sem, entw, per) {
   }
   return bl.map((b, i) => { if (per && b.periode !== per) return alt[b.key] || { key: b.key, wer: "", datum: null, pin: false };
     const o = best[i] >= 0 ? opt[i][best[i]] : null; const a = alt[b.key];
-    return { key: b.key, wer: o ? o.wer : "", datum: o ? o.datum : (b.moeglich.length === 1 ? b.moeglich[0] : null), pin: !!(a && a.pin) }; });
+    return { key: b.key, wer: o ? o.wer : "", datum: o ? o.datum : (b.moeglich.length === 1 ? b.moeglich[0] : null), pin: !!(a && a.pin), vb: a && o && a.wer === o.wer ? a.vb || "" : "" }; });
 }
 
 /* ---------- Verfügbarkeit eintragen (Fenster) ---------- */
@@ -3572,10 +3584,10 @@ function ansichtHtPlanung() {
     ${htReiter()}
     <p class="einr-hinweis klein" style="margin:0 0 12px">Das ist ein <b>erster Entwurf</b> der Zuteilung. Wir können gerne zusammen besprechen, was passt, was fehlt und was anders sein soll.<br>
       <b>Diesen Reiter siehst nur du.</b> Die anderen sehen nur den Knopf «Verfügbarkeit eintragen» und – sobald du festgesetzt hast – ihre eigenen zugeteilten Besuche in der Liste.</p>
-    <div class="ht-sem">${["H", "F"].map((h) => `<button class="knopf ${sem.h === h ? "haupt" : ""}" onclick="htSemWahl('${h}')">${SEM_NAME[h]}</button>`).join("")}<span class="leise">Studienjahr ${sjText(sem.sj)} · ${fest ? `festgesetzt ${esc(datumText(fest.zeit))} von ${esc(fest.wer)}${fest.quelle ? " (" + esc(fest.quelle) + ")" : ""}` : "noch nicht festgesetzt"}</span></div>
-    <div class="ht-sem"><span class="klein">Zuteilen für:</span>${[["", "beide Perioden"], ...semPerioden(sem.h).map((p) => [p, "nur Periode " + p])].map(([p, n]) => `<button class="knopf klein ${htPer(sem) === p ? "haupt" : ""}" onclick="htPerWahl('${p}')">${n}</button>`).join("")}
-      <span class="leise klein">Eine Periode wählen, um sie für sich zu planen und festzusetzen – die andere bleibt, wie sie ist.</span></div>
-    <div class="karte">${zuteilungAnsicht(sem)}</div>`;
+    <div class="ht-sem"><b>Perioden</b>${["A", "B", "C", "D"].map((p) => { const an = semPerioden(sem.h).includes(p) && (!htPer(sem) || htPer(sem) === p); return `<button type="button" class="fchip fk-ht-${p.toLowerCase()} ${an ? "an" : ""}" title="${an ? "" : "Periode " + p + " wählen"}" onclick="htPerKnopf('${p}')">${p}</button>`; }).join("")}
+      <span class="leise">${sem.h === "H" ? "Herbstsemester" : "Frühlingssemester"} ${sjText(sem.sj)} · ${fest ? `festgesetzt ${esc(datumText(fest.zeit))} von ${esc(fest.wer)}${fest.quelle ? " (" + esc(fest.quelle) + ")" : ""}` : "noch nicht festgesetzt"}</span></div>
+    <p class="leise klein" style="margin:-8px 0 12px">A und B (bzw. C und D) zusammen oder einzeln – eine einzelne Periode wird für sich zugeteilt und festgesetzt, die andere bleibt, wie sie ist.</p>
+    ${zuteilungAnsicht(sem)}`;
 }
 function zuteilungAnsicht(sem) {
   const entw = planEntwurf(sem), per = htPer(sem), alleDaten = semDaten(sem, entw).filter((d) => !per || d.periode === per), daten = alleDaten.filter((d) => !entw.ohne.includes(d.datum));
@@ -3589,22 +3601,24 @@ function zuteilungAnsicht(sem) {
   const fest = planFest(sem), abweichend = fest && JSON.stringify(festVergleich(fest)) !== JSON.stringify(entwVergleich(blAlle, ist));
   const ohneOrte = bl.some((b) => gebietVon(b.xs[0].schulort) === OHNE_GEBIET);
   const tagVon = (k, d) => (verf[k] && verf[k].tage ? verf[k].tage[d] || "" : "");
-  const vbVon = (k) => (verf[k] && verf[k].selbst ? "selbst" : vorname(rh("vbStandard", entw)));
-  const t1 = `<div class="zt-schritt"><b>1 · Besuchsdaten</b> <span class="leise klein">aus den Stundenplänen${rh("hospitation", entw) ? " (ohne ersten Tag = Hospitation)" : ""}. Abwählen, was nicht in Frage kommt.</span><div class="zt-daten">
-    ${alleDaten.map((d) => `<label class="zt-dat ${entw.ohne.includes(d.datum) ? "aus" : ""}"><input type="checkbox" ${entw.ohne.includes(d.datum) ? "" : "checked"} onchange="planDatum('${d.datum}')"> <span class="pk fk-ht-${d.periode.toLowerCase()}" style="min-width:0">${d.periode}</span> ${esc(kurzDatum(d.datum))}</label>`).join("")}</div></div>`;
-  const t2 = `<div class="zt-schritt"><b>2 · Wer wird besucht?</b> <span class="leise klein">${bes ? bes.size : xs.length} von ${xs.length} gewählt.</span>
-    <button class="knopf mini" onclick="planAlle(true)">alle</button> <button class="knopf mini" onclick="planAlle(false)">keine</button>
-    <details class="zt-wer"><summary class="klein">Liste anzeigen / ändern</summary><div class="zt-wer-l">${(per ? [per] : semPerioden(sem.h).concat(["Einzel"])).map((p) => { const ps = xs.filter((x) => (p === "Einzel" ? /^Einzel/.test(periode(x)) : periode(x) === "Periode " + p)); return ps.length ? `<div><div class="klein"><b>${p === "Einzel" ? "Einzelpraktika" : "Periode " + p}</b></div>${ps.sort((a, b) => a.person.name.localeCompare(b.person.name)).map((x) => `<label class="klein zt-p"><input type="checkbox" ${!bes || bes.has(x.idpraktikum) ? "checked" : ""} onchange="planBesuchen(${ref(x.idpraktikum)}, this.checked)"> ${esc(x.person.name)} <span class="leise">${esc(x.schulort)}</span></label>`).join("")}</div>` : ""; }).join("")}</div>
-    <p class="leise klein">Später: die Liste, die Luzia bekommt, hier einlesen statt anklicken.</p></details></div>`;
-  const ueb = `<div class="zt-schritt"><b>3 · Verfügbarkeiten und Übersicht</b> <span class="leise klein">${ks.filter((k) => verf[k]).length} von ${ks.length} haben eingetragen. Name anklicken = für diese Person eintragen. Farbe = Verfügbarkeit, Text = zugeteilte Schule (anklicken = zur Zeile unten).</span>
-    <div style="overflow-x:auto"><table class="zt-raster"><thead><tr><th></th><th>Wunsch</th><th>zugeteilt</th><th title="Zugeteilte Orte, die für diese Person weit sind (Aktualisieren › Orte)">weit</th><th title="Besuche, die vor ${FRUEH_BIS.replace(":", ".")} Uhr beginnen">früh</th>${daten.map((d) => `<th><span class="pk fk-ht-${d.periode.toLowerCase()}" style="min-width:0">${d.periode}</span><br>${esc(kurzDatum(d.datum))}</th>`).join("")}<th>Vorbespr.</th><th>Bemerkung</th></tr></thead><tbody>
+  const nDaten = alleDaten.length - alleDaten.filter((d) => entw.ohne.includes(d.datum)).length;
+  const t1 = abschnitt("zt1", "1 · Besuchsdaten", `${nDaten} von ${alleDaten.length} Tagen`, `<p class="leise klein" style="margin-top:0">Aus den Stundenplänen${rh("hospitation", entw) ? " (ohne ersten Tag = Hospitation)" : ""}. Abwählen, was nicht in Frage kommt.</p><div class="zt-daten">
+    ${alleDaten.map((d) => `<label class="zt-dat ${entw.ohne.includes(d.datum) ? "aus" : ""}"><input type="checkbox" ${entw.ohne.includes(d.datum) ? "" : "checked"} onchange="planDatum('${d.datum}')"> <span class="pk fk-ht-${d.periode.toLowerCase()}" style="min-width:0">${d.periode}</span> ${esc(kurzDatum(d.datum))}</label>`).join("") || '<span class="leise">Noch keine Halbtagespraktika mit Stundenplan eingelesen.</span>'}</div>`, false);
+  const t2 = abschnitt("zt2", "2 · Wer wird besucht?", `${bes ? xs.filter((x) => bes.has(x.idpraktikum)).length : xs.length} von ${xs.length} Studierenden`, `<p style="margin-top:0"><button class="knopf mini" onclick="planAlle(true)">alle</button> <button class="knopf mini" onclick="planAlle(false)">keine</button> <span class="leise klein">Abgewählte bekommen keinen Besuch.</span></p>
+    <div class="zt-wer-l">${(per ? [per] : semPerioden(sem.h).concat(["Einzel"])).map((p) => { const ps = xs.filter((x) => (p === "Einzel" ? /^Einzel/.test(periode(x)) : periode(x) === "Periode " + p)); return ps.length ? `<div><div class="klein"><b>${p === "Einzel" ? "Einzelpraktika" : "Periode " + p}</b></div>${ps.sort((a, b) => a.person.name.localeCompare(b.person.name)).map((x) => `<label class="klein zt-p"><input type="checkbox" ${!bes || bes.has(x.idpraktikum) ? "checked" : ""} onchange="planBesuchen(${ref(x.idpraktikum)}, this.checked)"> ${esc(x.person.name)} <span class="leise">${esc(x.schulort)}</span></label>`).join("")}</div>` : ""; }).join("")}</div>
+    <p class="leise klein">Später: die Liste, die Luzia bekommt, hier einlesen statt anklicken.</p>`, false);
+  /* Raster Person × Tag: in Schritt 3 nur die Verfügbarkeit, in Schritt 4 zusätzlich die zugeteilten Schulen */
+  const raster = (mitZuteilung) => `<div style="overflow-x:auto"><table class="zt-raster"><thead><tr><th></th><th>Wunsch</th>${mitZuteilung ? `<th>zugeteilt</th><th title="Zugeteilte Orte, die für diese Person weit sind (Aktualisieren › Orte)">weit</th><th title="Besuche, die vor ${FRUEH_BIS.replace(":", ".")} Uhr beginnen">früh</th>` : ""}${daten.map((d) => `<th><span class="pk fk-ht-${d.periode.toLowerCase()}" style="min-width:0">${d.periode}</span><br>${esc(kurzDatum(d.datum))}</th>`).join("")}${mitZuteilung ? "" : "<th>Vorbespr.</th><th>Bemerkung</th>"}</tr></thead><tbody>
     ${ks.map((k) => { const v = verf[k], mx = v ? Number(v.max) || 0 : 0, mn = v ? Number(v.min) || 0 : 0, n = anz[k] || 0;
-      return `<tr><th style="text-align:left"><a href="#" title="Verfügbarkeit für ${esc(vorname(k))} eintragen oder ändern" onclick="vfOeffnen('${k}');return false">${esc(vorname(k))}</a><div class="leise klein" style="font-weight:400">${esc((abfahrt(k) || {}).text || "")}</div></th>
-      <td class="klein">${v ? `${mn}–${mx}` : '<span class="leise">fehlt (0)</span>'}</td>
-      <td class="${n > mx || n < mn ? "rot" : ""}"><b>${n}</b></td><td class="klein">${n ? kmS[k] || 0 : ""}</td><td class="klein">${n ? frN[k] || 0 : ""}</td>
-      ${daten.map((d) => { const t = tagVon(k, d.datum), bs = belegt[k + d.datum] || []; return `<td class="vf-${t || "leer"} ${bs.length > proTag ? "zt-doppelt" : ""}" title="${esc(VF_TEXT[t])}">${bs.map((b) => `<a href="#" class="zt-ort" title="zur Zeile springen" onclick="ztZeile(${bl.indexOf(b)});return false">${esc(b.xs[0].schulort)}</a>`).join("<br>") || `<span class="leise klein">${t === "nein" ? "✗" : t === "ja" ? "" : t === "evtl" ? "~" : "?"}</span>`}</td>`; }).join("")}
-      <td class="klein">${v ? vbVon(k) : ""}</td><td class="klein" style="text-align:left">${esc((v && v.bemerkung) || "")}${v && v.quelle ? `<div class="leise">${esc(v.quelle)}</div>` : ""}</td></tr>`; }).join("")}
-    </tbody></table></div><div class="leg-zeile klein"><span class="vf-ja zt-leg">ja</span><span class="vf-evtl zt-leg">eher nicht</span><span class="vf-nein zt-leg">nein</span><span class="vf-leer zt-leg">keine Angabe</span></div></div>`;
+      return `<tr><th style="text-align:left">${mitZuteilung ? esc(vorname(k)) : `<a href="#" title="Verfügbarkeit für ${esc(vorname(k))} eintragen oder ändern" onclick="vfOeffnen('${k}');return false">${esc(vorname(k))}</a><div class="leise klein" style="font-weight:400">${esc((abfahrt(k) || {}).text || "")}</div>`}</th>
+      <td class="klein">${v ? (mn === mx ? mx : `${mn}–${mx}`) : '<span class="leise">fehlt (0)</span>'}</td>
+      ${mitZuteilung ? `<td class="${n > mx || n < mn ? "rot" : ""}"><b>${n}</b></td><td class="klein">${n ? kmS[k] || 0 : ""}</td><td class="klein">${n ? frN[k] || 0 : ""}</td>` : ""}
+      ${daten.map((d) => { const t = tagVon(k, d.datum), bs = mitZuteilung ? belegt[k + d.datum] || [] : []; return `<td class="vf-${t || "leer"} ${bs.length > proTag ? "zt-doppelt" : ""}" title="${esc(VF_TEXT[t])}">${bs.map((b) => `<a href="#" class="zt-ort" title="zur Zeile springen" onclick="ztZeile(${bl.indexOf(b)});return false">${esc(b.xs[0].schulort)}</a>`).join("<br>") || `<span class="leise klein">${t === "nein" ? "✗" : t === "ja" ? (mitZuteilung ? "" : "✓") : t === "evtl" ? "~" : "?"}</span>`}</td>`; }).join("")}
+      ${mitZuteilung ? "" : `<td class="klein">${v ? (v.selbst ? "selbst" : "bei " + esc(vorname(rh("vbStandard", entw)))) : ""}</td><td class="klein" style="text-align:left">${esc((v && v.bemerkung) || "")}${v && v.quelle ? `<div class="leise">${esc(v.quelle)}</div>` : ""}</td>`}</tr>`; }).join("")}
+    </tbody></table></div><div class="leg-zeile klein"><span class="vf-ja zt-leg">ja</span><span class="vf-evtl zt-leg">eher nicht</span><span class="vf-nein zt-leg">nein</span><span class="vf-leer zt-leg">keine Angabe</span></div>`;
+  const nVerf = ks.filter((k) => verf[k]).length;
+  const ueb = abschnitt("zt3", "3 · Verfügbarkeiten", nVerf === ks.length ? `<span class="ok">✓ alle ${ks.length} eingetragen</span>` : `<span class="off">${nVerf} von ${ks.length} eingetragen</span>`,
+    `<p class="leise klein" style="margin-top:0">Was das Team angegeben hat – wie in deiner Excel-Liste. Name anklicken = für diese Person eintragen oder ändern. Fehlende mit «✉ Verfügbarkeit einholen» (oben) anfragen.</p>${raster(false)}`, nVerf < ks.length);
   const tagZeichen = (k, d, b) => { const da = (belegt[k + d] || []).filter((x) => x !== b); if (da.length) return ` · besetzt (${da.map((x) => x.xs[0].schulort).join(", ")})`;
     const t = tagVon(k, d); return t === "ja" ? " ✓" : t === "evtl" ? " ~ eher nicht" : t === "nein" ? " ✗ nein" : " ? keine Angabe"; };
   const zeilen = bl.map((b, zi) => {
@@ -3634,20 +3648,23 @@ function zuteilungAnsicht(sem) {
       <td>${b.xs.map((y) => `<div>${esc(y.person.name)} <span class="leise klein">${esc(y.person.studiengang || "")}</span></div>`).join("")}${b.xs.length === 2 ? '<div class="leise klein">Doppelbesuch</div>' : ""}</td>
       <td>${praktChip(b.xs[0], b.einzel ? "Einzel" : "Periode " + b.periode)}</td><td>${esc(b.xs[0].schulort)}<div class="leise klein">${esc(b.xs[0].schulhaus)}</div></td>
       <td class="klein">${b.einzel ? "" : b.moeglich.map((d) => esc(d.slice(8, 10) + "." + d.slice(5, 7) + ".")).join(" ")}</td>
-      <td>${werWahl}</td><td class="klein" title="${esc(gebietVon(b.xs[0].schulort))} – für diese Person (Aktualisieren › Orte › Gebiete)">${wegWort(z.wer, b.xs[0].schulort)}${z.datum && istFrueh(b, z.datum) ? `<div class="leise">früh ${esc(besuchBeginn(b, z.datum))}</div>` : ""}</td><td class="klein">${z.wer ? esc(vbVon(z.wer)) : ""}</td>
+      <td>${werWahl}</td><td class="klein" title="${esc(gebietVon(b.xs[0].schulort))} – für diese Person (Aktualisieren › Orte › Gebiete)">${wegWort(z.wer, b.xs[0].schulort)}${z.datum && istFrueh(b, z.datum) ? `<div class="leise">früh ${esc(besuchBeginn(b, z.datum))}</div>` : ""}</td><td class="klein">${z.wer ? (() => { const auto = vbAuto(z.wer, verf, entw), vb = (zu[b.key] && zu[b.key].vb) || (z.gebucht && z.vb) || auto;
+        return `<select class="klein" title="Vorbesprechung – automatisch: ${esc(vbText(auto, z.wer))}" onchange="planSetze(${k},'vb',this.value)">${ks.map((kk) => `<option value="${kk}" ${kk === vb ? "selected" : ""}>${kk === z.wer ? "selbst" : esc(vorname(kk))}</option>`).join("")}</select>`; })() : ""}</td>
       <td>${z.gebucht ? '<span class="leise klein">gebucht</span>' : `<label class="klein" title="Beim nächsten Vorschlag so lassen"><input type="checkbox" ${z.pin ? "checked" : ""} onchange="planSetze(${k},'pin',this.checked)"> fix</label>`}</td>
       <td class="klein rot">${warn.map(esc).join("<br>")}</td></tr>`; }).join("");
   const offen = bl.filter((b) => !ist(b).wer).length, eigen = !!entw.regeln;
-  const t4 = `<div class="zt-schritt"><b>4 · Zuteilung je Besuch</b> <span class="leise klein">${bl.length} Besuche (Doppelbesuche zählen als einer), ${offen ? `<span class="rot">${offen} ohne Person</span>` : "alle zugeteilt"}.</span>
-    <p style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap"><button class="knopf haupt" onclick="planVorschlagKnopf()">Vorschlag berechnen</button>
+  const t4 = abschnitt("zt4", "4 · Zuteilung", bl.length ? (offen ? `<span class="off">${bl.length} Besuche · ${offen} ohne Person</span>` : `<span class="ok">✓ ${bl.length} Besuche zugeteilt</span>`) : "keine Besuche", `
+    <p style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-top:0"><button class="knopf haupt" onclick="planVorschlagKnopf()">Vorschlag berechnen</button>
       <span class="leise klein" style="flex:1;min-width:300px"><b>Regeln${eigen ? " (für diesen Vorschlag geändert)" : ""}:</b> ${rhKurz(entw)}.</span></p>
-    <details class="zt-regeln" ${eigen ? "open" : ""}><summary class="klein">Regeln für diesen Vorschlag ändern</summary>
-      <p class="leise klein">Gilt nur für dieses Semester. Den Standard gibt es unter Aktualisieren › Regeln Halbtag.${eigen ? ` <button class="knopf mini" onclick="rhStandard()">zurück auf Standard</button>` : ""}</p>${rhFelder("entw", entw)}</details>
+    <details class="zt-regeln" ${eigen ? "open" : ""}><summary class="klein">Regeln für diesen Vorschlag ändern (zum Ausprobieren)</summary>
+      <p class="leise klein">Gilt nur für diesen Entwurf. Der Standard bleibt unter Aktualisieren › Regeln Halbtag.${eigen ? ` <button class="knopf mini" onclick="rhStandard()">zurück auf Standard</button>` : ""}</p>${rhFelder("entw", entw)}</details>
     ${ohneOrte ? `<p class="einr-hinweis klein" style="margin:6px 0">Einige Schulorte haben noch kein Gebiet und zählen als mittel (Aktualisieren › Orte › Gebiete).</p>` : ""}
-    <table class="liste spalten"><thead><tr><th>Tag</th><th>Studierende</th><th>Periode</th><th>Schule</th><th>Mathe an</th><th>Wer besucht</th><th title="für diese Person: nah / mittel / weit (Aktualisieren › Orte)">Weg</th><th>Vorbespr.</th><th></th><th>Hinweis</th></tr></thead><tbody>${zeilen}</tbody></table></div>`;
-  const t5 = `<div class="zt-schritt" style="border:0"><b>5 · Festsetzen</b> <span class="leise klein">${fest ? (abweichend ? '<span class="rot">Der Entwurf weicht vom festgesetzten Stand ab.</span>' : "Entwurf = festgesetzter Stand.") : "Noch nichts festgesetzt. Erst danach sehen die Zugeteilten ihre Besuche in der Liste («zugeteilt: …», Filter «nur meine») und den Tag beim Buchen."}</span>
+    <h4 style="margin:14px 0 4px">Übersicht</h4><p class="leise klein" style="margin:0">Wie viele Besuche jede Person hat und wo – Farbe = Verfügbarkeit, Schule anklicken = zur Zeile unten.</p>${raster(true)}
+    <h4 style="margin:16px 0 4px">Je Besuch</h4><p class="leise klein" style="margin:0 0 6px">Zum Umhängen Tag, Person oder Vorbesprechung ändern. Von Hand Geändertes wird «fix» und bleibt beim nächsten Vorschlag. Vorbesprechung: wer sie selbst macht, sonst ${esc(vorname(rh("vbStandard", entw)))} – je Besuch änderbar.</p>
+    <table class="liste spalten"><thead><tr><th>Tag</th><th>Studierende</th><th>Periode</th><th>Schule</th><th>Mathe an</th><th>Wer besucht</th><th title="für diese Person: nah / mittel / weit (Aktualisieren › Orte)">Weg</th><th>Vorbespr.</th><th></th><th>Hinweis</th></tr></thead><tbody>${zeilen}</tbody></table>`, true);
+  const t5 = abschnitt("zt5", "5 · Festsetzen", fest ? (abweichend ? '<span class="off">Entwurf weicht ab</span>' : '<span class="ok">✓ festgesetzt</span>') : '<span class="off">noch nicht festgesetzt</span>', `<p class="leise klein" style="margin-top:0">${fest ? (abweichend ? '<span class="rot">Der Entwurf weicht vom festgesetzten Stand ab.</span> Erst nach dem Festsetzen sehen die anderen die Änderungen.' : "Entwurf = festgesetzter Stand.") : "Noch nichts festgesetzt. Erst danach sehen die Zugeteilten ihre Besuche in der Liste («zugeteilt · Kürzel», Filter «nur meine») und den Tag beim Buchen."}</p>
     <p><button class="knopf haupt" onclick="planFestsetzen()">Zuteilung festsetzen</button> <button class="knopf" onclick="planExcel()">Als Excel-Liste</button>
-    ${fest ? `<button class="knopf" onclick="planVerwerfen()">Entwurf verwerfen (zurück zum festgesetzten Stand)</button>` : ""}</p></div>`;
+    ${fest ? `<button class="knopf" onclick="planVerwerfen()">Entwurf verwerfen (zurück zum festgesetzten Stand)</button>` : ""}</p>`, true);
   return t1 + t2 + ueb + t4 + t5;
 }
 /* Weg in Worten für diese Person */
@@ -3677,14 +3694,16 @@ function planSetze(i, feld, wert) {
     const [, j, kk] = String(wert).split(":"), k2 = REFS[+j];
     const hol = (k) => e.bloecke.find((b) => b.key === k) || (e.bloecke.push({ key: k, wer: "", datum: null, pin: false }), e.bloecke[e.bloecke.length - 1]);
     const a = hol(key), b = hol(k2), bisher = a.wer || "";
-    a.wer = kk; a.pin = true; b.wer = bisher; b.pin = !!bisher;
+    a.wer = kk; a.pin = true; b.wer = bisher; b.pin = !!bisher; a.vb = ""; b.vb = "";
     planMerken(sem, e);
     meldung(bisher ? `Getauscht: ${vorname(kk)} ↔ ${vorname(bisher)}.` : `${vorname(kk)} umgehängt – der andere Besuch ist jetzt ohne Person.`);
     return;
   }
   let b = e.bloecke.find((b) => b.key === key); if (!b) e.bloecke.push(b = { key, wer: "", datum: null, pin: false });
   b[feld] = feld === "pin" ? !!wert : wert || (feld === "datum" ? null : "");
-  if (feld !== "pin" && wert) b.pin = true;   // von Hand gesetzt = beim nächsten Vorschlag behalten
+  if (feld === "wer") b.vb = "";
+  if (feld === "vb" && wert === vbAuto(b.wer, verfuegbarkeiten(sem), e)) b.vb = "";
+  if (!["pin", "vb"].includes(feld) && wert) b.pin = true;   // von Hand gesetzt = beim nächsten Vorschlag behalten
   planMerken(sem, e);
 }
 async function planVorschlagKnopf() {
@@ -3702,7 +3721,7 @@ async function planFestsetzen() {
   const bloecke = bl.map((b) => {
     if (per && b.periode !== per) { const f = festZu[b.key]; return f ? { ...f, praktika: b.ids } : { praktika: b.ids, wer: "", datum: null, pin: false, vb: "" }; }   // andere Periode: wie festgesetzt
     const z = b.gebucht || zu[b.key] || {}, f = festZu[b.key];
-    return { praktika: b.ids, wer: z.wer || "", datum: z.datum || null, pin: !!(zu[b.key] && zu[b.key].pin), vb: z.wer ? (f && f.wer === z.wer && f.vb ? f.vb : verf[z.wer] && verf[z.wer].selbst ? z.wer : vbStd) : "" }; });
+    return { praktika: b.ids, wer: z.wer || "", datum: z.datum || null, pin: !!(zu[b.key] && zu[b.key].pin), vb: z.wer ? ((zu[b.key] && zu[b.key].vb) || vbAuto(z.wer, verf, e)) : "" }; });
   const offen = bloecke.filter((b, i) => !b.wer && (!per || bl[i].periode === per)).length;
   const ok = await frage(`Zuteilung ${per ? "Periode " + per : SEM_NAME[sem.h]} festsetzen?\n${bloecke.filter((b, i) => !per || bl[i].periode === per).length - offen} Besuche zugeteilt${offen ? `, ${offen} noch ohne Person` : ""}.\nDie Zugeteilten sehen danach ihre Besuche in der Liste und den Tag beim Buchen.`, { art: "wahl", wert: "ja", optionen: [["ja", "Ja, festsetzen"]] });
   if (ok !== "ja") return;
@@ -3717,7 +3736,7 @@ function planExcel() {
     for (const x of b.xs) { const z = b.gebucht || zu[b.key] || {};
       const pxl = (x.kontakte && x.kontakte.pxl && x.kontakte.pxl[0] && x.kontakte.pxl[0].name) || ((x.lektionen || [])[0] || {}).lehrer || "";
       zeilen.push([x.person.studiengang || "", x.person.name, pxl, x.schulort || "", x.schulhaus || "", b.einzel ? "Einzel" : b.periode, z.datum ? `${z.datum.slice(8, 10)}.${z.datum.slice(5, 7)}.${z.datum.slice(0, 4)}` : "", z.wer ? team1(z.wer) : "",
-        z.wer ? (verf[z.wer] && verf[z.wer].selbst ? "online " + team1(z.wer) : team1(rh("vbStandard", e))) : "", (x.kontakte && x.kontakte.mentor && x.kontakte.mentor.name) || ""]); }
+        z.wer ? (() => { const vb = (zu[b.key] && zu[b.key].vb) || vbAuto(z.wer, verf, e); return vb === z.wer ? "online " + team1(z.wer) : team1(vb); })() : "", (x.kontakte && x.kontakte.mentor && x.kontakte.mentor.name) || ""]); }
   const ws = XLSX.utils.aoa_to_sheet(zeilen), wb = XLSX.utils.book_new();
   ws["!cols"] = [6, 26, 22, 18, 26, 8, 11, 20, 24, 22].map((w) => ({ wch: w }));
   XLSX.utils.book_append_sheet(wb, ws, "Zuteilung");
@@ -3767,7 +3786,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261111-143229";
+const STAND = "20261111-144053";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
