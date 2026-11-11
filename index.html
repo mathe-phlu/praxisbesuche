@@ -3219,6 +3219,9 @@ function htSemester() {
 }
 function htSemWahl(h) { merke("htSem", h); S.vf = null; zeichnen(); if ($("#frage").open && S.vfFuer) vfOeffnen(S.vfFuer); }
 function htTab(k) { merke("htTab", k); zeichnen(); }
+/* Zuteilung je Periode (Luzia macht A und B nacheinander): "" = beide */
+function htPer(sem) { const p = lies("htPer") || ""; return semPerioden(sem.h).includes(p) ? p : ""; }
+function htPerWahl(p) { merke("htPer", p); zeichnen(); }
 function semHaelfte(x) { const d = datumAus(x.von); if (!d) return "F"; const m = +d.slice(5, 7); return m >= 8 || m === 1 ? "H" : "F"; }
 function semPraktika(sem) {
   const per = semPerioden(sem.h);
@@ -3353,7 +3356,7 @@ function planBloecke(sem, entw) {
 }
 
 /* ---------- Vorschlag nach den Regeln ---------- */
-function planRechnen(sem, entw) {
+function planRechnen(sem, entw, per) {
   const bl = planBloecke(sem, entw), verf = verfuegbarkeiten(sem), ks = team().map((d) => d.kuerzel);
   const proTag = Number(rh("proTag", entw)) || 1, evtl = rh("evtl", entw), gleich = !!rh("gleichmaessig", entw);
   const wegG = [0, 5, 15, 40][rh("weg", entw)] ?? 15, umG = [0, 120, 300, 700][rh("umweg", entw)] ?? 300, fruehG = [0, 40, 120, 300][rh("frueh", entw)] ?? 120;
@@ -3363,6 +3366,7 @@ function planRechnen(sem, entw) {
   const wegC = {};   // je Person und Block: nah 0 / mittel 1 / weit 2
   for (const k of ks) bl.forEach((b, i) => { wegC[k + i] = WEG_WERT[wegKlasse(k, b.xs[0].schulort)]; });
   const opt = bl.map((b) => {
+    if (per && b.periode !== per && !b.gebucht) { const a = alt[b.key]; return a && a.wer ? [{ wer: a.wer, datum: a.datum, fest: true }] : []; }   // andere Periode bleibt
     if (b.gebucht) return [{ wer: b.gebucht.wer, datum: b.gebucht.datum, fest: true }];
     const a = alt[b.key]; if (a && a.pin && a.wer) return [{ wer: a.wer, datum: a.datum, fest: true }];
     const o = [];
@@ -3420,7 +3424,8 @@ function planRechnen(sem, entw) {
     }
     if (k < bestK) { bestK = k; best = [...a]; }
   }
-  return bl.map((b, i) => { const o = best[i] >= 0 ? opt[i][best[i]] : null; const a = alt[b.key];
+  return bl.map((b, i) => { if (per && b.periode !== per) return alt[b.key] || { key: b.key, wer: "", datum: null, pin: false };
+    const o = best[i] >= 0 ? opt[i][best[i]] : null; const a = alt[b.key];
     return { key: b.key, wer: o ? o.wer : "", datum: o ? o.datum : (b.moeglich.length === 1 ? b.moeglich[0] : null), pin: !!(a && a.pin) }; });
 }
 
@@ -3544,19 +3549,21 @@ function ansichtHtPlanung() {
   return `<div class="start-kopf"><h2>Halbtagespraktikum – Zuteilung</h2>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="knopf haupt" title="E-Mail ans Team mit Link direkt aufs Eintragen" onclick="vfAnfrageZeigen()">✉ Verfügbarkeit einholen</button></div></div>
     ${htReiter()}
-    <div class="ht-sem">${["H", "F"].map((h) => `<button class="knopf ${sem.h === h ? "haupt" : ""}" onclick="htSemWahl('${h}')">${SEM_NAME[h]}</button>`).join("")}<span class="leise">Studienjahr ${sjText(sem.sj)} · ${fest ? `festgesetzt ${esc(datumText(fest.zeit))} von ${esc(fest.wer)}` : "noch nicht festgesetzt"}</span></div>
+    <div class="ht-sem">${["H", "F"].map((h) => `<button class="knopf ${sem.h === h ? "haupt" : ""}" onclick="htSemWahl('${h}')">${SEM_NAME[h]}</button>`).join("")}<span class="leise">Studienjahr ${sjText(sem.sj)} · ${fest ? `festgesetzt ${esc(datumText(fest.zeit))} von ${esc(fest.wer)}${fest.quelle ? " (" + esc(fest.quelle) + ")" : ""}` : "noch nicht festgesetzt"}</span></div>
+    <div class="ht-sem"><span class="klein">Zuteilen für:</span>${[["", "beide Perioden"], ...semPerioden(sem.h).map((p) => [p, "nur Periode " + p])].map(([p, n]) => `<button class="knopf klein ${htPer(sem) === p ? "haupt" : ""}" onclick="htPerWahl('${p}')">${n}</button>`).join("")}
+      <span class="leise klein">Eine Periode wählen, um sie für sich zu planen und festzusetzen – die andere bleibt, wie sie ist.</span></div>
     <div class="karte">${zuteilungAnsicht(sem)}</div>`;
 }
 function zuteilungAnsicht(sem) {
-  const entw = planEntwurf(sem), alleDaten = semDaten(sem, entw), daten = alleDaten.filter((d) => !entw.ohne.includes(d.datum));
-  const xs = semPraktika(sem), bes = entw.besuchen ? new Set(entw.besuchen) : null;
-  const verf = verfuegbarkeiten(sem), ks = team().map((d) => d.kuerzel), bl = planBloecke(sem, entw), proTag = Number(rh("proTag", entw)) || 1;
+  const entw = planEntwurf(sem), per = htPer(sem), alleDaten = semDaten(sem, entw).filter((d) => !per || d.periode === per), daten = alleDaten.filter((d) => !entw.ohne.includes(d.datum));
+  const xs = semPraktika(sem).filter((x) => !per || periode(x) === "Periode " + per), bes = entw.besuchen ? new Set(entw.besuchen) : null;
+  const verf = verfuegbarkeiten(sem), ks = team().map((d) => d.kuerzel), blAlle = planBloecke(sem, entw), bl = blAlle.filter((b) => !per || b.periode === per), proTag = Number(rh("proTag", entw)) || 1;
   const zu = Object.fromEntries(entw.bloecke.map((b) => [b.key, b]));
   const ist = (b) => (b.gebucht ? { wer: b.gebucht.wer, datum: b.gebucht.datum, gebucht: true } : zu[b.key] || { wer: "", datum: null });
   const anz = {}, belegt = {}, kmS = {}, kmN = {}, frN = {};
-  for (const b of bl) { const z = ist(b); if (!z.wer) continue; anz[z.wer] = (anz[z.wer] || 0) + 1; if (z.datum) (belegt[z.wer + z.datum] ||= []).push(b);
+  for (const b of blAlle) { const z = ist(b); if (!z.wer) continue; anz[z.wer] = (anz[z.wer] || 0) + 1; if (z.datum) (belegt[z.wer + z.datum] ||= []).push(b);
     if (wegKlasse(z.wer, b.xs[0].schulort) === "weit") kmS[z.wer] = (kmS[z.wer] || 0) + 1; if (z.datum && istFrueh(b, z.datum)) frN[z.wer] = (frN[z.wer] || 0) + 1; }
-  const fest = planFest(sem), abweichend = fest && JSON.stringify(festVergleich(fest)) !== JSON.stringify(entwVergleich(bl, ist));
+  const fest = planFest(sem), abweichend = fest && JSON.stringify(festVergleich(fest)) !== JSON.stringify(entwVergleich(blAlle, ist));
   const ohneOrte = bl.some((b) => gebietVon(b.xs[0].schulort) === OHNE_GEBIET);
   const tagVon = (k, d) => (verf[k] && verf[k].tage ? verf[k].tage[d] || "" : "");
   const vbVon = (k) => (verf[k] && verf[k].selbst ? "selbst" : vorname(rh("vbStandard", entw)));
@@ -3564,7 +3571,7 @@ function zuteilungAnsicht(sem) {
     ${alleDaten.map((d) => `<label class="zt-dat ${entw.ohne.includes(d.datum) ? "aus" : ""}"><input type="checkbox" ${entw.ohne.includes(d.datum) ? "" : "checked"} onchange="planDatum('${d.datum}')"> <span class="pk fk-ht-${d.periode.toLowerCase()}" style="min-width:0">${d.periode}</span> ${esc(kurzDatum(d.datum))}</label>`).join("")}</div></div>`;
   const t2 = `<div class="zt-schritt"><b>2 · Wer wird besucht?</b> <span class="leise klein">${bes ? bes.size : xs.length} von ${xs.length} gewählt.</span>
     <button class="knopf mini" onclick="planAlle(true)">alle</button> <button class="knopf mini" onclick="planAlle(false)">keine</button>
-    <details class="zt-wer"><summary class="klein">Liste anzeigen / ändern</summary><div class="zt-wer-l">${semPerioden(sem.h).concat(["Einzel"]).map((p) => { const ps = xs.filter((x) => (p === "Einzel" ? /^Einzel/.test(periode(x)) : periode(x) === "Periode " + p)); return ps.length ? `<div><div class="klein"><b>${p === "Einzel" ? "Einzelpraktika" : "Periode " + p}</b></div>${ps.sort((a, b) => a.person.name.localeCompare(b.person.name)).map((x) => `<label class="klein zt-p"><input type="checkbox" ${!bes || bes.has(x.idpraktikum) ? "checked" : ""} onchange="planBesuchen(${ref(x.idpraktikum)}, this.checked)"> ${esc(x.person.name)} <span class="leise">${esc(x.schulort)}</span></label>`).join("")}</div>` : ""; }).join("")}</div>
+    <details class="zt-wer"><summary class="klein">Liste anzeigen / ändern</summary><div class="zt-wer-l">${(per ? [per] : semPerioden(sem.h).concat(["Einzel"])).map((p) => { const ps = xs.filter((x) => (p === "Einzel" ? /^Einzel/.test(periode(x)) : periode(x) === "Periode " + p)); return ps.length ? `<div><div class="klein"><b>${p === "Einzel" ? "Einzelpraktika" : "Periode " + p}</b></div>${ps.sort((a, b) => a.person.name.localeCompare(b.person.name)).map((x) => `<label class="klein zt-p"><input type="checkbox" ${!bes || bes.has(x.idpraktikum) ? "checked" : ""} onchange="planBesuchen(${ref(x.idpraktikum)}, this.checked)"> ${esc(x.person.name)} <span class="leise">${esc(x.schulort)}</span></label>`).join("")}</div>` : ""; }).join("")}</div>
     <p class="leise klein">Später: die Liste, die Luzia bekommt, hier einlesen statt anklicken.</p></details></div>`;
   const ueb = `<div class="zt-schritt"><b>3 · Verfügbarkeiten und Übersicht</b> <span class="leise klein">${ks.filter((k) => verf[k]).length} von ${ks.length} haben eingetragen. Name anklicken = für diese Person eintragen. Farbe = Verfügbarkeit, Text = zugeteilte Schule (anklicken = zur Zeile unten).</span>
     <div style="overflow-x:auto"><table class="zt-raster"><thead><tr><th></th><th>Wunsch</th><th>zugeteilt</th><th title="Zugeteilte Orte, die für diese Person weit sind (Aktualisieren › Orte)">weit</th><th title="Besuche, die vor ${FRUEH_BIS.replace(":", ".")} Uhr beginnen">früh</th>${daten.map((d) => `<th><span class="pk fk-ht-${d.periode.toLowerCase()}" style="min-width:0">${d.periode}</span><br>${esc(kurzDatum(d.datum))}</th>`).join("")}<th>Vorbespr.</th><th>Bemerkung</th></tr></thead><tbody>
@@ -3625,7 +3632,13 @@ function wegWort(k, ort) { if (!k) return ""; const w = wegKlasse(k, ort); retur
 const festVergleich = (f) => (f.bloecke || []).filter((b) => b.wer).map((b) => [[...b.praktika].sort().join("+"), b.wer, b.datum || null]).sort();
 const entwVergleich = (bl, ist) => bl.map((b) => [b.key, ist(b).wer, ist(b).datum || null]).filter((z) => z[1]).sort();
 function planDatum(d) { const sem = htSemester(), e = planEntwurf(sem); e.ohne = e.ohne.includes(d) ? e.ohne.filter((x) => x !== d) : [...e.ohne, d]; planMerken(sem, e); }
-function planAlle(an) { const sem = htSemester(), e = planEntwurf(sem); e.besuchen = an ? null : []; planMerken(sem, e); }
+function planAlle(an) {
+  const sem = htSemester(), e = planEntwurf(sem), per = htPer(sem);
+  if (!per) e.besuchen = an ? null : [];
+  else { const alle = semPraktika(sem), hier = new Set(alle.filter((x) => periode(x) === "Periode " + per).map((x) => x.idpraktikum)), s = new Set(e.besuchen || alle.map((x) => x.idpraktikum));
+    for (const id of hier) an ? s.add(id) : s.delete(id); e.besuchen = [...s]; }
+  planMerken(sem, e);
+}
 function planBesuchen(i, an) {
   const sem = htSemester(), e = planEntwurf(sem), id = REFS[i];
   const s = new Set(e.besuchen || semPraktika(sem).map((x) => x.idpraktikum)); an ? s.add(id) : s.delete(id);
@@ -3653,17 +3666,22 @@ function planSetze(i, feld, wert) {
 }
 async function planVorschlagKnopf() {
   const sem = htSemester(), e = planEntwurf(sem);
-  const vonHand = e.bloecke.filter((b) => b.wer && !b.pin).length;
+  const per = htPer(sem), perVon = Object.fromEntries(planBloecke(sem, e).map((b) => [b.key, b.periode]));
+  const vonHand = e.bloecke.filter((b) => b.wer && !b.pin && (!per || perVon[b.key] === per)).length;
   if (vonHand && (await frage(`Der Vorschlag ersetzt die Zuteilungen, die nicht «fix» sind (${vonHand}). Weiter?`, { art: "wahl", wert: "ja", optionen: [["ja", "Ja, neu berechnen"]] })) !== "ja") return;
-  e.bloecke = planRechnen(sem, e); planMerken(sem, e);
+  e.bloecke = planRechnen(sem, e, per); planMerken(sem, e);
   meldung("Vorschlag berechnet – zum Umhängen Tag oder Person in der Liste ändern.");
 }
 async function planFestsetzen() {
   const sem = htSemester(), e = planEntwurf(sem), bl = planBloecke(sem, e), verf = verfuegbarkeiten(sem);
-  const zu = Object.fromEntries(e.bloecke.map((b) => [b.key, b])), vbStd = rh("vbStandard", e);
-  const bloecke = bl.map((b) => { const z = b.gebucht || zu[b.key] || {}; return { praktika: b.ids, wer: z.wer || "", datum: z.datum || null, pin: !!(zu[b.key] && zu[b.key].pin), vb: z.wer ? (verf[z.wer] && verf[z.wer].selbst ? z.wer : vbStd) : "" }; });
-  const offen = bloecke.filter((b) => !b.wer).length;
-  const ok = await frage(`Zuteilung ${SEM_NAME[sem.h]} festsetzen?\n${bloecke.length - offen} Besuche zugeteilt${offen ? `, ${offen} noch ohne Person` : ""}.\nDie Zugeteilten sehen danach ihre Besuche in der Liste und den Tag beim Buchen.`, { art: "wahl", wert: "ja", optionen: [["ja", "Ja, festsetzen"]] });
+  const zu = Object.fromEntries(e.bloecke.map((b) => [b.key, b])), vbStd = rh("vbStandard", e), per = htPer(sem), alt = planFest(sem);
+  const festZu = Object.fromEntries(((alt && alt.bloecke) || []).map((b) => [[...b.praktika].sort().join("+"), b]));
+  const bloecke = bl.map((b) => {
+    if (per && b.periode !== per) { const f = festZu[b.key]; return f ? { ...f, praktika: b.ids } : { praktika: b.ids, wer: "", datum: null, pin: false, vb: "" }; }   // andere Periode: wie festgesetzt
+    const z = b.gebucht || zu[b.key] || {}, f = festZu[b.key];
+    return { praktika: b.ids, wer: z.wer || "", datum: z.datum || null, pin: !!(zu[b.key] && zu[b.key].pin), vb: z.wer ? (f && f.wer === z.wer && f.vb ? f.vb : verf[z.wer] && verf[z.wer].selbst ? z.wer : vbStd) : "" }; });
+  const offen = bloecke.filter((b, i) => !b.wer && (!per || bl[i].periode === per)).length;
+  const ok = await frage(`Zuteilung ${per ? "Periode " + per : SEM_NAME[sem.h]} festsetzen?\n${bloecke.filter((b, i) => !per || bl[i].periode === per).length - offen} Besuche zugeteilt${offen ? `, ${offen} noch ohne Person` : ""}.\nDie Zugeteilten sehen danach ihre Besuche in der Liste und den Tag beim Buchen.`, { art: "wahl", wert: "ja", optionen: [["ja", "Ja, festsetzen"]] });
   if (ok !== "ja") return;
   if (await eintragen({ typ: "ht_zuteilung", semester: sem.key, ohne: e.ohne, besuchen: e.besuchen, regeln: e.regeln || null, bloecke })) meldung("Festgesetzt.");
 }
@@ -3726,7 +3744,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261111-114651";
+const STAND = "20261111-115056";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
