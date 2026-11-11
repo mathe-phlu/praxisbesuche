@@ -3503,20 +3503,21 @@ function vfLinkPruefen() {
   S.vfLink = false; setTimeout(() => vfOeffnen(), 0);
 }
 /* Luzia: Anfrage ans Team (wie Maurus' «E-Mail ans Team») */
-function vfAnfrageText(sem) {
-  const entw = planEntwurf(sem), daten = semDaten(sem, entw).filter((d) => !entw.ohne.includes(d.datum)), n = planBloecke(sem, entw).length;
-  const name = vorname(S.ich);
-  return `Liebe alle\n\nIm Halbtagespraktikum stehen im ${SEM_NAME[sem.h].split(" · ")[0]} ${sjText(sem.sj)} (Periode ${semPerioden(sem.h).join(" und ")}) ${n} Besuche an.\n\n` +
-    `Gebt mir doch bitte bis … an, an welchen Daten ihr verfügbar seid und wie viele Besuche ihr maximal übernehmen könnt – direkt hier:\n${SEITE}#verfuegbar-${sem.sj}-${sem.h}\n\n` +
-    `Besuchsdaten:\n${semPerioden(sem.h).map((p) => { const ds = daten.filter((d) => d.periode === p); return ds.length ? `Periode ${p}\n${ds.map((d) => `* ${Number(d.datum.slice(8, 10))}.${Number(d.datum.slice(5, 7))}.`).join("\n")}` : ""; }).filter(Boolean).join("\n\n")}\n\n` +
-    `Allfällige Wünsche bitte bei «Bemerkungen / Wünsche» eintragen.\n\nLiebe Grüsse\n${name}`;
+function vfAnfrageText(sem, bis) {
+  const per = htPer(sem), pers = per ? [per] : semPerioden(sem.h), entw = planEntwurf(sem);
+  const n = planBloecke(sem, entw).filter((b) => !b.einzel && pers.includes(b.periode)).length;
+  const wann = `im ${SEM_NAME[sem.h].split(" · ")[0]} ${sjText(sem.sj)} (Periode ${pers.join(" und ")})`;
+  const frist = bis ? `${["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"][new Date(bis + "T12:00").getDay()]}, ${Number(bis.slice(8, 10))}.${Number(bis.slice(5, 7))}.` : "…";
+  return `Liebe alle\n\n${n ? `Im Halbtagespraktikum stehen ${wann} ${n} Besuche an.` : `Im Halbtagespraktikum stehen ${wann} wieder Besuche an.`}\n\n` +
+    `Gebt mir bitte bis ${frist} Bescheid und tragt eure Verfügbarkeit direkt hier ein:\n${SEITE}#verfuegbar-${sem.sj}-${sem.h}\n\nLiebe Grüsse\n${vorname(S.ich)}`;
 }
 function vfAnfrageZeigen() {
-  const sem = htSemester(), t = vfAnfrageText(sem);
+  const sem = htSemester(), bis = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10), t = vfAnfrageText(sem, bis);
   const an = team().filter((d) => d.kuerzel !== S.ich).map((d) => d.mail || mailAdresse(d.name)).filter(Boolean);
   const d = $("#frage");
   $("#frageText").textContent = "Verfügbarkeit einholen – so geht die E-Mail raus:";
-  $("#frageFeld").innerHTML = `<textarea id="anfrageText" style="width:100%;height:300px;font:13px/1.4 inherit">${esc(t)}</textarea>
+  $("#frageFeld").innerHTML = `<p class="klein" style="margin-top:0"><label>Rückmeldung bis <input type="date" id="anfrageBis" value="${bis}" onchange="$('#anfrageText').value = vfAnfrageText(htSemester(), this.value)" onkeydown="if(event.key==='Enter')event.preventDefault()"></label></p>
+    <textarea id="anfrageText" style="width:100%;height:190px;font:13px/1.4 inherit">${esc(t)}</textarea>
     <p class="klein leise">An: ${esc(an.join(", "))} · Der Link öffnet bei allen direkt das Fenster «Verfügbarkeit eintragen».</p>
     <p style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="knopf haupt" onclick="vfAnfrageMail(${ref(an.join(","))})">✉ E-Mail öffnen</button>
       <button type="button" class="knopf" onclick="navigator.clipboard.writeText($('#anfrageText').value).then(() => meldung('Text kopiert.'))">Text kopieren</button></p>`;
@@ -3526,7 +3527,7 @@ function vfAnfrageZeigen() {
 }
 function vfAnfrageMail(i) {
   const sem = htSemester();
-  location.href = `mailto:${REFS[i]}?subject=${encodeURIComponent("Besuchseinteilung Halbtagespraktikum " + sjText(sem.sj) + " " + semPerioden(sem.h).join("/"))}&body=${encodeURIComponent($("#anfrageText").value)}`;
+  location.href = `mailto:${REFS[i]}?subject=${encodeURIComponent("Besuchseinteilung Halbtagespraktikum " + sjText(sem.sj) + " " + (htPer(sem) || semPerioden(sem.h).join("/")))}&body=${encodeURIComponent($("#anfrageText").value)}`;
 }
 
 /* ---------- Zuteilung in der Liste ---------- */
@@ -3749,7 +3750,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261111-115424";
+const STAND = "20261111-120710";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
