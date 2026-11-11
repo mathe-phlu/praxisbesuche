@@ -1298,7 +1298,11 @@ function ansichtOhneOrdner() {
 function jahre() { return [...new Set(Object.values(S.praktika).map((p) => p.jahr))].sort().reverse(); }
 /* Filter je Reiter getrennt: im Halbtag gelten eigene Werte (nur das Studienjahr ist gemeinsam) */
 function fk(k) { return S.ansicht === "halbtag" && k !== "jahr" ? "h." + k : k; }
-function fw(k, std) { return S.filter[fk(k)] ?? std; }
+function fw(k, std) {
+  // Halbtag: «nur meine» standardmässig an – ausser für Luzia, die alle sehen will (man kann es ausschalten)
+  if (k === "nurMeine" && S.ansicht === "halbtag") std = !!S.ich && !HT_ALLE_SEHEN.includes(S.ich);
+  return S.filter[fk(k)] ?? std;
+}
 function setzeFilter(k, v) { S.filter[fk(k)] = v; merke("filter", JSON.stringify(S.filter)); zeichnen(); }
 
 function ansichtStart() {
@@ -3191,6 +3195,7 @@ async function dokumentOeffnen(name) {
      ht_verfuegbar  {semester, fuer, tage:{iso:"ja"|"evtl"|"nein"}, min, max, selbst, bemerkung}
      ht_zuteilung   {semester, ohne:[iso], besuchen:[id], regeln:{…}, bloecke:[{praktika:[id], wer, datum, vb}]}
    ===================================================================== */
+const HT_ALLE_SEHEN = ["clu"];          // Halbtag-Liste: «nur meine» standardmässig aus
 const ZUTEILUNG_DURCH = ["clu", "alh"];   // Reiter Zuteilung: Luzia, Rike zum Testen
 const planungSichtbar = () => !!S.ich;     // Verfügbarkeit eintragen: alle
 const darfZuteilen = () => ZUTEILUNG_DURCH.includes(S.ich);
@@ -3765,7 +3770,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261111-115056";
+const STAND = "20261111-115424";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
