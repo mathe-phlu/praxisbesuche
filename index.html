@@ -1245,14 +1245,20 @@ function standBestimmen(x, altBesuch) {
 /* Bereinigungslisten der Praktikumsabteilung (Rike, 12.11.2026): Hinweise je Praktikum.
    Mit Datum: gilt, solange die Buchung (gleiche Person, gleicher Tag) noch besteht – wer im Tool umbucht oder austrägt,
    sieht den Hinweis nach dem nächsten Holen nicht mehr. Ohne Datum: Hinweis bleibt (z.B. «zweiter Fachbesuch wünschenswert»). */
+/* «erledigt ✕» (Eintrag regel_ok) beim aktuellen Termin: alle Hinweise zu diesem Termin ausblenden – auch das ⚠ in den Listen */
+function hinweisErledigt(x) { return !!(x.termin && x.eintraege.some((e) => e.typ === "regel_ok" && e.termin === x.termin.datum + " " + x.termin.zeit)); }
 function bereinigungZuordnen(liste) {
   const b = S.bereinigung || {}, nach = {};
   for (const f of b.faelle || []) (nach[nameSchluessel(f.name)] ||= []).push(f);
   for (const x of liste) {
     x.bereinigung = [];
     if (b.jahr && x.jahr !== b.jahr) continue;
+    const weg = hinweisErledigt(x);
+    if (weg) x.achtung = x.achtung.filter((f) => f.stufe !== "info");   // reine Hinweise weg, Pflicht bleibt
     for (const f of nach[nameSchluessel(x.person.name)] || []) {
-      if (f.liste !== x.gruppe) continue;
+      if (f.liste !== x.gruppe || weg) continue;
+      // Termin nach dem Einlesen der Liste in der App angepasst/neu übernommen (und im Tool bestätigt): gilt als bereinigt
+      if (f.datum && x.eintraege.some((e) => ["termin", "uebernehmen"].includes(e.typ) && f.wer.includes(e.wer) && (e.zeit || "").slice(0, 10) >= (b.eingelesen || "9999"))) continue;
       if (f.datum) {
         const imTool = (x.besuche || []).some((v) => v.fach === "MA" && v.datum === f.datum && (!f.wer.length || f.wer.includes(teamKuerzel(v.dozent))));
         const inApp = x.termin && x.termin.datum === f.datum && (!f.wer.length || f.wer.includes(x.wer));
@@ -2329,11 +2335,11 @@ function ansichtTermine() {
   ${pruefKasten(sj)}${wegKasten(sj)}
   ${meine.length ? `<table class="liste"><thead><tr><th>Tag</th><th>Zeit</th><th>Name</th><th>Prakt.</th><th>Schule</th><th>Stand</th><th>Hinweise</th><th></th></tr></thead><tbody>
   ${Object.entries(tage).map(([d, xs]) => xs.map((x, i) => { const w0 = x.termin ? terminWarnungen(x, x.termin.datum, x.termin.zeit) : [];
-    const pb = terminProbleme(x), w = [...pb, ...w0.filter((t) => !pb.some((p) => p.includes(t.replace(/^nicht (an den |am |in der )?/, ""))))];
+    const pb = terminProbleme(x), w = hinweisErledigt(x) ? [] : [...pb, ...w0.filter((t) => !pb.some((p) => p.includes(t.replace(/^nicht (an den |am |in der )?/, ""))))];
     return `<tr class="${farbKlasse(x)}"><td style="white-space:nowrap">${i === 0 ? `<b>${esc(tagText(d))}</b>` : ""}</td><td>${esc(x.termin ? x.termin.zeit : "")}</td>
     <td><span class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</span>${kontakteZelle(x)}</td><td>${praktChip(x)}</td>
     <td>${esc(x.schulort)}<div class="leise klein">${esc(x.schulhaus)}</div></td><td>${standChip(x, true, true)}</td>
-    <td>${w.map((t) => `<div class="hinweis">⚠ ${esc(t)}</div>`).join("")}${tauschKandidaten(x)}${pb.length ? `<button class="knopf klein" style="margin-top:3px" title="Bewusst so gebucht (z.B. abgesprochen) – Hinweis nicht mehr zeigen" onclick="regelOk(${ref(x.idpraktikum)})">passt so ✕</button>` : ""}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`; }).join("")).join("")}
+    <td>${w.map((t) => `<div class="hinweis">⚠ ${esc(t)}</div>`).join("")}${tauschKandidaten(x)}${w.length ? `<button class="knopf klein" style="margin-top:3px" title="Erledigt (im Tool angepasst) oder bewusst so – Hinweise zu diesem Termin ausblenden, auch das ⚠ in den Listen. Bei einem neuen Termin erscheinen sie wieder, falls sie dann noch zutreffen." onclick="regelOk(${ref(x.idpraktikum)})">erledigt ✕</button>` : ""}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`; }).join("")).join("")}
   </tbody></table>` : `<div class="leer">Noch keine Besuche übernommen.</div>`}
   ${reiseplanTeil()}`;
 }
@@ -2365,8 +2371,7 @@ function terminProbleme(x) {
   if (g) p.push(g);
   for (const f of x.bereinigung || []) p.push("Praktikumsabteilung: " + f.regel.split(/ → /)[0] + (f.regel.includes(" → ") ? " – " + f.regel.split(/ → /)[1] : ""));
   if (x.halbGebucht) p.push(`Doppellektion ${x.halbGebucht.l.zeit}–${x.halbGebucht.l.bis}, im Tool nur ${x.halbGebucht.gebucht} von ${x.halbGebucht.anzahl} Lektionen gebucht`);
-  const ok = x.eintraege.filter((e) => e.typ === "regel_ok" && e.termin === x.termin.datum + " " + x.termin.zeit);
-  return ok.length ? [] : p;
+  return hinweisErledigt(x) ? [] : p;
 }
 function regelKasten(sj) {
   const alle = R.praktika.filter((x) => x.jahr === sj && terminProbleme(x).length);
@@ -2391,7 +2396,7 @@ function tauschKandidaten(x) {
 async function regelOk(id) {
   const x = R.praktika.find((p) => p.idpraktikum === id);
   if (!x || !x.termin) return;
-  if (await eintragen({ typ: "regel_ok", praktikum: id, termin: x.termin.datum + " " + x.termin.zeit })) meldung("Hinweis ausgeblendet.");
+  if (await eintragen({ typ: "regel_ok", praktikum: id, termin: x.termin.datum + " " + x.termin.zeit })) meldung("Hinweise zu diesem Termin ausgeblendet.");
 }
 function wegKasten(sj) {
   const w = (R.wegGebucht || []).filter((x) => x.wer === S.ich && x.jahr === sj);
@@ -3947,7 +3952,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261112-121042";
+const STAND = "20261112-121812";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
