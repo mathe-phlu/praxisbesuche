@@ -1266,15 +1266,19 @@ function noetigBestimmen(x) {
     const laeuft = profile.some((y) => y.jahr === x.jahr && y.stand !== "besucht");
     const erneut = p.alt && p.alt.erneut;
     // Spezialfall «Mentoratsbesuch + beide/drei Studienfächer» (SK-Quartal) nennt kein Fach: Mathe ist nur nötig,
-    // wenn Mathe im Profil noch nicht besucht wurde (Rike, 12.11.2026, Fälle Dihr und Wyrsch). Nennt der Hinweis MA, gilt er.
-    x.spezialErfuellt = null;
+    // wenn Mathe im Profil noch nicht besucht wurde (Rike, 12.11.2026, Fälle Dihr und Wyrsch). Sonst «optional» mit
+    // Hinweis «Achtung: im Profil schon besucht» (⚠ bleibt sichtbar, zwingt aber nichts). Nennt der Hinweis MA, gilt er.
+    x.spezialErfuellt = null; x.profilBesuchtVon = "";
     const nurFaecher = (f) => spez.includes(f) && f.stufe === "zwingend" && /Studienfächer/.test(f.hinweis || "") && !/\bMA\b|Fachbesuche zwingend/.test(f.hinweis || "");
     if (regulaer && !erneut && x.achtung.some(nurFaecher)) {
       x.spezialErfuellt = x.achtung.filter(nurFaecher);
-      x.achtung = x.achtung.filter((f) => !nurFaecher(f));
+      const pv = profile.find((y) => y.stand === "besucht" || y.stand === "gebucht"), pw = pv && pv.wer ? ` von ${pv.wer}` : "";
+      x.achtung = x.achtung.map((f) => nurFaecher(f) ? { ...f, stufe: "info", hinweis: `${f.hinweis} – Achtung: Mathe im Profil${pv && pv.jahr ? " " + sjText(pv.jahr) : ""} schon besucht${pw}` } : f);
+      x.profilBesuchtVon = pw;
     }
     if (erneut) { n = "ja"; warum = "soll erneut besucht werden (alte Liste)"; }
-    else if (regulaer) { n = "nein"; warum = "im Profil schon besucht" + (x.spezialErfuellt ? ` (Spezialfall «${x.spezialErfuellt[0].hinweis}»: Mathe damit abgedeckt)` : ""); }
+    else if (regulaer && x.spezialErfuellt) { n = "optional"; warum = `Spezialfall «${x.spezialErfuellt[0].hinweis}» – Achtung: im Profil schon besucht${x.profilBesuchtVon || ""}`; }
+    else if (regulaer) { n = "nein"; warum = "im Profil schon besucht"; }
     else if (laeuft) { n = "später"; warum = "Profil läuft noch"; }
     else { n = "ja"; warum = profile.length ? "im Profil nicht regulär besucht" : "kein Profilbesuch bekannt"; }
   } else { n = "ja"; warum = x.gruppe; }
@@ -2268,7 +2272,7 @@ function ansichtPlanung() {
     <td class="name" title="Fächer: ${esc((x.faecher || []).join(", "))}" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}${entfernenKnopf(x)}<div class="leise klein">${esc(x.person.studiengang || "")} · ${esc((x.faecher || []).join(", "))}</div></td>
     <td>${praktChip(x)}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
-    <td class="noetig" style="cursor:pointer" title="${esc(x.warum)} – Klick: ändern" onclick="noetigSetzen(REFS[${ref(x.idpraktikum)}])"><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}">${esc({ ja: "nötig", optional: "opt.", später: "später" }[x.noetig] || x.noetig)}</span>${x.achtung.length ? `<div class="klein rot" title="${esc(x.achtung.map((f) => f.hinweis).join(" · "))}">⚠ Pflicht</div>` : ""}</td>
+    <td class="noetig" style="cursor:pointer" title="${esc(x.warum)} – Klick: ändern" onclick="noetigSetzen(REFS[${ref(x.idpraktikum)}])"><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}">${esc({ ja: "nötig", optional: "opt.", später: "später" }[x.noetig] || x.noetig)}</span>${x.achtung.length ? `<div class="klein rot" title="${esc(x.achtung.map((f) => f.hinweis).join(" · "))}">⚠ ${x.achtung.some((f) => f.stufe !== "info") ? "Pflicht" : "Profil besucht"}</div>` : ""}</td>
     <td>${standChip(x)}</td><td style="white-space:nowrap">${buchenZelle(x)}</td></tr>`).join("")}
   </tbody></table>` : `<div class="leer">Keine Praktika für diese Auswahl.</div>`}${entferntListe(["Profil", "Quartal", "Spezial", "Abschluss"])}</div></div>`;
 }
@@ -3885,7 +3889,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261112-111731";
+const STAND = "20261112-114118";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
