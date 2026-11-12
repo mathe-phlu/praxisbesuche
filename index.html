@@ -568,11 +568,21 @@ function ferienEnden(x) {
   const ds = [...new Set(L.map((l) => l.datum))].filter(Boolean).sort(), r = [];
   for (let i = 1; i < ds.length; i++) {
     const a = new Date(ds[i - 1] + "T12:00"), b = new Date(ds[i] + "T12:00");
-    if ((b - a) / 864e5 >= 10) { b.setDate(b.getDate() - ((b.getDay() + 6) % 7)); r.push(b.toISOString().slice(0, 10)); }
+    if ((b - a) / 864e5 >= 10) {
+      b.setDate(b.getDate() - ((b.getDay() + 6) % 7)); r.push(b.toISOString().slice(0, 10));
+      a.setDate(a.getDate() + (5 - a.getDay())); r.vor = [...(r.vor || []), a.toISOString().slice(0, 10)];   // Freitag davor
+    }
   }
   FERIEN_CACHE.set(L, r); return r;
 }
-function nachFerien(x, datum, zeit) { return regel("ferienErsterHalbtag") && vormittag(zeit) && ferienEnden(x).includes(datum); }
+/* Checkliste: keine Besuche am letzten Halbtag vor (Freitagnachmittag) und am ersten Halbtag nach den Ferien (Montagvormittag) */
+function nachFerien(x, datum, zeit) {
+  if (!regel("ferienErsterHalbtag")) return "";
+  const f = ferienEnden(x);
+  if (vormittag(zeit) && f.includes(datum)) return "erster Halbtag nach den Ferien";
+  if (!vormittag(zeit) && (f.vor || []).includes(datum)) return "letzter Halbtag vor den Ferien";
+  return "";
+}
 /* Lektionen mit kurzer Pause dazwischen (bis 30 Min, keine andere Lektion dazwischen, gleiche Klasse) sind eine Doppellektion
    (Rike, 12.11.2026, Fall Hotz: 9.15–10.00 und 10.20–11.05). Das Lesezeichen trennt bei mehr als 15 Min – hier zusammenfügen. */
 const PAUSE_DOPPEL = 30;
@@ -881,6 +891,7 @@ async function schreibeJSON(pfad, obj) {
 async function allesLaden() {
   if (!S.ordner) return zeichnen();
   S.orte = await leseJSON("stamm/orte.json", {});
+  S.bereinigung = await leseJSON("stamm/bereinigung.json", { faelle: [] });   // Bereinigungslisten der Praktikumsabteilung (nur Mathe/Team)
   const [pr, alt, sp, einst] = await Promise.all([
     leseJSON("stamm/praktika.json", { praktika: [] }), leseJSON("stamm/alt.json", { personen: [] }),
     leseJSON("stamm/spezial.json", { faelle: [] }), leseJSON("stamm/einstellungen.json", null)]);
@@ -1126,6 +1137,7 @@ function berechnen() {
     if (k) { x.wer = k; x.werAusBericht = true; x.besuchtVon = [k]; person.besucher.add(k); }
   }
   for (const x of liste) noetigBestimmen(x);
+  bereinigungZuordnen(liste);
   for (const person of Object.values(personen)) for (const x of person.praktika) if (x.quelle === "alt") noetigBestimmen(x);
   R = { praktika: liste, personen, ausgeblendet, wegGebucht };
 }
@@ -1229,6 +1241,34 @@ function standBestimmen(x, altBesuch) {
   x.berichteWeg = new Set(x.eintraege.filter((e) => e.typ === "bericht_weg").map((e) => e.datei));
 }
 
+/* Bereinigungslisten der Praktikumsabteilung (Rike, 12.11.2026): Hinweise je Praktikum.
+   Mit Datum: gilt, solange die Buchung (gleiche Person, gleicher Tag) noch besteht – wer im Tool umbucht oder austrägt,
+   sieht den Hinweis nach dem nächsten Holen nicht mehr. Ohne Datum: Hinweis bleibt (z.B. «zweiter Fachbesuch wünschenswert»). */
+function bereinigungZuordnen(liste) {
+  const b = S.bereinigung || {}, nach = {};
+  for (const f of b.faelle || []) (nach[nameSchluessel(f.name)] ||= []).push(f);
+  for (const x of liste) {
+    x.bereinigung = [];
+    if (b.jahr && x.jahr !== b.jahr) continue;
+    for (const f of nach[nameSchluessel(x.person.name)] || []) {
+      if (f.liste !== x.gruppe) continue;
+      if (f.datum) {
+        const imTool = (x.besuche || []).some((v) => v.fach === "MA" && v.datum === f.datum && (!f.wer.length || f.wer.includes(teamKuerzel(v.dozent))));
+        const inApp = x.termin && x.termin.datum === f.datum && (!f.wer.length || f.wer.includes(x.wer));
+        if (!imTool && !inApp) continue;   // umgebucht oder ausgetragen: erledigt
+        if (f.wer.length && !(x.wer && f.wer.includes(x.wer))) continue;   // in der App abgegeben: erledigt
+      } else if (f.wer && f.wer.length && !(x.wer && f.wer.includes(x.wer))) continue;   // «drei Fachbesuche»: nur solange unser Besuch steht
+      x.bereinigung.push(f);
+      const kurz = f.regel.split(/ → /)[0];
+      x.achtung.push({ kategorie: "Praktikumsabteilung (Bereinigung " + datumText(b.eingelesen || "") + ")", hinweis: f.regel + (f.datum ? ` (${kurzDatum(f.datum)})` : "") + (f.bemerkung ? " – " + f.bemerkung : ""),
+        stufe: f.zwingend ? "zwingend" : "info", etikett: /Profilpraktikum stattgefunden/.test(kurz) ? "prüfen: Profil besucht" : /drei Fachbesuchen/.test(kurz) ? "3 Fachbesuche" : /Zweiter Fachbesuch/.test(kurz) ? "2. Besuch erwünscht" : "Bereinigung" });
+      if (f.zwingend && x.noetig !== "ja" && !x.eintraege.some((e) => e.typ === "noetig" && e.wert)) {
+        x.noetig = "ja"; x.warum = "Praktikumsabteilung: " + kurz;
+        if (x.stand === "nicht nötig") x.stand = "offen";
+      }
+    }
+  }
+}
 function noetigBestimmen(x) {
   const p = x.person, spez = (p.spezial || []).filter((f) => f.jahr === x.jahr);
   x.achtung = spez.filter((f) => f.stufe === "zwingend" || f.stufe === "prüfen");
@@ -1252,7 +1292,7 @@ function noetigBestimmen(x) {
     if (regulaer && !erneut && x.achtung.some(nurFaecher)) {
       x.spezialErfuellt = x.achtung.filter(nurFaecher);
       const pv = profile.find((y) => y.stand === "besucht" || y.stand === "gebucht"), pw = pv && pv.wer ? ` von ${pv.wer}` : "";
-      x.achtung = x.achtung.map((f) => nurFaecher(f) ? { ...f, stufe: "info", hinweis: `${f.hinweis} – Achtung: Mathe im Profil${pv && pv.jahr ? " " + sjText(pv.jahr) : ""} schon besucht${pw}` } : f);
+      x.achtung = x.achtung.map((f) => nurFaecher(f) ? { ...f, stufe: "info", etikett: "prüfen: Profil besucht", hinweis: `${f.hinweis} – Achtung: Mathe im Profil${pv && pv.jahr ? " " + sjText(pv.jahr) : ""} schon besucht${pw}` } : f);
       x.profilBesuchtVon = pw;
     }
     if (erneut) { n = "ja"; warum = "soll erneut besucht werden (alte Liste)"; }
@@ -1793,7 +1833,7 @@ function terminGesperrt(x, datum, zeit, nurDatum) {
   if (von && x.gruppe === "Quartal" && ersteKal) { const e = new Date(von + "T12:00"); e.setDate(e.getDate() + ersteKal); if (datum < e.toISOString().slice(0, 10)) return "erste Praktikumswoche"; }
   const arb = x.gruppe === "Profil" ? S.einst.arbeitssitzungProfil : x.gruppe === "Quartal" ? S.einst.arbeitssitzungQuartal : "";
   if (arb && datum === arb && vormittag(zeit)) return "Vormittag der Arbeitssitzung";
-  if (nachFerien(x, datum, zeit)) return "erster Halbtag nach den Ferien";
+  if (nachFerien(x, datum, zeit)) return nachFerien(x, datum, zeit);
   if (nurDatum) return "";
   return besuchsRegeln(x, datum, zeit)[0] || "";
 }
@@ -1832,7 +1872,7 @@ function terminWarnungen(x, datum, zeit) {
   if (von && x.gruppe === "Quartal") { const e = new Date(von + "T12:00"); e.setDate(e.getDate() + 7); if (datum < e.toISOString().slice(0, 10)) w.push("nicht in der ersten Praktikumswoche"); }
   const arb = x.gruppe === "Profil" ? S.einst.arbeitssitzungProfil : x.gruppe === "Quartal" ? S.einst.arbeitssitzungQuartal : "";
   if (arb && datum === arb && vormittag(zeit)) w.push("Vormittag der Arbeitssitzung");
-  if (nachFerien(x, datum, zeit)) w.push("nicht am ersten Halbtag nach den Ferien");
+  if (nachFerien(x, datum, zeit)) w.push("nicht am " + nachFerien(x, datum, zeit));
   // eigene Besuche: in der Regel ein Besuch pro Halbtag
   // ausser genau zur selben Zeit (Doppelbesuch: zwei Studierende in derselben Lektion)
   const meine = R.praktika.filter((y) => y !== x && y.wer === S.ich && y.termin && y.termin.datum === datum && y.termin.zeit !== zeit && vormittag(y.termin.zeit) === vormittag(zeit));
@@ -2251,7 +2291,7 @@ function ansichtPlanung() {
     <td class="name" title="Fächer: ${esc((x.faecher || []).join(", "))}" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}${entfernenKnopf(x)}<div class="leise klein">${esc(x.person.studiengang || "")} · ${esc((x.faecher || []).join(", "))}</div></td>
     <td>${praktChip(x)}</td><td class="klein">${zeitraum(x)}</td>
     <td>${esc(x.schulort)}${umkreisText(x)}<div class="leise klein">${esc(x.schulhaus)}</div></td>
-    <td class="noetig" style="cursor:pointer" title="${esc(x.warum)} – Klick: ändern" onclick="noetigSetzen(REFS[${ref(x.idpraktikum)}])"><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}">${esc({ ja: "nötig", optional: "opt.", später: "später" }[x.noetig] || x.noetig)}</span>${x.achtung.length ? `<div class="klein rot" title="${esc(x.achtung.map((f) => f.hinweis).join(" · "))}">⚠ ${x.achtung.some((f) => f.stufe !== "info") ? "Pflicht" : "Profil besucht"}</div>` : ""}</td>
+    <td class="noetig" style="cursor:pointer" title="${esc(x.warum)} – Klick: ändern" onclick="noetigSetzen(REFS[${ref(x.idpraktikum)}])"><span class="n-${x.noetig === "später" ? "spaeter" : x.noetig}">${esc({ ja: "nötig", optional: "opt.", später: "später" }[x.noetig] || x.noetig)}</span>${x.achtung.length ? `<div class="klein rot" title="${esc(x.achtung.map((f) => f.hinweis).join(" · "))}">⚠ ${x.achtung.some((f) => f.stufe !== "info") ? "Pflicht" : esc((x.achtung.find((f) => f.etikett) || {}).etikett || "Hinweis")}</div>` : ""}</td>
     <td>${standChip(x)}</td><td style="white-space:nowrap">${buchenZelle(x)}</td></tr>`).join("")}
   </tbody></table>` : `<div class="leer">Keine Praktika für diese Auswahl.</div>`}${entferntListe(["Profil", "Quartal", "Spezial", "Abschluss"])}</div></div>`;
 }
@@ -2310,6 +2350,7 @@ function terminProbleme(x) {
   const p = [];
   const g = terminGesperrt(x, x.termin.datum, x.termin.zeit, true);
   if (g) p.push(g);
+  for (const f of x.bereinigung || []) p.push("Praktikumsabteilung: " + f.regel.split(/ → /)[0] + (f.regel.includes(" → ") ? " – " + f.regel.split(/ → /)[1] : ""));
   if (x.halbGebucht) p.push(`Doppellektion ${x.halbGebucht.l.zeit}–${x.halbGebucht.l.bis}, im Tool nur ${x.halbGebucht.gebucht} von ${x.halbGebucht.anzahl} Lektionen gebucht`);
   const ok = x.eintraege.filter((e) => e.typ === "regel_ok" && e.termin === x.termin.datum + " " + x.termin.zeit);
   return ok.length ? [] : p;
@@ -2321,8 +2362,8 @@ function regelKasten(sj) {
   const zeile = (x, eigen) => `<tr><td>${esc(kurzDatum(x.termin.datum) + " " + (x.termin.zeit || ""))}</td><td><span class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</span></td><td>${esc(praktKurz(x))}${eigen ? "" : " · <b>" + esc(x.wer) + "</b>"}</td>
       <td class="klein rot">${esc(terminProbleme(x).join(" · "))}</td>
       <td style="white-space:nowrap">${x.link ? `<button class="knopf klein" onclick="toolOeffnen(${ref(toolLink(x, x.termin.lektion || ""))})">Tool ↗</button> ` : ""}${eigen ? `<button class="knopf klein" title="Bewusst so gebucht (z.B. abgesprochen) – Hinweis nicht mehr zeigen" onclick="regelOk(${ref(x.idpraktikum)})">passt so ✕</button>` : ""}</td></tr>`;
-  return `<div class="karte" style="border:2px solid var(--achtung);margin-bottom:14px"><b class="rot">⚠ Termin passt nicht zur Checkliste</b>
-    <p class="klein" style="margin:4px 0 8px">So steht es im Praktikumstool (Stand letztes Holen). Bitte im Tool anpassen – nach dem nächsten Holen verschwindet der Hinweis. War es so abgesprochen: «passt so».</p>
+  return `<div class="karte" style="border:2px solid var(--achtung);margin-bottom:14px"><b class="rot">⚠ Bitte prüfen: Checkliste und Bereinigungsliste der Praktikumsabteilung</b>
+    <p class="klein" style="margin:4px 0 8px">Gebuchte Termine (Stand letztes Holen), zu denen es einen Hinweis gibt. Wenn nötig im Praktikumstool ändern oder austragen – nach dem nächsten Holen verschwindet der Hinweis. Bleibt es bewusst so: «passt so».</p>
     <table class="liste"><tbody>${meine.map((x) => zeile(x, true)).join("")}${team.length ? `<tr><td colspan="5" class="klein leise" style="padding-top:8px">im Team (nur für dich sichtbar):</td></tr>` + team.map((x) => zeile(x, false)).join("") : ""}</tbody></table></div>`;
 }
 async function regelOk(id) {
@@ -2934,7 +2975,7 @@ function ansichtAktualisieren() {
       + abschnitt("check", "Checkliste der Praktikumsabteilung", `<span id="aktCheck">…</span>`, `<p class="klein">Die aktuelle Fassung als PDF im Ordner ablegen, damit alle sie haben.</p>
     <p><input type="file" id="dateiCheck" accept=".pdf"> <button class="knopf" id="checkAblegen">Ablegen</button></p>
     <div id="dokumente" class="klein"></div>`, false)
-      + abschnitt("regeln", "Regeln aus der Checkliste", `Profil ab Tag ${Number(regel("profilErsteTage")) + 1} · Quartal ab Tag ${Number(regel("quartalErsteTage")) + 1} · max. ${esc(regel("maxProWoche"))} pro Woche · nicht am ersten Halbtag nach Ferien`, `<p class="klein leise">Termine, die dagegen verstossen, bietet die Seite beim Buchen nicht an. Änderungen werden sofort gespeichert.</p>
+      + abschnitt("regeln", "Regeln aus der Checkliste", `Profil ab Tag ${Number(regel("profilErsteTage")) + 1} · Quartal ab Tag ${Number(regel("quartalErsteTage")) + 1} · max. ${esc(regel("maxProWoche"))} pro Woche · nicht am letzten Halbtag vor und am ersten nach Ferien`, `<p class="klein leise">Termine, die dagegen verstossen, bietet die Seite beim Buchen nicht an. Änderungen werden sofort gespeichert.</p>
     <table class="regeln">
       <tr><td>Arbeitssitzung Profil (Vormittag, keine Besuche)</td><td><input class="eingabe" type="date" id="eArbP" value="${esc(e.arbeitssitzungProfil || "")}"></td></tr>
       <tr><td>Arbeitssitzung Quartal (Vormittag, keine Besuche)</td><td><input class="eingabe" type="date" id="eArbQ" value="${esc(e.arbeitssitzungQuartal || "")}"></td></tr>
@@ -3868,7 +3909,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261112-114118";
+const STAND = "20261112-115104";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
