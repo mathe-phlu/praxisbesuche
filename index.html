@@ -1063,6 +1063,7 @@ function berechnen() {
       if (e.faecher) personen[e.person].faecher = e.faecher;
       personen[e.person].angepasst = e.wer;
     }
+    if (e.typ === "be_fach" && e.person && personen[e.person]) personen[e.person].beFach = { fach: e.fach || "", wer: e.wer, quelle: e.quelle || "", zeit: e.zeit };
     if (e.typ === "achtung_weg" && e.person && personen[e.person]) personen[e.person].achtungen = (personen[e.person].achtungen || []).filter((a) => a.id !== e.bezug);
   }
 
@@ -1269,6 +1270,8 @@ function bereinigungZuordnen(liste) {
     }
   }
 }
+/* SK und Master B: Quartal Phase I–II / III–IV (Art 24/25) oder Studiengang SK */
+function beRelevant(x) { return x.gruppe === "Quartal" && ([24, 25].includes(Number(x.art)) || /^SK/i.test((x.person && x.person.studiengang) || x.studiengang || "")); }
 function noetigBestimmen(x) {
   const p = x.person, spez = (p.spezial || []).filter((f) => f.jahr === x.jahr);
   x.achtung = spez.filter((f) => f.stufe === "zwingend" || f.stufe === "prüfen");
@@ -1295,8 +1298,17 @@ function noetigBestimmen(x) {
       x.achtung = x.achtung.map((f) => nurFaecher(f) ? { ...f, stufe: "info", etikett: "prüfen: Profil besucht", hinweis: `${f.hinweis} – Achtung: Mathe im Profil${pv && pv.jahr ? " " + sjText(pv.jahr) : ""} schon besucht${pw}` } : f);
       x.profilBesuchtVon = pw;
     }
-    if (erneut) { n = "ja"; warum = "soll erneut besucht werden (alte Liste)"; }
-    else if (regulaer && x.spezialErfuellt) { n = "optional"; warum = `Spezialfall «${x.spezialErfuellt[0].hinweis}» – Achtung: im Profil schon besucht${x.profilBesuchtVon || ""}`; }
+    // BE-Masterprüfung (Checkliste 2026/27): SK/Master B erhalten im Quartal im Fach mit BE-Masterprüfung zwingend einen Fachbesuch;
+    // sonst gilt «nur Fachbesuch, wenn dieser im Profilpraktikum noch nicht stattgefunden hat» (Rike, 12.11.2026)
+    const be = beRelevant(x) && p.beFach ? p.beFach.fach : "";
+    if (x.spezialErfuellt) {
+      const et = be ? `Profil besucht · BE ${be}` : "prüfen: BE-Fach?";
+      x.achtung = x.achtung.map((f) => f.stufe === "info" && f.etikett === "prüfen: Profil besucht" ? { ...f, etikett: et } : f);
+    }
+    if (be === "MA") { n = "ja"; warum = "BE-Masterprüfung in Mathe – Checkliste: im Quartal zwingend ein Fachbesuch (Phase II oder III)"; }
+    else if (erneut) { n = "ja"; warum = "soll erneut besucht werden (alte Liste)"; }
+    else if (regulaer && be) { n = "nein"; warum = `im Profil schon besucht; BE-Masterprüfung in ${be} – Checkliste: Quartal nur, wenn im Profil noch nicht besucht`; }
+    else if (regulaer && x.spezialErfuellt) { n = "optional"; warum = `Spezialfall «${x.spezialErfuellt[0].hinweis}» – Achtung: im Profil schon besucht${x.profilBesuchtVon || ""}. BE-Prüfungsfach unbekannt: unter Aktualisieren › Regeln Block › BE-Masterprüfung eintragen (MA = nötig, anderes Fach = nein)`; }
     else if (regulaer) { n = "nein"; warum = "im Profil schon besucht"; }
     else if (laeuft) { n = "später"; warum = "Profil läuft noch"; }
     else { n = "ja"; warum = profile.length ? "im Profil nicht regulär besucht" : "kein Profilbesuch bekannt"; }
@@ -2321,7 +2333,7 @@ function ansichtTermine() {
     return `<tr class="${farbKlasse(x)}"><td style="white-space:nowrap">${i === 0 ? `<b>${esc(tagText(d))}</b>` : ""}</td><td>${esc(x.termin ? x.termin.zeit : "")}</td>
     <td><span class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</span>${kontakteZelle(x)}</td><td>${praktChip(x)}</td>
     <td>${esc(x.schulort)}<div class="leise klein">${esc(x.schulhaus)}</div></td><td>${standChip(x, true, true)}</td>
-    <td>${w.map((t) => `<div class="hinweis">⚠ ${esc(t)}</div>`).join("")}${pb.length ? `<button class="knopf klein" style="margin-top:3px" title="Bewusst so gebucht (z.B. abgesprochen) – Hinweis nicht mehr zeigen" onclick="regelOk(${ref(x.idpraktikum)})">passt so ✕</button>` : ""}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`; }).join("")).join("")}
+    <td>${w.map((t) => `<div class="hinweis">⚠ ${esc(t)}</div>`).join("")}${tauschKandidaten(x)}${pb.length ? `<button class="knopf klein" style="margin-top:3px" title="Bewusst so gebucht (z.B. abgesprochen) – Hinweis nicht mehr zeigen" onclick="regelOk(${ref(x.idpraktikum)})">passt so ✕</button>` : ""}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`; }).join("")).join("")}
   </tbody></table>` : `<div class="leer">Noch keine Besuche übernommen.</div>`}
   ${reiseplanTeil()}`;
 }
@@ -2366,6 +2378,15 @@ function regelKasten(sj) {
   return `<div class="karte" style="border:2px solid var(--achtung);margin-bottom:14px"><b class="rot">⚠ Bitte prüfen: Checkliste und Bereinigungsliste der Praktikumsabteilung</b>
     <p class="klein" style="margin:4px 0 8px">Gebuchte Termine (Stand letztes Holen), zu denen es einen Hinweis gibt. Wenn nötig im Praktikumstool ändern oder austragen – nach dem nächsten Holen verschwindet der Hinweis. Bleibt es bewusst so: «passt so».</p>
     <table class="liste"><tbody>${meine.map((x) => zeile(x, true)).join("")}${team.length ? `<tr><td colspan="5" class="klein leise" style="padding-top:8px">im Team (nur für dich sichtbar):</td></tr>` + team.map((x) => zeile(x, false)).join("") : ""}</tbody></table></div>`;
+}
+/* Bereinigung «drei Fachbesuche – evtl. einen streichen und bei Studierenden mit nur einem Fachbesuch planen»:
+   zeigt beim Termin, wer im selben Jahr noch einen 2. Fachbesuch braucht und Mathe hat (Rike, 12.11.2026) */
+function tauschKandidaten(x) {
+  if (!(x.bereinigung || []).some((f) => /drei Fachbesuchen/.test(f.regel))) return "";
+  const k = R.praktika.filter((y) => y.jahr === x.jahr && y.gruppe === "Profil" && (y.bereinigung || []).some((f) => /Zweiter Fachbesuch/.test(f.regel)));
+  if (!k.length) return "";
+  return `<div class="klein" style="margin-top:3px">Stattdessen möglich (2. Fachbesuch erwünscht, Mathe im Fächerangebot):<br>${k.map((y) =>
+    `<span class="name" onclick="detailZeigen(REFS[${ref(y.person.id)}])">${esc(y.person.name)}</span> <span class="leise">${esc(y.schulort)}${y.wer ? " · schon bei " + esc(y.wer) : ""}</span>`).join("<br>")}</div>`;
 }
 async function regelOk(id) {
   const x = R.praktika.find((p) => p.idpraktikum === id);
@@ -2914,6 +2935,21 @@ function aktUebersicht() {
       ${!spezN && blockPr.length && !fehlt ? `<div style="margin-top:8px"><button class="knopf haupt" onclick="aktReiter('regelnBlock')">Zu den Regeln Block</button></div>` : `<div class="leise klein" style="margin-top:4px">Holen: unten bei «Daten aus dem Praktikumstool holen».</div>`}</div>`;
 }
 /* Abschnitt mit dunkler Kopfleiste, einklappbar; offen/zu merkt sich der Browser */
+/* Liste BE-Masterprüfung (Rike, 12.11.2026): SK/Master B im Quartal – in welchem Fach ist die BE-Masterprüfung? */
+function beAbschnitt(sj) {
+  const xs = R.praktika.filter((x) => x.jahr === sj && beRelevant(x)).sort((a, b) => a.person.name.localeCompare(b.person.name));
+  const fehlen = xs.filter((x) => !(x.person.beFach && x.person.beFach.fach)).length;
+  const zeile = (x) => { const p = x.person, b = p.beFach || {}, f = [...new Set([...(p.faecher || x.faecher || []).filter((k) => !/^(LK|ERG|PU|Z\d|BO)$/.test(k)), b.fach].filter(Boolean))];
+    const prof = p.praktika.filter((y) => y.gruppe === "Profil" && y !== x && (y.stand === "besucht" || y.stand === "gebucht"));
+    return `<tr><td><span class="name" onclick="detailZeigen(REFS[${ref(p.id)}])">${esc(p.name)}</span></td><td>${esc(p.studiengang || x.studiengang || "")}</td>
+      <td class="klein">${esc((p.faecher || x.faecher || []).join(", "))}</td><td class="klein">${prof.length ? "besucht" + (prof[0].wer ? " (" + esc(prof[0].wer) + ")" : "") : "–"}</td>
+      <td><select onchange="beSetzen(REFS[${ref(p.id)}], this.value)"><option value="">– unbekannt –</option>${f.map((k) => `<option ${k === b.fach ? "selected" : ""}>${esc(k)}</option>`).join("")}</select></td>
+      <td>${esc(x.noetig === "ja" ? "nötig" : x.noetig)}</td><td class="klein leise">${b.fach ? esc((b.quelle || "von " + b.wer) + " · " + datumText(b.zeit)) : ""}</td></tr>`; };
+  return abschnitt("be", "BE-Masterprüfung (SK / Master B)", fehlen ? `<span class="off">${fehlen} von ${xs.length} offen</span>` : `<span class="ok">✓ alle ${xs.length} erfasst</span>`,
+    `<p class="klein">Checkliste 2026/27: SK-Studierende erhalten im Quartalspraktikum im Fach mit BE-Masterprüfung <b>zwingend</b> einen Fachbesuch (Phase II oder III). Sonst gilt im Quartal: nur Fachbesuch, wenn er im Profil noch nicht stattgefunden hat. Hier das Prüfungsfach eintragen – <b>MA</b> = Mathe-Besuch nötig, anderes Fach = Mathe nur, wenn im Profil nicht besucht. Gilt für alle, wird sofort gespeichert.</p>
+    <table class="liste"><thead><tr><th>Name</th><th>Stg.</th><th>Fächer</th><th>Profil</th><th>BE-Prüfungsfach</th><th>Besuch?</th><th>eingetragen</th></tr></thead><tbody>${xs.map(zeile).join("")}</tbody></table>`, !!fehlen);
+}
+async function beSetzen(id, fach) { if (await eintragen({ typ: "be_fach", person: id, fach })) meldung(fach ? `BE-Prüfungsfach ${fach} gespeichert.` : "BE-Prüfungsfach entfernt."); }
 function abschnitt(k, titel, status, inhalt, offen) {
   const o = lies("auf." + k), auf = o === "1" || (o !== "0" && offen);
   return `<details class="abschn" data-k="${k}" ${auf ? "open" : ""} ontoggle="merke('auf.${k}', this.open ? '1' : '0')"><summary><span class="abschn-t">${titel}</span><span class="abschn-s">${status || ""}</span></summary><div class="abschn-i">${inhalt}</div></details>`;
@@ -2990,7 +3026,8 @@ function ansichtAktualisieren() {
       + abschnitt("spez", "Spezialfälle", spezN ? ok(`${spezN} Fälle ${sjText(sj)}`) : off(`${sjText(sj)} noch nicht eingelesen`), `<p class="klein">Excel-Liste «Spezialfälle Besuchsplanung», die die Praktikumsabteilung für die Blockpraktika schickt. Solange ihr Aufbau gleich bleibt, liest die Seite sie direkt ein; was sie nicht zuordnen kann, meldet sie.</p>
     <p>Studienjahr <select id="spezJahr">${[...new Set([sj, ...jahre()])].map((j) => `<option ${j === sj ? "selected" : ""} value="${j}">${sjText(j)}</option>`).join("")}</select>
       <input type="file" id="dateiSpez" accept=".xlsx,.xls"> <button class="knopf haupt" id="importSpez">Einlesen</button></p>
-    <div class="import-ergebnis" id="ergSpez"></div>`, !spezN),
+    <div class="import-ergebnis" id="ergSpez"></div>`, !spezN)
+      + beAbschnitt(sj),
     regelnHalbtag: () => wann("<b>Wann?</b> Selten – Standard für die Zuteilung der Halbtagsbesuche («Vorschlag berechnen» in Halbtag › Zuteilung). Luzia kann sie dort für einen einzelnen Vorschlag abweichend setzen.")
       + abschnitt("rh", "Regeln für den Zuteilungsvorschlag", rhKurz(null).split(" · ").slice(0, 2).join(" · ") + " …", `<p class="klein leise">Änderungen werden sofort gespeichert.</p>${rhFelder("einst")}`, true),
     orte: () => { const fehlen = schulorte().filter((o) => !S.orte[o]).length;
@@ -3910,7 +3947,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261112-115521";
+const STAND = "20261112-121042";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
