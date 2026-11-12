@@ -2416,12 +2416,14 @@ function regelKasten(sj) {
 }
 /* Bereinigung «drei Fachbesuche – evtl. einen streichen und bei Studierenden mit nur einem Fachbesuch planen»:
    zeigt beim Termin, wer im selben Jahr noch einen 2. Fachbesuch braucht und Mathe hat (Rike, 12.11.2026) */
+/* Noch niemand gebucht, nicht besucht -> «Termin wählen» (auch von der Studierendenseite und der Kandidatenliste aus, Rike 12.11.2026) */
+function buchbar(y) { return !!y && !y.wer && !["besucht", "abgebrochen"].includes(y.stand) && y.gruppe !== "Halbtag" && y.jahr >= (S.einst.studienjahrFest || S.einst.studienjahr) && R.praktika.includes(y); }
 function tauschKandidaten(x) {
   if (!(x.bereinigung || []).some((f) => /drei Fachbesuchen/.test(f.regel))) return "";
   const k = R.praktika.filter((y) => y.jahr === x.jahr && y.gruppe === "Profil" && (y.bereinigung || []).some((f) => /Zweiter Fachbesuch/.test(f.regel)));
   if (!k.length) return "";
   return `<div class="klein" style="margin-top:3px">Stattdessen möglich (2. Fachbesuch erwünscht, Mathe im Fächerangebot):<br>${k.map((y) =>
-    `<span class="name" onclick="detailZeigen(REFS[${ref(y.person.id)}])">${esc(y.person.name)}</span> <span class="leise">${esc(y.schulort)}${y.wer ? " · schon bei " + esc(y.wer) : ""}</span>`).join("<br>")}</div>`;
+    `<span class="name" onclick="detailZeigen(REFS[${ref(y.person.id)}])">${esc(y.person.name)}</span> <span class="leise">${esc(y.schulort)}${y.wer ? " · schon bei " + esc(y.wer) : ""}</span>${buchbar(y) ? ` <button class="knopf klein" title="Alle möglichen Termine zeigen – anklicken bucht und öffnet das Praktikumstool" onclick="uebernehmen(${ref(y.idpraktikum)})">Termin wählen</button>` : ""}`).join("<br>")}</div>`;
 }
 async function regelOk(id) {
   const x = R.praktika.find((p) => p.idpraktikum === id);
@@ -2860,7 +2862,7 @@ function detailZeigen(id, oeffnen = true) {
       <td>${standChip(x)}${x.besuchsart === "Wertschätzung" ? ' <span class="klein leise">Wertschätzung</span>' : ""}${x.datum ? `<div class="leise klein">${datumText(x.datum)}</div>` : ""}
         ${x.berichte && x.berichte.length ? `<div style="margin-top:4px">${berichtLinks(x)}</div>` : ""}
         ${x.notizen.map(notiz).join("")}</td>
-      <td style="white-space:nowrap">${(S.ich && x.wer === S.ich) && x.stand !== "besucht" ? `<button class="knopf klein" title="Termin ändern oder wieder abgeben" onclick="anpassen(${ref(x.idpraktikum)})">Anpassen ▾</button>` : ""}
+      <td style="white-space:nowrap">${S.ich && buchbar(R.praktika.find((y) => y.idpraktikum === x.idpraktikum)) ? `<button class="knopf klein haupt" title="Alle möglichen Termine zeigen – anklicken bucht und öffnet das Praktikumstool" onclick="uebernehmen(${ref(x.idpraktikum)})">Termin wählen</button> ` : ""}${(S.ich && x.wer === S.ich) && x.stand !== "besucht" ? `<button class="knopf klein" title="Termin ändern oder wieder abgeben" onclick="anpassen(${ref(x.idpraktikum)})">Anpassen ▾</button>` : ""}
         ${x.link ? `<button class="knopf klein" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">Tool ↗</button>` : ""}
         <button class="knopf klein" title="Stand, Besucher/in oder Datum korrigieren, Abbruch eintragen" onclick="korrigieren(${ref(x.idpraktikum)})">✎ korrigieren</button></td></tr>`).join("")}
     </tbody></table>
@@ -3982,7 +3984,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261112-134534";
+const STAND = "20261112-135328";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
