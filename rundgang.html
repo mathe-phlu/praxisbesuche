@@ -578,8 +578,36 @@ function passtSuche(text, such) {
 }
 /* Mathe-Lektionen eines Praktikums, gefiltert nach Zeitraum, Wochentag, Tageszeit */
 /* Regeln aus der Checkliste der Praktikumsabteilung; unter «Aktualisieren → Regeln» je Studienjahr anpassbar */
-const REGELN_STD = { profilErsteTage: 3, quartalErsteTage: 7, letzterTag: true, maxProWoche: 2, besprechungMin: 30 };
+const REGELN_STD = { profilErsteTage: 3, quartalErsteTage: 7, letzterTag: true, maxProWoche: 2, besprechungMin: 30, ferienErsterHalbtag: true };
 function regel(k) { const r = S.einst.regeln || {}; return r[k] ?? REGELN_STD[k]; }
+/* Ferienunterbruch im Praktikum (Rike, 12.11.2026): mindestens 10 Tage ohne Mathe-Lektion = Ferien.
+   Der erste Halbtag danach (Montagvormittag der Woche, in der es weitergeht) ist kein Besuchstermin. */
+const FERIEN_CACHE = new WeakMap();
+function ferienEnden(x) {
+  const L = x.lektionen || [];
+  if (FERIEN_CACHE.has(L)) return FERIEN_CACHE.get(L);
+  const ds = [...new Set(L.map((l) => l.datum))].filter(Boolean).sort(), r = [];
+  for (let i = 1; i < ds.length; i++) {
+    const a = new Date(ds[i - 1] + "T12:00"), b = new Date(ds[i] + "T12:00");
+    if ((b - a) / 864e5 >= 10) { b.setDate(b.getDate() - ((b.getDay() + 6) % 7)); r.push(b.toISOString().slice(0, 10)); }
+  }
+  FERIEN_CACHE.set(L, r); return r;
+}
+function nachFerien(x, datum, zeit) { return regel("ferienErsterHalbtag") && vormittag(zeit) && ferienEnden(x).includes(datum); }
+/* Lektionen mit kurzer Pause dazwischen (bis 30 Min, keine andere Lektion dazwischen, gleiche Klasse) sind eine Doppellektion
+   (Rike, 12.11.2026, Fall Hotz: 9.15–10.00 und 10.20–11.05). Das Lesezeichen trennt bei mehr als 15 Min – hier zusammenfügen. */
+const PAUSE_DOPPEL = 30;
+function doppelMitPause(L) {
+  const r = [];
+  for (const l of L || []) {
+    const v = r[r.length - 1];
+    if (v && v.datum === l.datum && v.klasse === l.klasse && v.frei != null && v.frei <= PAUSE_DOPPEL && v.naechste === l.zeit)
+      r[r.length - 1] = { ...v, bis: l.bis, anzahl: (v.anzahl || 1) + (l.anzahl || 1), ids: [...(v.ids || [v.id]), ...(l.ids || [l.id])],
+        gebucht: [...(v.gebucht || []), ...(l.gebucht || [])], frei: l.frei, naechste: l.naechste, rest: l.rest, schluss: l.schluss, pause: (v.pause || 0) + v.frei };
+    else r.push(l);
+  }
+  return r;
+}
 const BESPRECHUNG_MIN_STD = 30;
 Object.defineProperty(window, "BESPRECHUNG_MIN", { get: () => Number(regel("besprechungMin")) || BESPRECHUNG_MIN_STD });
 function besprechung(l) { return l.frei === null || (l.frei !== undefined && l.frei >= BESPRECHUNG_MIN); }
@@ -625,7 +653,7 @@ function danachKurz(l) {
   return `<span class="rz-danach" title="danach noch ${l.rest} ${l.rest === 1 ? "Lektion" : "Lektionen"} bis ${esc(l.schluss)}">+${l.rest} L. bis ${esc(l.schluss.replace(/^0/, ""))}</span>`;
 }
 function blockText(l) {
-  const art = (l.anzahl || 1) > 1 ? `${l.anzahl}er-Lektion` : "Einzellektion";
+  const art = ((l.anzahl || 1) > 1 ? `${l.anzahl}er-Lektion` : "Einzellektion") + (l.pause ? ` (mit ${l.pause} Min Pause)` : "");
   const danach = l.frei === null ? "danach kein Unterricht" : l.frei === undefined ? "" : (l.frei >= BESPRECHUNG_MIN ? `danach ${l.frei} Min frei` : `danach ${l.frei} Min Pause`)
     + (l.rest ? `, dann noch ${l.rest} ${l.rest === 1 ? "Lektion" : "Lektionen"} bis ${l.schluss}` : "");
   return `${kurzDatum(l.datum)} ${l.zeit}–${l.bis || ""} · ${art}${l.klasse ? " · Kl. " + l.klasse : ""}${danach ? " · " + danach : ""}`;
@@ -919,8 +947,9 @@ async function allesLaden() {
     // Halbtag: nur wer in dieser Periode gar keine eigene Mathe-Lektion hat, fällt weg. Alles Unklare bleibt drin
     // (lieber eine Person zu viel) – Fehleinträge entfernt man von Hand mit ✕.
     if (p.gruppe === "Halbtag" && !eigene.length && !matheBesuch) { S.nurHosp.push(p); S.praktika[p.idpraktikum] = { ...p, lektionen: eigene, ausblendGrund: "unterrichtet in dieser Periode kein Mathe (nur Hospitation/Besprechung)" }; continue; }
-    if (eigene.length === p.lektionen.length) continue;
-    S.praktika[p.idpraktikum] = { ...p, lektionen: eigene, hospitationen: p.lektionen.length - eigene.length };
+    const zus = doppelMitPause(eigene);
+    if (eigene.length === p.lektionen.length && zus.length === eigene.length) continue;
+    S.praktika[p.idpraktikum] = { ...p, lektionen: zus, ...(eigene.length < p.lektionen.length ? { hospitationen: p.lektionen.length - eigene.length } : {}) };
   }
   // Quartal: das Praktikumstool führt Teil 1 und Teil 2 mit eigener Nummer – hier ist das ein einziges Quartalspraktikum
   S.alias = {};
@@ -1147,8 +1176,9 @@ function standBestimmen(x, altBesuch) {
       if (!d) continue;   // Mentor/in o.ä. in einer Mathe-Lektion: zählt nicht als Fachdidaktik-Besuch
       if (!wer) wer = d.kuerzel;
       if (d.kuerzel === wer) {
-        const l = (x.lektionen || []).find((l) => l.datum === v.datum && l.zeit === v.zeit) || {};
-        termin ||= { datum: v.datum, zeit: v.zeit, bis: l.bis || "", lektion: l.id || "", imTool: true };
+        // Lektion = Block, in dem der Besuch liegt (Doppellektion: auch die zweite Lektion)
+        const l = (x.lektionen || []).find((l) => l.datum === v.datum && (l.zeit === v.zeit || (l.zeit < v.zeit && v.zeit < (l.bis || "")))) || {};
+        if (!termin) termin = { datum: v.datum, zeit: l.zeit || v.zeit, bis: l.bis || "", lektion: l.id || "", imTool: true };
       }
       stand = v.datum < new Date().toISOString().slice(0, 10) ? "besucht" : "gebucht";
       if (stand === "besucht" && !datum) datum = v.datum;
@@ -1204,6 +1234,13 @@ function standBestimmen(x, altBesuch) {
       if (toolBuchung.termin.datum !== termin.datum || (termin.zeit && toolBuchung.termin.zeit !== termin.zeit)) x.toolAbweichung = toolBuchung.termin;
     } else if (!toolBuchung) x.toolFehlt = true;
   }
+  // Doppellektion, im Tool aber nur ein Teil gebucht (Fall Hotz, 12.11.2026)
+  x.halbGebucht = null;
+  if (toolBuchung && x.stand === "gebucht" && termin && termin.imTool) {
+    const l = (x.lektionen || []).find((l) => l.datum === termin.datum && l.zeit === termin.zeit);
+    const n = (x.besuche || []).filter((v) => v.fach === "MA" && v.datum === termin.datum && v.zeit >= termin.zeit && v.zeit < ((l && l.bis) || termin.zeit + "~") && teamKuerzel(v.dozent) === wer).length;
+    if (l && (l.anzahl || 1) > 1 && n && n < l.anzahl) x.halbGebucht = { gebucht: n, anzahl: l.anzahl, l };
+  }
   x.besuchtVon = wer && (x.stand === "besucht" || x.stand === "übernommen" || x.stand === "gebucht") ? [wer] : [];
   x.notizen = x.eintraege.filter((e) => e.typ === "notiz");
   // Berichte: je Dateiname der neueste Eintrag; «bericht_weg» entfernt ihn
@@ -1228,8 +1265,16 @@ function noetigBestimmen(x) {
     const regulaer = profile.some((y) => (y.stand === "besucht" || (y.stand === "gebucht" && (y.jahr || "") < x.jahr)) && y.besuchsart !== "Wertschätzung");
     const laeuft = profile.some((y) => y.jahr === x.jahr && y.stand !== "besucht");
     const erneut = p.alt && p.alt.erneut;
+    // Spezialfall «Mentoratsbesuch + beide/drei Studienfächer» (SK-Quartal) nennt kein Fach: Mathe ist nur nötig,
+    // wenn Mathe im Profil noch nicht besucht wurde (Rike, 12.11.2026, Fälle Dihr und Wyrsch). Nennt der Hinweis MA, gilt er.
+    x.spezialErfuellt = null;
+    const nurFaecher = (f) => spez.includes(f) && f.stufe === "zwingend" && /Studienfächer/.test(f.hinweis || "") && !/\bMA\b|Fachbesuche zwingend/.test(f.hinweis || "");
+    if (regulaer && !erneut && x.achtung.some(nurFaecher)) {
+      x.spezialErfuellt = x.achtung.filter(nurFaecher);
+      x.achtung = x.achtung.filter((f) => !nurFaecher(f));
+    }
     if (erneut) { n = "ja"; warum = "soll erneut besucht werden (alte Liste)"; }
-    else if (regulaer) { n = "nein"; warum = "im Profil schon besucht"; }
+    else if (regulaer) { n = "nein"; warum = "im Profil schon besucht" + (x.spezialErfuellt ? ` (Spezialfall «${x.spezialErfuellt[0].hinweis}»: Mathe damit abgedeckt)` : ""); }
     else if (laeuft) { n = "später"; warum = "Profil läuft noch"; }
     else { n = "ja"; warum = profile.length ? "im Profil nicht regulär besucht" : "kein Profilbesuch bekannt"; }
   } else { n = "ja"; warum = x.gruppe; }
@@ -1749,7 +1794,7 @@ async function uebernehmen(i, nurTermin = false) {
   meldung(nurTermin ? "Termin geändert." : "Übernommen.");
 }
 /* Termine, die nach der Checkliste nie gehen – sie werden gar nicht angeboten */
-function terminGesperrt(x, datum, zeit) {
+function terminGesperrt(x, datum, zeit, nurDatum) {
   const von = datumAus(x.von), bis = datumAus(x.bis);
   if (von && datum < von) return "vor Beginn des Praktikums";
   if (bis && datum > bis) return "nach Ende des Praktikums";
@@ -1765,6 +1810,8 @@ function terminGesperrt(x, datum, zeit) {
   if (von && x.gruppe === "Quartal" && ersteKal) { const e = new Date(von + "T12:00"); e.setDate(e.getDate() + ersteKal); if (datum < e.toISOString().slice(0, 10)) return "erste Praktikumswoche"; }
   const arb = x.gruppe === "Profil" ? S.einst.arbeitssitzungProfil : x.gruppe === "Quartal" ? S.einst.arbeitssitzungQuartal : "";
   if (arb && datum === arb && vormittag(zeit)) return "Vormittag der Arbeitssitzung";
+  if (nachFerien(x, datum, zeit)) return "erster Halbtag nach den Ferien";
+  if (nurDatum) return "";
   return besuchsRegeln(x, datum, zeit)[0] || "";
 }
 /* Die Person: nicht 2 Besuche am selben Tag, höchstens 2 pro Woche – gezählt werden nur Besuche des Teams.
@@ -1802,6 +1849,7 @@ function terminWarnungen(x, datum, zeit) {
   if (von && x.gruppe === "Quartal") { const e = new Date(von + "T12:00"); e.setDate(e.getDate() + 7); if (datum < e.toISOString().slice(0, 10)) w.push("nicht in der ersten Praktikumswoche"); }
   const arb = x.gruppe === "Profil" ? S.einst.arbeitssitzungProfil : x.gruppe === "Quartal" ? S.einst.arbeitssitzungQuartal : "";
   if (arb && datum === arb && vormittag(zeit)) w.push("Vormittag der Arbeitssitzung");
+  if (nachFerien(x, datum, zeit)) w.push("nicht am ersten Halbtag nach den Ferien");
   // eigene Besuche: in der Regel ein Besuch pro Halbtag
   // ausser genau zur selben Zeit (Doppelbesuch: zwei Studierende in derselben Lektion)
   const meine = R.praktika.filter((y) => y !== x && y.wer === S.ich && y.termin && y.termin.datum === datum && y.termin.zeit !== zeit && vormittag(y.termin.zeit) === vormittag(zeit));
@@ -2259,7 +2307,7 @@ function ansichtTermine() {
 function pruefKasten(sj) {
   const spaet = R.praktika.filter((x) => x.jahr === sj && S.ich && x.wer && x.wer !== S.ich && (x.doppelt || []).includes(S.ich));
   const abw = R.praktika.filter((x) => x.jahr === sj && S.ich && x.wer === S.ich && (x.toolAbweichung || x.toolFehlt));
-  let h = "";
+  let h = regelKasten(sj);
   if (spaet.length) h += `<div class="karte" style="border:2px solid var(--achtung);margin-bottom:14px"><b class="rot">⚠ Jemand war schneller</b>
     <p class="klein" style="margin:4px 0 8px">Diese Personen hast du übernommen, aber jemand anderes kurz vor dir. Bitte deine Buchung im Praktikumstool wieder austragen – oder mit der Person sprechen. Danach hier «erledigt».</p>
     <table class="liste"><tbody>${spaet.map((x) => `<tr><td><span class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</span></td><td>${esc(praktKurz(x))}</td>
@@ -2271,6 +2319,33 @@ function pruefKasten(sj) {
       <td class="klein">hier: <b>${esc(kurzDatum(x.termin.datum) + " " + (x.termin.zeit || ""))}</b> · im Tool: <b>${x.toolAbweichung ? esc(kurzDatum(x.toolAbweichung.datum) + " " + (x.toolAbweichung.zeit || "")) : "kein Besuch von dir eingetragen"}</b></td>
       <td style="white-space:nowrap">${x.toolAbweichung ? `<button class="knopf klein" onclick="toolTerminUebernehmen(${ref(x.idpraktikum)})">Termin aus dem Tool übernehmen</button> ` : ""}${x.link ? `<button class="knopf klein" onclick="toolOeffnen(${ref(toolLink(x, x.termin && x.termin.lektion))})">${x.toolAbweichung ? "Im Tool ändern ↗" : "Im Tool eintragen ↗"}</button>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
   return h;
+}
+/* Gebuchte Termine, die nicht zur Checkliste passen (meist direkt im Praktikumstool gebucht) oder Doppellektion nur halb gebucht.
+   Eigene unter Meine Termine; alh sieht zusätzlich die des Teams (Rike, 12.11.2026: Fälle Mboup, Schelker, Hotz). */
+function terminProbleme(x) {
+  if (!x.termin || !x.termin.datum || !x.wer || !["gebucht", "übernommen"].includes(x.stand)) return [];
+  const p = [];
+  const g = terminGesperrt(x, x.termin.datum, x.termin.zeit, true);
+  if (g) p.push(g);
+  if (x.halbGebucht) p.push(`Doppellektion ${x.halbGebucht.l.zeit}–${x.halbGebucht.l.bis}, im Tool nur ${x.halbGebucht.gebucht} von ${x.halbGebucht.anzahl} Lektionen gebucht`);
+  const ok = x.eintraege.filter((e) => e.typ === "regel_ok" && e.termin === x.termin.datum + " " + x.termin.zeit);
+  return ok.length ? [] : p;
+}
+function regelKasten(sj) {
+  const alle = R.praktika.filter((x) => x.jahr === sj && terminProbleme(x).length);
+  const meine = alle.filter((x) => x.wer === S.ich), team = S.ich === "alh" ? alle.filter((x) => x.wer !== S.ich) : [];
+  if (!meine.length && !team.length) return "";
+  const zeile = (x, eigen) => `<tr><td>${esc(kurzDatum(x.termin.datum) + " " + (x.termin.zeit || ""))}</td><td><span class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</span></td><td>${esc(praktKurz(x))}${eigen ? "" : " · <b>" + esc(x.wer) + "</b>"}</td>
+      <td class="klein rot">${esc(terminProbleme(x).join(" · "))}</td>
+      <td style="white-space:nowrap">${x.link ? `<button class="knopf klein" onclick="toolOeffnen(${ref(toolLink(x, x.termin.lektion || ""))})">Tool ↗</button> ` : ""}${eigen ? `<button class="knopf klein" title="Bewusst so gebucht (z.B. abgesprochen) – Hinweis nicht mehr zeigen" onclick="regelOk(${ref(x.idpraktikum)})">passt so ✕</button>` : ""}</td></tr>`;
+  return `<div class="karte" style="border:2px solid var(--achtung);margin-bottom:14px"><b class="rot">⚠ Termin passt nicht zur Checkliste</b>
+    <p class="klein" style="margin:4px 0 8px">So steht es im Praktikumstool (Stand letztes Holen). Bitte im Tool anpassen – nach dem nächsten Holen verschwindet der Hinweis. War es so abgesprochen: «passt so».</p>
+    <table class="liste"><tbody>${meine.map((x) => zeile(x, true)).join("")}${team.length ? `<tr><td colspan="5" class="klein leise" style="padding-top:8px">im Team (nur für dich sichtbar):</td></tr>` + team.map((x) => zeile(x, false)).join("") : ""}</tbody></table></div>`;
+}
+async function regelOk(id) {
+  const x = R.praktika.find((p) => p.idpraktikum === id);
+  if (!x || !x.termin) return;
+  if (await eintragen({ typ: "regel_ok", praktikum: id, termin: x.termin.datum + " " + x.termin.zeit })) meldung("Hinweis ausgeblendet.");
 }
 function wegKasten(sj) {
   const w = (R.wegGebucht || []).filter((x) => x.wer === S.ich && x.jahr === sj);
@@ -2876,7 +2951,7 @@ function ansichtAktualisieren() {
       + abschnitt("check", "Checkliste der Praktikumsabteilung", `<span id="aktCheck">…</span>`, `<p class="klein">Die aktuelle Fassung als PDF im Ordner ablegen, damit alle sie haben.</p>
     <p><input type="file" id="dateiCheck" accept=".pdf"> <button class="knopf" id="checkAblegen">Ablegen</button></p>
     <div id="dokumente" class="klein"></div>`, false)
-      + abschnitt("regeln", "Regeln aus der Checkliste", `Profil ab Tag ${Number(regel("profilErsteTage")) + 1} · Quartal ab Tag ${Number(regel("quartalErsteTage")) + 1} · max. ${esc(regel("maxProWoche"))} pro Woche`, `<p class="klein leise">Termine, die dagegen verstossen, bietet die Seite beim Buchen nicht an. Änderungen werden sofort gespeichert.</p>
+      + abschnitt("regeln", "Regeln aus der Checkliste", `Profil ab Tag ${Number(regel("profilErsteTage")) + 1} · Quartal ab Tag ${Number(regel("quartalErsteTage")) + 1} · max. ${esc(regel("maxProWoche"))} pro Woche · nicht am ersten Halbtag nach Ferien`, `<p class="klein leise">Termine, die dagegen verstossen, bietet die Seite beim Buchen nicht an. Änderungen werden sofort gespeichert.</p>
     <table class="regeln">
       <tr><td>Arbeitssitzung Profil (Vormittag, keine Besuche)</td><td><input class="eingabe" type="date" id="eArbP" value="${esc(e.arbeitssitzungProfil || "")}"></td></tr>
       <tr><td>Arbeitssitzung Quartal (Vormittag, keine Besuche)</td><td><input class="eingabe" type="date" id="eArbQ" value="${esc(e.arbeitssitzungQuartal || "")}"></td></tr>
@@ -3810,7 +3885,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261111-164645";
+const STAND = "20261112-111731";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
