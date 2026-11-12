@@ -302,6 +302,7 @@ table.liste td.name:hover { text-decoration: underline; }
 .achtung { color: var(--achtung); font-weight: 700; cursor: help; }
 .zeile-achtung td:first-child { box-shadow: inset 4px 0 0 var(--achtung); }
 .hinweis { background: var(--achtung-hell); color: var(--achtung); padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+.hinweis.gelb { background: #fdf3cf; color: #6f5600; }
 .karte { background: #fff; border: 1px solid var(--linie); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
 .karte h3 { margin-top: 0; }
 .start { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
@@ -2356,11 +2357,11 @@ function ansichtTermine() {
   ${pruefKasten(sj)}${wegKasten(sj)}
   ${meine.length ? `<table class="liste"><thead><tr><th>Tag</th><th>Zeit</th><th>Name</th><th>Prakt.</th><th>Schule</th><th>Stand</th><th>Hinweise</th><th></th></tr></thead><tbody>
   ${Object.entries(tage).map(([d, xs]) => xs.map((x, i) => { const w0 = x.termin ? terminWarnungen(x, x.termin.datum, x.termin.zeit) : [];
-    const pb = terminProbleme(x), w = hinweisErledigt(x) ? [] : [...pb, ...w0.filter((t) => !pb.some((p) => p.includes(t.replace(/^nicht (an den |am |in der )?/, ""))))];
+    const pb = terminProbleme(x), gelb = terminUnsicher(x), w = hinweisErledigt(x) ? [] : [...pb, ...w0.filter((t) => !(gelb.length && /ersten .* Praktikumstagen/.test(t)) && !pb.some((p) => p.includes(t.replace(/^nicht (an den |am |in der )?/, ""))))];
     return `<tr class="${farbKlasse(x)}"><td style="white-space:nowrap">${i === 0 ? `<b>${esc(tagText(d))}</b>` : ""}</td><td>${esc(x.termin ? x.termin.zeit : "")}</td>
     <td><span class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</span>${kontakteZelle(x)}</td><td>${praktChip(x)}</td>
     <td>${esc(x.schulort)}<div class="leise klein">${esc(x.schulhaus)}</div></td><td>${standChip(x, true, true)}</td>
-    <td>${w.map((t) => `<div class="hinweis">⚠ ${esc(t)}</div>`).join("")}${tauschKandidaten(x)}${w.length ? `<button class="knopf klein" style="margin-top:3px" title="Erledigt (im Tool angepasst) oder bewusst so – Hinweise zu diesem Termin ausblenden, auch das ⚠ in den Listen. Bei einem neuen Termin erscheinen sie wieder, falls sie dann noch zutreffen." onclick="regelOk(${ref(x.idpraktikum)})">erledigt ✕</button>` : ""}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`; }).join("")).join("")}
+    <td>${w.map((t) => `<div class="hinweis">⚠ ${esc(t)}</div>`).join("")}${gelb.map((t) => `<div class="hinweis gelb">? ${esc(t)}</div>`).join("")}${tauschKandidaten(x)}${w.length || gelb.length ? `<button class="knopf klein" style="margin-top:3px" title="Erledigt (im Tool angepasst) oder bewusst so – Hinweise zu diesem Termin ausblenden, auch das ⚠ in den Listen. Bei einem neuen Termin erscheinen sie wieder, falls sie dann noch zutreffen." onclick="regelOk(${ref(x.idpraktikum)})">erledigt ✕</button>` : ""}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`; }).join("")).join("")}
   </tbody></table>` : `<div class="leer">Noch keine Besuche übernommen.</div>`}
   ${reiseplanTeil()}`;
 }
@@ -2389,10 +2390,18 @@ function terminProbleme(x) {
   if (!x.termin || !x.termin.datum || !x.wer || !["gebucht", "übernommen"].includes(x.stand)) return [];
   const p = [];
   const g = terminGesperrt(x, x.termin.datum, x.termin.zeit, true);
-  if (g) p.push(g);
+  if (g && !(sonderProfil(x) && /^erste /.test(g))) p.push(g);
   for (const f of x.bereinigung || []) p.push("Praktikumsabteilung: " + f.regel.split(/ → /)[0] + (f.regel.includes(" → ") ? " – " + f.regel.split(/ → /)[1] : ""));
   if (x.halbGebucht) p.push(`Doppellektion ${x.halbGebucht.l.zeit}–${x.halbGebucht.l.bis}, im Tool nur ${x.halbGebucht.gebucht} von ${x.halbGebucht.anzahl} Lektionen gebucht`);
   return hinweisErledigt(x) ? [] : p;
+}
+/* Sonder-Profilpraktikum (nicht das reguläre «srfach3», z.B. Schelker SF/zsffpp 15.02.–05.03.2027): die offizielle Bereinigungsliste
+   prüft es nicht; ob «nicht an den ersten 3 Praktikumstagen» gilt, ist unklar -> gelber Hinweis statt rot (Rike, 12.11.2026) */
+function sonderProfil(x) { return x.gruppe === "Profil" && !!x.prid && x.prid !== "srfach3" && !(x.bereinigung || []).length; }
+function terminUnsicher(x) {
+  if (!x.termin || !x.termin.datum || !sonderProfil(x) || hinweisErledigt(x)) return [];
+  const g = terminGesperrt(x, x.termin.datum, x.termin.zeit, true);
+  return /^erste /.test(g || "") ? [`Verstösst eigentlich gegen die Regel «Nicht an den ersten ${Number(regel("profilErsteTage")) || 3} Praktikumstagen». Unsicher, ob das für ${x.person.name} (Sonderpraktikum ${x.person.studiengang || x.prid}) auch gilt. In der offiziellen Bereinigungsliste wurde es nicht angekreidet.`] : [];
 }
 function regelKasten(sj) {
   const alle = R.praktika.filter((x) => x.jahr === sj && terminProbleme(x).length);
@@ -3973,7 +3982,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261112-121812";
+const STAND = "20261112-134534";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
