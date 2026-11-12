@@ -2204,12 +2204,13 @@ function filterLeiste(ansicht, anzahl) {
       <select onchange="setzeFilter('umKm',this.value)">${opt([["", "– km"], ["5", "5 km"], ["10", "10 km"], ["15", "15 km"], ["20", "20 km"], ["30", "30 km"], ["50", "50 km"]], fw("umKm", ""))}</select>
       ${orte.length ? "" : '<span class="leise klein">Orte zuerst unter «Aktualisieren» suchen lassen.</span>'}</div>`;
   // Weitere
-  const weitereAktiv = [fw("name", "") && "Name «" + fw("name", "") + "»", fw("nichtVonMir", true) && "nicht von mir besucht", fw("nurMeine", false) && "nur meine", fw("nurAchtung", false) && "nur ⚠"].filter(Boolean);
+  const weitereAktiv = [fw("name", "") && "Name «" + fw("name", "") + "»", fw("nichtVonMir", true) && "nicht von mir besucht", fw("nurMeine", false) && "nur meine", fw("nurAchtung", false) && "nur ⚠", fw("nurBereinigung", false) && "nur Bereinigung"].filter(Boolean);
   const weitere = `<div class="fblock"><span class="ftitel">Name</span><input type="search" value="${esc(fw("name", ""))}" onchange="setzeFilter('name',this.value)" placeholder="Name, Studiengang, Fach"></div>
     <div class="fblock haken-liste">
       <label class="haken"><input type="checkbox" ${fw("nichtVonMir", true) ? "checked" : ""} onchange="setzeFilter('nichtVonMir',this.checked)"> nicht schon von mir besucht</label>
       <label class="haken"><input type="checkbox" ${fw("nurMeine", false) ? "checked" : ""} onchange="setzeFilter('nurMeine',this.checked)"> nur meine</label>
-      <label class="haken"><input type="checkbox" ${fw("nurAchtung", false) ? "checked" : ""} onchange="setzeFilter('nurAchtung',this.checked)"> nur ⚠ Spezialfälle</label></div>`;
+      <label class="haken"><input type="checkbox" ${fw("nurAchtung", false) ? "checked" : ""} onchange="setzeFilter('nurAchtung',this.checked)"> nur ⚠ Spezialfälle</label>
+      <label class="haken" title="Alle Termine aller Dozierenden, die in der Bereinigungsliste der Praktikumsabteilung noch offen sind – unabhängig von Stand und «nötig»"><input type="checkbox" ${fw("nurBereinigung", false) ? "checked" : ""} onchange="setzeFilter('nurBereinigung',this.checked)"> nur offene Bereinigung</label></div>`;
   const gruppe = (titel, inhalt) => `<section class="fsek"><h4>${titel}</h4>${inhalt}</section>`;
   const klapp = (titel, aktiv, inhalt) => { const offen = S.offeneGruppen ? S.offeneGruppen.has(titel) : false;
     return `<details class="fsek" ${offen ? "open" : ""} ontoggle="gruppeMerken('${titel}',this.open)"><summary><h4>${titel}</h4>${aktiv.length ? `<span class="faktiv">${esc(aktiv.join(" · "))}</span>` : ""}</summary>${inhalt}</details>`; };
@@ -2230,8 +2231,9 @@ function aktivLeiste(ansicht, anzahl) {
     ? fa(k).filter((v) => optionen(k).includes(v)).map((v) => `<button type="button" class="fchip ${filterAussehen(k, v)} an" onclick="umschalten('${k}','${v}')" title="${esc(TEXT[v] || v)} abwählen">${esc(TEXT[v] || v)} ✕</button>`).join(" ")
     : `<button type="button" class="aktivchip" onclick="filterWeg('${k}')" title="Filter zurücksetzen">keins ✕</button>`}</span>`);
   if (ansicht === "planung" && !alleGewaehlt("praktika")) wegKaesten("praktika", "Praktikum");
-  if (ansicht === "planung" && !alleGewaehlt("noetig")) wegKaesten("noetig", "Besuch");
-  if (!alleGewaehlt("stand")) wegKaesten("stand", "Stand");
+  const nurBer = ansicht === "planung" && fw("nurBereinigung", false);   // dann gelten Besuch/Stand/«nicht von mir» nicht
+  if (ansicht === "planung" && !nurBer && !alleGewaehlt("noetig")) wegKaesten("noetig", "Besuch");
+  if (!nurBer && !alleGewaehlt("stand")) wegKaesten("stand", "Stand");
   if (ansicht === "halbtag" && !alleGewaehlt("perioden")) wegKaesten("perioden", "Periode");
   const pl = ansicht === "planung";
   if (pl && fw("von", "")) weg("von", "ab " + kurzDatum(fw("von", "")));
@@ -2245,9 +2247,12 @@ function aktivLeiste(ansicht, anzahl) {
   if (pl && fw("ort", "")) weg("ort", "Ort: " + fw("ort", ""));
   if (pl && fw("umOrt", "") && fw("umKm", "")) weg("umKm", `${fw("umKm", "")} km um ${fw("umOrt", "")}`);
   if (fw("name", "")) weg("name", "Name: " + fw("name", ""));
-  if (pl && fw("nichtVonMir", true)) c.push(`<button type="button" class="aktivchip" onclick="setzeFilter('nichtVonMir',false)" title="Filter ausschalten">nicht schon von mir besucht ✕</button>`);
+  if (pl && !nurBer && fw("nichtVonMir", true)) c.push(`<button type="button" class="aktivchip" onclick="setzeFilter('nichtVonMir',false)" title="Filter ausschalten">nicht schon von mir besucht ✕</button>`);
   if (fw("nurMeine", false)) weg("nurMeine", "nur meine");
   if (pl && fw("nurAchtung", false)) weg("nurAchtung", "nur ⚠");
+  if (pl && fw("nurBereinigung", false)) c.unshift(`<button type="button" class="aktivchip" onclick="setzeFilter('nurBereinigung',false)" title="Filter ausschalten">nur offene Bereinigung, alle Dozierenden ✕</button>`);
+  else if (pl) { const nb = R.praktika.filter((x) => x.jahr === fw("jahr", S.einst.studienjahr) && bereinigungOffen(x)).length;
+    if (nb) c.push(`<button type="button" class="knopf klein" style="border-color:var(--achtung);color:var(--achtung)" onclick="setzeFilter('nurBereinigung',true)" title="Alle Termine aller Dozierenden zeigen, die in der Bereinigungsliste noch offen sind (Frist 17.11.)">⚠ Bereinigung offen: ${nb}</button>`); }
   return `<div class="aktivleiste"><b>${anzahl}</b> ${anzahl === 1 ? "Eintrag" : "Einträge"}${c.length ? " · " + c.join(" ") : ' <span class="leise klein">· keine Einschränkung</span>'}
     <span style="margin-left:auto"></span><button class="knopf klein" onclick="listeKopieren()" title="Kopiert die Liste, so wie sie gerade gefiltert ist, in die Zwischenablage – danach in Excel oder eine Mail einfügen (Cmd+V / Ctrl+V)">Liste für Excel kopieren</button></div>`;
 }
@@ -2255,7 +2260,7 @@ function filterWeg(k) { delete S.filter[fk(k)]; merke("filter", JSON.stringify(S
 }
 function gruppeMerken(titel, offen) { S.offeneGruppen ||= new Set(JSON.parse(lies("offen") || "[]")); setTimeout(() => merke("offen", JSON.stringify([...S.offeneGruppen])), 0); offen ? S.offeneGruppen.add(titel) : S.offeneGruppen.delete(titel); }
 function filterLeeren() {
-  for (const k of ["praktika", "noetig", "stand", "von", "bis", "tage", "tageszeit", "lektart", "bespr", "perioden", "ort", "umOrt", "umKm", "name", "nichtVonMir", "nurMeine", "nurAchtung"]) delete S.filter[fk(k)];
+  for (const k of ["praktika", "noetig", "stand", "von", "bis", "tage", "tageszeit", "lektart", "bespr", "perioden", "ort", "umOrt", "umKm", "name", "nichtVonMir", "nurMeine", "nurAchtung", "nurBereinigung"]) delete S.filter[fk(k)];
   merke("filter", JSON.stringify(S.filter)); zeichnen();
 }
 
@@ -2266,6 +2271,8 @@ function listeKopieren() {
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => meldung("Liste kopiert – in Excel oder eine Mail einfügen."), ersatz);
   else ersatz();
 }
+/* Offene Punkte aus der Bereinigungsliste der Praktikumsabteilung (nicht mit «erledigt ✕» ausgeblendet) – Filter für alle (Rike, 12.11.2026) */
+function bereinigungOffen(x) { return (x.bereinigung || []).length > 0 && !hinweisErledigt(x); }
 function filtern(liste, ansicht) {
   const sj = fw("jahr", S.einst.studienjahr);
   const pl = ansicht === "planung", von = pl ? fw("von", "") : "", bis = pl ? fw("bis", "") : "";
@@ -2273,14 +2280,17 @@ function filtern(liste, ansicht) {
   const noetig = fa("noetig"), stand = fa("stand"), perioden = fa("perioden");
   const mitZt = ztStandDa();
   const standGruppe = (x) => x.stand === "besucht" ? "besucht" : ["übernommen", "gebucht"].includes(x.stand) ? "eingeteilt" : mitZt && ztOffen(x) ? "zugeteilt" : "offen";
+  const nurBer = pl && fw("nurBereinigung", false);
   return liste.filter((x) => {
     if (x.jahr !== sj) return false;
-    if (ansicht === "planung") {
+    // nur Bereinigung: alle betroffenen Termine, egal ob nötig/offen/gebucht und von wem
+    if (nurBer) { if (!bereinigungOffen(x)) return false; }
+    else if (ansicht === "planung") {
       const n = x.noetig === "später" ? "nein" : x.noetig;
       if (!noetig.includes(n)) return false;
     }
     if (ansicht === "halbtag" && perioden.length) { const pe = periode(x); if (pe !== "Spezial" && !perioden.some((p) => p === "SK" ? /^Einzel/.test(pe) : pe === "Periode " + p)) return false; }
-    if (!stand.includes(standGruppe(x))) return false;
+    if (!nurBer && !stand.includes(standGruppe(x))) return false;
     // Zeitraum: Praktikum muss hineinfallen; mit Stundenplan zusätzlich eine passende freie Mathe-Lektion
     if (von && datumAus(x.bis) && datumAus(x.bis) < von) return false;
     if (bis && datumAus(x.von) && datumAus(x.von) > bis) return false;
@@ -2288,7 +2298,7 @@ function filtern(liste, ansicht) {
     if (pl && fw("ort", "") && !passtSuche([x.schulort, x.schulhaus].join(" "), fw("ort", "").toLowerCase().trim())) return false;
     if (pl && fw("umOrt", "") && fw("umKm", "")) { const d = km(fw("umOrt", ""), x.schulort); if (d == null || d > Number(fw("umKm", ""))) return false; }
     if (fw("name", "") && !passtSuche([x.person.name, x.person.studiengang, (x.faecher || []).join(" ")].join(" "), fw("name", "").toLowerCase().trim())) return false;
-    if (pl && fw("nichtVonMir", true) && S.ich && x.wer !== S.ich && x.person.praktika.some((y) => y !== x && y.besuchtVon.includes(S.ich))) return false;
+    if (pl && !nurBer && fw("nichtVonMir", true) && S.ich && x.wer !== S.ich && x.person.praktika.some((y) => y !== x && y.besuchtVon.includes(S.ich))) return false;
     if (fw("nurMeine", false) && (!S.ich || (x.wer !== S.ich && !mirZugeteilt(x)))) return false;
     if (pl && fw("nurAchtung", false) && !(x.achtung && x.achtung.length)) return false;
     return true;
@@ -3984,7 +3994,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261112-135328";
+const STAND = "20261112-151706";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
