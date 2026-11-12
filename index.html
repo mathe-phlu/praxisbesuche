@@ -2316,11 +2316,12 @@ function ansichtTermine() {
     <button class="knopf klein" onclick="kalAlleLaden()" title="Alle kommenden gebuchten Besuche als Kalenderdatei – doppelklicken, dann übernimmt Outlook sie">📅 Alle Termine für Outlook</button></div>
   ${pruefKasten(sj)}${wegKasten(sj)}
   ${meine.length ? `<table class="liste"><thead><tr><th>Tag</th><th>Zeit</th><th>Name</th><th>Prakt.</th><th>Schule</th><th>Stand</th><th>Hinweise</th><th></th></tr></thead><tbody>
-  ${Object.entries(tage).map(([d, xs]) => xs.map((x, i) => { const w = x.termin ? terminWarnungen(x, x.termin.datum, x.termin.zeit) : [];
+  ${Object.entries(tage).map(([d, xs]) => xs.map((x, i) => { const w0 = x.termin ? terminWarnungen(x, x.termin.datum, x.termin.zeit) : [];
+    const pb = terminProbleme(x), w = [...pb, ...w0.filter((t) => !pb.some((p) => p.includes(t.replace(/^nicht (an den |am |in der )?/, ""))))];
     return `<tr class="${farbKlasse(x)}"><td style="white-space:nowrap">${i === 0 ? `<b>${esc(tagText(d))}</b>` : ""}</td><td>${esc(x.termin ? x.termin.zeit : "")}</td>
     <td><span class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</span>${kontakteZelle(x)}</td><td>${praktChip(x)}</td>
     <td>${esc(x.schulort)}<div class="leise klein">${esc(x.schulhaus)}</div></td><td>${standChip(x, true, true)}</td>
-    <td>${w.map((t) => `<div class="hinweis">⚠ ${esc(t)}</div>`).join("")}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`; }).join("")).join("")}
+    <td>${w.map((t) => `<div class="hinweis">⚠ ${esc(t)}</div>`).join("")}${pb.length ? `<button class="knopf klein" style="margin-top:3px" title="Bewusst so gebucht (z.B. abgesprochen) – Hinweis nicht mehr zeigen" onclick="regelOk(${ref(x.idpraktikum)})">passt so ✕</button>` : ""}</td><td style="white-space:nowrap">${aktionen(x)}</td></tr>`; }).join("")).join("")}
   </tbody></table>` : `<div class="leer">Noch keine Besuche übernommen.</div>`}
   ${reiseplanTeil()}`;
 }
@@ -2330,7 +2331,7 @@ function ansichtTermine() {
 function pruefKasten(sj) {
   const spaet = R.praktika.filter((x) => x.jahr === sj && S.ich && x.wer && x.wer !== S.ich && (x.doppelt || []).includes(S.ich));
   const abw = R.praktika.filter((x) => x.jahr === sj && S.ich && x.wer === S.ich && (x.toolAbweichung || x.toolFehlt));
-  let h = regelKasten(sj);
+  let h = "";   // Checkliste/Bereinigung stehen beim Termin selbst (Rike, 12.11.2026), kein Kasten oben
   if (spaet.length) h += `<div class="karte" style="border:2px solid var(--achtung);margin-bottom:14px"><b class="rot">⚠ Jemand war schneller</b>
     <p class="klein" style="margin:4px 0 8px">Diese Personen hast du übernommen, aber jemand anderes kurz vor dir. Bitte deine Buchung im Praktikumstool wieder austragen – oder mit der Person sprechen. Danach hier «erledigt».</p>
     <table class="liste"><tbody>${spaet.map((x) => `<tr><td><span class="name" onclick="detailZeigen(REFS[${ref(x.person.id)}])">${esc(x.person.name)}</span></td><td>${esc(praktKurz(x))}</td>
@@ -3909,7 +3910,7 @@ setInterval(() => {
 </script>
 <script>
 /* Neue Version online? Dann Hinweis oben mit «Jetzt neu laden» (der Browser hält die Seite sonst bis 10 Min im Zwischenspeicher) */
-const STAND = "20261112-115104";
+const STAND = "20261112-115521";
 async function standPruefen() {
   if (!/^\d/.test(STAND) || location.protocol === "file:" || document.getElementById("neueVersion")) return;
   try {
